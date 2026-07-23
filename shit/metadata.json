@@ -1,0 +1,279 @@
+{
+  "group_id": "138434b6-7fce-4ca7-b351-ce0a8083030a",
+  "states": [
+    {
+      "character": {
+        "id": "8c13a517-c1c7-4358-9c99-2911bd273737",
+        "name": "Pixel art character sprite, simple",
+        "prompt": "Pixel art character sprite, simple farmer, front-facing idle pose, straw hat, plain overalls or work shirt, rolled-up sleeves, simple round face with minimal features, solid opaque background filling the canvas.  limited color palette (skin tone, denim blue, straw yellow, brown boots), clean pixel-perfect outlines, no anti-aliasing, top-down/front light source, cozy farming game style.",
+        "size": {
+          "width": 104,
+          "height": 104
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-07-21T13:54:18.193573+00:00"
+      },
+      "folder": "Pixel_art_character_sprite_simple",
+      "frames": {
+        "rotations": {
+          "south": "Pixel_art_character_sprite_simple/rotations/south.png",
+          "south-east": "Pixel_art_character_sprite_simple/rotations/south-east.png",
+          "east": "Pixel_art_character_sprite_simple/rotations/east.png",
+          "north-east": "Pixel_art_character_sprite_simple/rotations/north-east.png",
+          "north": "Pixel_art_character_sprite_simple/rotations/north.png",
+          "north-west": "Pixel_art_character_sprite_simple/rotations/north-west.png",
+          "west": "Pixel_art_character_sprite_simple/rotations/west.png",
+          "south-west": "Pixel_art_character_sprite_simple/rotations/south-west.png"
+        },
+        "animations": {
+          "Walking": {
+            "west": [
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/west/frame_005.png"
+            ],
+            "north": [
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north/frame_005.png"
+            ],
+            "east": [
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/east/frame_005.png"
+            ],
+            "south": [
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south/frame_005.png"
+            ],
+            "south-west": [
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-west/frame_005.png"
+            ],
+            "south-east": [
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_000.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_001.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_002.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_003.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_004.png",
+              "Pixel_art_character_sprite_simple/animations/Walking/north-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "4b9ab8d4-bcc8-414c-912e-50b1b67da274",
+        "name": "idle",
+        "prompt": "Pixel art character sprite, simple farmer, front-facing idle pose, straw hat, plain overalls or work shirt, rolled-up sleeves, simple round face with minimal features, solid opaque background filling the canvas.  limited color palette (skin tone, denim blue, straw yellow, brown boots), clean pixel-perfect outlines, no anti-aliasing, top-down/front light source, cozy farming game style.",
+        "size": {
+          "width": 104,
+          "height": 104
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-07-21T14:10:25.635657+00:00"
+      },
+      "folder": "idle",
+      "frames": {
+        "rotations": {
+          "south": "idle/rotations/south.png",
+          "south-east": "idle/rotations/south-east.png",
+          "east": "idle/rotations/east.png",
+          "north-east": "idle/rotations/north-east.png",
+          "north": "idle/rotations/north.png",
+          "north-west": "idle/rotations/north-west.png",
+          "west": "idle/rotations/west.png",
+          "south-west": "idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Breathing_Idle": {
+            "south-west": [
+              "idle/animations/Breathing_Idle/south-west/frame_000.png",
+              "idle/animations/Breathing_Idle/south-west/frame_001.png",
+              "idle/animations/Breathing_Idle/south-west/frame_002.png",
+              "idle/animations/Breathing_Idle/south-west/frame_003.png"
+            ],
+            "south-east": [
+              "idle/animations/Breathing_Idle/south-east/frame_000.png",
+              "idle/animations/Breathing_Idle/south-east/frame_001.png",
+              "idle/animations/Breathing_Idle/south-east/frame_002.png",
+              "idle/animations/Breathing_Idle/south-east/frame_003.png"
+            ],
+            "east": [
+              "idle/animations/Breathing_Idle/east/frame_000.png",
+              "idle/animations/Breathing_Idle/east/frame_001.png",
+              "idle/animations/Breathing_Idle/east/frame_002.png",
+              "idle/animations/Breathing_Idle/east/frame_003.png"
+            ],
+            "north-east": [
+              "idle/animations/Breathing_Idle/north-east/frame_000.png",
+              "idle/animations/Breathing_Idle/north-east/frame_001.png",
+              "idle/animations/Breathing_Idle/north-east/frame_002.png",
+              "idle/animations/Breathing_Idle/north-east/frame_003.png"
+            ],
+            "north": [
+              "idle/animations/Breathing_Idle/north/frame_000.png",
+              "idle/animations/Breathing_Idle/north/frame_001.png",
+              "idle/animations/Breathing_Idle/north/frame_002.png",
+              "idle/animations/Breathing_Idle/north/frame_003.png"
+            ],
+            "north-west": [
+              "idle/animations/Breathing_Idle/north-west/frame_000.png",
+              "idle/animations/Breathing_Idle/north-west/frame_001.png",
+              "idle/animations/Breathing_Idle/north-west/frame_002.png",
+              "idle/animations/Breathing_Idle/north-west/frame_003.png"
+            ],
+            "south": [
+              "idle/animations/Breathing_Idle/south/frame_000.png",
+              "idle/animations/Breathing_Idle/south/frame_001.png",
+              "idle/animations/Breathing_Idle/south/frame_002.png",
+              "idle/animations/Breathing_Idle/south/frame_003.png"
+            ],
+            "west": [
+              "idle/animations/Breathing_Idle/west/frame_000.png",
+              "idle/animations/Breathing_Idle/west/frame_001.png",
+              "idle/animations/Breathing_Idle/west/frame_002.png",
+              "idle/animations/Breathing_Idle/west/frame_003.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "41499f8a-21f3-4293-bcd0-150e767886ea",
+        "name": "run",
+        "prompt": "Pixel art character sprite, simple farmer, front-facing idle pose, straw hat, plain overalls or work shirt, rolled-up sleeves, simple round face with minimal features, solid opaque background filling the canvas.  limited color palette (skin tone, denim blue, straw yellow, brown boots), clean pixel-perfect outlines, no anti-aliasing, top-down/front light source, cozy farming game style.",
+        "size": {
+          "width": 104,
+          "height": 104
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-07-21T14:26:45.672005+00:00"
+      },
+      "folder": "run",
+      "frames": {
+        "rotations": {
+          "south": "run/rotations/south.png",
+          "south-east": "run/rotations/south-east.png",
+          "east": "run/rotations/east.png",
+          "north-east": "run/rotations/north-east.png",
+          "north": "run/rotations/north.png",
+          "north-west": "run/rotations/north-west.png",
+          "west": "run/rotations/west.png",
+          "south-west": "run/rotations/south-west.png"
+        },
+        "animations": {
+          "Running": {
+            "south-west": [
+              "run/animations/Running/south-west/frame_000.png",
+              "run/animations/Running/south-west/frame_001.png",
+              "run/animations/Running/south-west/frame_002.png",
+              "run/animations/Running/south-west/frame_003.png",
+              "run/animations/Running/south-west/frame_004.png",
+              "run/animations/Running/south-west/frame_005.png"
+            ],
+            "north": [
+              "run/animations/Running/north/frame_000.png",
+              "run/animations/Running/north/frame_001.png",
+              "run/animations/Running/north/frame_002.png",
+              "run/animations/Running/north/frame_003.png",
+              "run/animations/Running/north/frame_004.png",
+              "run/animations/Running/north/frame_005.png"
+            ],
+            "east": [
+              "run/animations/Running/east/frame_000.png",
+              "run/animations/Running/east/frame_001.png",
+              "run/animations/Running/east/frame_002.png",
+              "run/animations/Running/east/frame_003.png",
+              "run/animations/Running/east/frame_004.png",
+              "run/animations/Running/east/frame_005.png"
+            ],
+            "west": [
+              "run/animations/Running/west/frame_000.png",
+              "run/animations/Running/west/frame_001.png",
+              "run/animations/Running/west/frame_002.png",
+              "run/animations/Running/west/frame_003.png",
+              "run/animations/Running/west/frame_004.png",
+              "run/animations/Running/west/frame_005.png"
+            ],
+            "south-east": [
+              "run/animations/Running/south-east/frame_000.png",
+              "run/animations/Running/south-east/frame_001.png",
+              "run/animations/Running/south-east/frame_002.png",
+              "run/animations/Running/south-east/frame_003.png",
+              "run/animations/Running/south-east/frame_004.png",
+              "run/animations/Running/south-east/frame_005.png"
+            ],
+            "south": [
+              "run/animations/Running/south/frame_000.png",
+              "run/animations/Running/south/frame_001.png",
+              "run/animations/Running/south/frame_002.png",
+              "run/animations/Running/south/frame_003.png",
+              "run/animations/Running/south/frame_004.png",
+              "run/animations/Running/south/frame_005.png"
+            ],
+            "north-west": [
+              "run/animations/Running/north-west/frame_000.png",
+              "run/animations/Running/north-west/frame_001.png",
+              "run/animations/Running/north-west/frame_002.png",
+              "run/animations/Running/north-west/frame_003.png",
+              "run/animations/Running/north-west/frame_004.png",
+              "run/animations/Running/north-west/frame_005.png"
+            ],
+            "north-east": [
+              "run/animations/Running/north-east/frame_000.png",
+              "run/animations/Running/north-east/frame_001.png",
+              "run/animations/Running/north-east/frame_002.png",
+              "run/animations/Running/north-east/frame_003.png",
+              "run/animations/Running/north-east/frame_004.png",
+              "run/animations/Running/north-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-21T14:36:31.764601"
+}

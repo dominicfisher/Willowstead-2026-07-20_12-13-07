@@ -16,22 +16,30 @@ namespace Willowstead.Input
         public event Action InteractEvent = delegate { };
         public event Action InteractCanceledEvent = delegate { };
         public event Action AttackEvent = delegate { };
+        public event Action AttackCanceledEvent = delegate { };
         public event Action SprintEvent = delegate { };
         public event Action SprintCanceledEvent = delegate { };
         public event Action PreviousEvent = delegate { };
         public event Action NextEvent = delegate { };
 
+        /// <summary>
+        /// When true, every gameplay-emitting callback (Move / Sprint / Attack /
+        /// Interact / Previous / Next) early-returns BEFORE the event is invoked. Set by the dev console while open so background
+        /// WASD, interact-E, hotbar-digits, etc. don't move the character, fire the
+        /// farming tool, or open the Inventory/Shop overlay while the developer is
+        /// typing a command.
+        /// </summary>
+        public static bool BlockGameplayInput;
+
         private InputSystem_Actions _inputActions;
 
         private void OnEnable()
         {
-            Debug.Log("[InputReader] OnEnable called automatically by Unity.");
             EnableGameplayInput();
         }
 
         private void OnDisable()
         {
-            Debug.Log("[InputReader] OnDisable called.");
             DisableGameplayInput();
         }
 
@@ -39,13 +47,22 @@ namespace Willowstead.Input
         {
             if (_inputActions == null)
             {
-                Debug.Log("[InputReader] Instantiating InputSystem_Actions wrapper and setting callbacks.");
                 _inputActions = new InputSystem_Actions();
                 _inputActions.Player.SetCallbacks(this);
             }
-            
+
             _inputActions.Enable();
-            Debug.Log("[InputReader] InputSystem_Actions asset enabled.");
+        }
+
+        public Vector2 GetMoveInput()
+        {
+            if (BlockGameplayInput) return Vector2.zero;
+            if (_inputActions == null) EnableGameplayInput();
+            if (_inputActions != null && _inputActions.Player.enabled)
+            {
+                return _inputActions.Player.Move.ReadValue<Vector2>();
+            }
+            return Vector2.zero;
         }
 
         public void DisableGameplayInput()
@@ -53,21 +70,14 @@ namespace Willowstead.Input
             if (_inputActions != null)
             {
                 _inputActions.Disable();
-                Debug.Log("[InputReader] InputSystem_Actions asset disabled.");
             }
             _inputActions = null; // Clean up so it is re-initialized fresh next time
         }
 
         public void OnMove(InputAction.CallbackContext context)
         {
+            if (BlockGameplayInput) return;
             Vector2 direction = context.ReadValue<Vector2>();
-            
-            // Only log on performed/canceled to avoid spamming every frame, but log when values change
-            if (context.performed || context.canceled)
-            {
-                Debug.Log($"[InputReader] OnMove called. Phase: {context.phase}, Value: {direction}");
-            }
-
             MoveEvent.Invoke(direction);
         }
 
@@ -78,16 +88,20 @@ namespace Willowstead.Input
 
         public void OnAttack(InputAction.CallbackContext context)
         {
-            Debug.Log($"[InputReader] OnAttack called. Phase: {context.phase}");
+            if (BlockGameplayInput) return;
             if (context.phase == InputActionPhase.Performed)
             {
                 AttackEvent.Invoke();
+            }
+            else if (context.phase == InputActionPhase.Canceled)
+            {
+                AttackCanceledEvent.Invoke();
             }
         }
 
         public void OnInteract(InputAction.CallbackContext context)
         {
-            Debug.Log($"[InputReader] OnInteract called. Phase: {context.phase}");
+            if (BlockGameplayInput) return;
             if (context.phase == InputActionPhase.Performed)
             {
                 InteractEvent.Invoke();
@@ -110,6 +124,7 @@ namespace Willowstead.Input
 
         public void OnPrevious(InputAction.CallbackContext context)
         {
+            if (BlockGameplayInput) return;
             if (context.phase == InputActionPhase.Performed)
             {
                 PreviousEvent.Invoke();
@@ -118,6 +133,7 @@ namespace Willowstead.Input
 
         public void OnNext(InputAction.CallbackContext context)
         {
+            if (BlockGameplayInput) return;
             if (context.phase == InputActionPhase.Performed)
             {
                 NextEvent.Invoke();
@@ -126,6 +142,7 @@ namespace Willowstead.Input
 
         public void OnSprint(InputAction.CallbackContext context)
         {
+            if (BlockGameplayInput) return;
             if (context.phase == InputActionPhase.Performed)
             {
                 SprintEvent.Invoke();

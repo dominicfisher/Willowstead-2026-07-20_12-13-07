@@ -65,27 +65,46 @@ namespace Willowstead.World
             _lineRenderer.positionCount = 5;
             _lineRenderer.useWorldSpace = false; // Draw relative to this GameObject's position
             _lineRenderer.loop = true;
-            _lineRenderer.startWidth = 0.05f;
-            _lineRenderer.endWidth = 0.05f;
             _lineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _lineRenderer.receiveShadows = false;
 
-            // Draw a 1x1 square border centered on the cell
-            _lineRenderer.SetPosition(0, new Vector3(-0.5f, -0.5f, 0f));
-            _lineRenderer.SetPosition(1, new Vector3(0.5f, -0.5f, 0f));
-            _lineRenderer.SetPosition(2, new Vector3(0.5f, 0.5f, 0f));
-            _lineRenderer.SetPosition(3, new Vector3(-0.5f, 0.5f, 0f));
-            _lineRenderer.SetPosition(4, new Vector3(-0.5f, -0.5f, 0f));
-
             // Use the standard Sprites shader for clean coloring
             _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+
+            UpdateLineRendererPoints();
+        }
+
+        private void UpdateLineRendererPoints()
+        {
+            if (_lineRenderer == null) return;
+
+            Vector3 cellSize = Vector3.one;
+            if (GridManager.Instance != null)
+            {
+                cellSize = GridManager.Instance.CellSize;
+            }
+
+            float halfX = cellSize.x * 0.5f;
+            float halfY = cellSize.y * 0.5f;
+
+            // Scale outline width relative to the cell size
+            float width = 0.05f * cellSize.x;
+            _lineRenderer.startWidth = width;
+            _lineRenderer.endWidth = width;
+
+            // Draw a square border centered on the cell
+            _lineRenderer.SetPosition(0, new Vector3(-halfX, -halfY, 0f));
+            _lineRenderer.SetPosition(1, new Vector3(halfX, -halfY, 0f));
+            _lineRenderer.SetPosition(2, new Vector3(halfX, halfY, 0f));
+            _lineRenderer.SetPosition(3, new Vector3(-halfX, halfY, 0f));
+            _lineRenderer.SetPosition(4, new Vector3(-halfX, -halfY, 0f));
         }
 
         private void Update()
         {
             // Block grid selector updates and hide box when mouse is over UI elements (Shop/Inventory)
             // Checks EventSystem raycast first, and uses direct RectTransform bounding box calculations as a bulletproof fallback.
-            if ((EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) || IsMouseOverUIPanel())
+            if (Player.UIResourceHelper.IsPointerOverAnyUI())
             {
                 if (_lineRenderer != null) _lineRenderer.enabled = false;
                 _isCellInRange = false;
@@ -99,6 +118,8 @@ namespace Willowstead.World
             }
 
             if (GridManager.Instance == null) return;
+
+            UpdateLineRendererPoints();
 
             // 1. Get mouse position in world coordinates
             Vector3 mouseWorldPos = Vector3.zero;
@@ -131,34 +152,5 @@ namespace Willowstead.World
             _lineRenderer.endColor = targetColor;
         }
 
-        private bool IsMouseOverUIPanel()
-        {
-            if (UnityEngine.InputSystem.Mouse.current == null) return false;
-            Vector2 mouseScreenPos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
-
-            // Check ShopPanel bounds
-            GameObject shopPanel = GameObject.Find("ShopPanel");
-            if (shopPanel != null && shopPanel.activeInHierarchy)
-            {
-                RectTransform rect = shopPanel.GetComponent<RectTransform>();
-                if (rect != null && RectTransformUtility.RectangleContainsScreenPoint(rect, mouseScreenPos, null))
-                {
-                    return true;
-                }
-            }
-
-            // Check InventoryPanel bounds
-            GameObject invPanel = GameObject.Find("InventoryPanel");
-            if (invPanel != null && invPanel.activeInHierarchy)
-            {
-                RectTransform rect = invPanel.GetComponent<RectTransform>();
-                if (rect != null && RectTransformUtility.RectangleContainsScreenPoint(rect, mouseScreenPos, null))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }

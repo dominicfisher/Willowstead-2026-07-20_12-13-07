@@ -35,10 +35,14 @@ namespace Willowstead.World
 
         // Tracks active crops spawned in the world, keyed by their grid coordinate.
         private Dictionary<Vector3Int, Farming.Crop> _activeCrops = new Dictionary<Vector3Int, Farming.Crop>();
-        
-        // Tracks which cells have tilled dirt and their watered state.
+
+        // Tracks which cells have tilled dirt, their watered state, and 3-stage moisture levels (0=Dry, 1=Moist, 2=Wet).
+        /// <summary>Day counter; bumped inside AdvanceDay() whenever a midnight rollover happens.</summary>
+        public int CurrentDay { get; private set; }
+
         private HashSet<Vector3Int> _tilledCells = new HashSet<Vector3Int>();
         private HashSet<Vector3Int> _wateredCells = new HashSet<Vector3Int>();
+        private Dictionary<Vector3Int, int> _moistureLevels = new Dictionary<Vector3Int, int>();
 
         [Header("Farmland Edges")]
         [Tooltip("The grass sprites used to decorate and soften the clean edges of tilled soil.")]
@@ -51,11 +55,137 @@ namespace Willowstead.World
         [Tooltip("Maximum scale for the grass fringe sprigs.")]
         [SerializeField] private float _fringeScaleMax = 0.38f;
 
-        [Tooltip("Distance offset from the tile center to place the fringe. Higher values push grass further outwards.")]
-        [SerializeField] private float _fringeBoundaryOffset = 0.55f;
-
         // Tracks the spawned edge fringe GameObjects, keyed by the cell position that owns them.
         private Dictionary<Vector3Int, System.Collections.Generic.List<GameObject>> _edgeFringes = new Dictionary<Vector3Int, System.Collections.Generic.List<GameObject>>();
+
+        // ─── Save / load hooks ───────────────────────────────────────────
+        public List<Willowstead.Persistence.Vector3IntRecord> CaptureTilledCells()
+        {
+            var list = new List<Willowstead.Persistence.Vector3IntRecord>(_tilledCells.Count);
+            foreach (var c in _tilledCells) list.Add(new Willowstead.Persistence.Vector3IntRecord(c));
+            return list;
+        }
+
+        public List<Willowstead.Persistence.Vector3IntRecord> CaptureWateredCells()
+        {
+            var list = new List<Willowstead.Persistence.Vector3IntRecord>(_wateredCells.Count);
+            foreach (var c in _wateredCells) list.Add(new Willowstead.Persistence.Vector3IntRecord(c));
+            return list;
+        }
+
+        public List<Willowstead.Persistence.SavedMoisture> CaptureMoistureLevels()
+        {
+            var list = new List<Willowstead.Persistence.SavedMoisture>(_moistureLevels.Count);
+            foreach (var kvp in _moistureLevels)
+            {
+                list.Add(new Willowstead.Persistence.SavedMoisture
+                {
+                    cell = new Willowstead.Persistence.Vector3IntRecord(kvp.Key),
+                    level = kvp.Value,
+                });
+            }
+            return list;
+        }
+
+        public List<Willowstead.Persistence.SavedCrop> CaptureCrops()
+        {
+            var list = new List<Willowstead.Persistence.SavedCrop>();
+            foreach (var kvp in _activeCrops)
+            {
+                Farming.Crop crop = kvp.Value;
+                if (crop == null || crop.Data == null) continue;
+                list.Add(new Willowstead.Persistence.SavedCrop
+                {
+                    cell = new Willowstead.Persistence.Vector3IntRecord(kvp.Key),
+                    cropDataName = crop.Data.name,
+                    currentStage = crop.CurrentStage,
+                    daysInCurrentStage = 0,
+                    visualsCount = crop.VisualsCount,
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Apply all grid state from a save. Bypasses SoilPopAnimator and
+        /// sets the tilemap tile instantly so a load doesn't replay
+        /// animations the player has already seen. Crops are respawned
+        /// directly to their saved stage via PlantCropFromSave.
+        /// </summary>
+        public void RestoreGridState(Willowstead.Persistence.SaveData data)
+        {
+            if (data == null) return;
+            if (data.currentDay > 0) CurrentDay = data.currentDay;
+
+            for (int i = 0; i < data.tilledCells.Count; i++)
+            {
+                Vector3Int cell = data.tilledCells[i].ToVector3Int();
+                if (ProceduralGridGenerator.Instance != null)
+                    ProceduralGridGenerator.Instance.ClearGrassAt(cell);
+                _tilledCells.Add(cell);
+                _moistureLevels[cell] = 0;
+                if (_farmingTilemap != null && _tilledTile != null)
+                    _farmingTilemap.SetTile(cell, _tilledTile);
+            }
+
+            for (int i = 0; i < data.wateredCells.Count; i++)
+            {
+                Vector3Int cell = data.wateredCells[i].ToVector3Int();
+                _wateredCells.Add(cell);
+                _moistureLevels[cell] = 2;
+            }
+
+            for (int i = 0; i < data.moistureLevels.Count; i++)
+            {
+                var m = data.moistureLevels[i];
+                if (m == null || m.cell == null) continue;
+                Vector3Int cell = m.cell.ToVector3Int();
+                _moistureLevels[cell] = Mathf.Clamp(m.level, 0, 2);
+                if (m.level > 0) _wateredCells.Add(cell);
+            }
+
+            if (_farmingTilemap != null)
+                foreach (var cell in _tilledCells) RefreshFarmingNeighbours(cell);
+
+            foreach (var cell in _tilledCells) UpdateEdgeFringesAround(cell);
+
+            for (int i = 0; i < data.crops.Count; i++)
+            {
+                var sc = data.crops[i];
+                if (sc == null || sc.cell == null) continue;
+                Vector3Int cell = sc.cell.ToVector3Int();
+                Farming.CropData data2 = FindCropDataByName(sc.cropDataName);
+                if (data2 == null) continue;
+                PlantCropFromSave(cell, data2, sc.currentStage, sc.visualsCount);
+            }
+        }
+
+        private static Farming.CropData FindCropDataByName(string dataName)
+        {
+            if (string.IsNullOrEmpty(dataName)) return null;
+            var all = Resources.FindObjectsOfTypeAll<Farming.CropData>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].name == dataName) return all[i];
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Respawn a saved crop straight to its visual stage without
+        /// retriggering growth pop-ups. Synthesizes a fresh GameObject if
+        /// no prefab reference exists, so a save always loads cleanly.
+        /// </summary>
+        private void PlantCropFromSave(Vector3Int cell, Farming.CropData cropData, int currentStage, int visualsCount)
+        {
+            if (HasCrop(cell)) return;
+            GameObject cropGo = new GameObject($"Crop_{cell.x}_{cell.y}");
+            cropGo.transform.position = CellToWorldCenter(cell);
+            Farming.Crop crop = cropGo.AddComponent<Farming.Crop>();
+            crop.Initialize(cropData, cell);
+            _activeCrops.Add(cell, crop);
+            crop.ForceStage(currentStage, visualsCount);
+        }
 
         private void Awake()
         {
@@ -89,6 +219,18 @@ namespace Willowstead.World
         }
 
         /// <summary>
+        /// Exposes the cell size of the Grid component.
+        /// </summary>
+        public Vector3 CellSize
+        {
+            get
+            {
+                if (_grid != null) return _grid.cellSize;
+                return Vector3.one;
+            }
+        }
+
+        /// <summary>
         /// Check if a cell is tilled soil.
         /// </summary>
         public bool IsCellTilled(Vector3Int cellPosition)
@@ -102,6 +244,18 @@ namespace Willowstead.World
         public bool IsCellWatered(Vector3Int cellPosition)
         {
             return _wateredCells.Contains(cellPosition);
+        }
+
+        /// <summary>
+        /// Gets the moisture level for a grid cell (0 = Dry, 1 = Moist, 2 = Wet).
+        /// </summary>
+        public int GetMoistureLevel(Vector3Int cellPosition)
+        {
+            if (_moistureLevels.TryGetValue(cellPosition, out int moisture))
+            {
+                return moisture;
+            }
+            return 0;
         }
 
         /// <summary>
@@ -128,13 +282,33 @@ namespace Willowstead.World
         {
             if (_tilledCells.Contains(cellPosition)) return;
 
-            _tilledCells.Add(cellPosition);
-            
-            // Extract the sprite from the Tile asset
-            Sprite soilSprite = null;
-            if (_tilledTile != null && _tilledTile is Tile tile)
+            // Disallow hoeing on water/puddle tiles
+            if (ProceduralGridGenerator.Instance != null && ProceduralGridGenerator.Instance.HasPuddleAt(cellPosition))
             {
-                soilSprite = tile.sprite;
+#if UNITY_EDITOR
+                Debug.Log($"[GridManager] Cannot hoe here: water/puddle occupies this tile at {cellPosition}.");
+#endif
+                return;
+            }
+
+            // Convert grass tile to bare dirt underneath
+            if (ProceduralGridGenerator.Instance != null)
+            {
+                ProceduralGridGenerator.Instance.ClearGrassAt(cellPosition);
+            }
+
+            _tilledCells.Add(cellPosition);
+            _moistureLevels[cellPosition] = 0; // 0 = Dry (Blue block)
+
+            // Extract a preview sprite for the pop animation
+            Sprite soilSprite = null;
+            if (_tilledTile is PlowedDirtAutoTile autoTile)
+            {
+                soilSprite = autoTile.DryIsolatedSprite;
+            }
+            else if (_tilledTile is Tile standardTile)
+            {
+                soilSprite = standardTile.sprite;
             }
 
             if (soilSprite != null)
@@ -142,7 +316,7 @@ namespace Willowstead.World
                 // Instantiate the visual pop animator at the cell's world position
                 GameObject animGo = new GameObject("SoilPopAnimation");
                 animGo.transform.position = CellToWorldCenter(cellPosition);
-                
+
                 SoilPopAnimator animator = animGo.AddComponent<SoilPopAnimator>();
                 animator.Initialize(soilSprite, _dirtParticleSprite, _dirtColor, () =>
                 {
@@ -150,6 +324,7 @@ namespace Willowstead.World
                     if (_farmingTilemap != null && _tilledTile != null)
                     {
                         _farmingTilemap.SetTile(cellPosition, _tilledTile);
+                        RefreshFarmingNeighbours(cellPosition);
                     }
                 });
             }
@@ -159,9 +334,10 @@ namespace Willowstead.World
                 if (_farmingTilemap != null && _tilledTile != null)
                 {
                     _farmingTilemap.SetTile(cellPosition, _tilledTile);
+                    RefreshFarmingNeighbours(cellPosition);
                 }
             }
-            
+
             // Update edge fringes for this tile and its 4 neighbors
             UpdateEdgeFringesAround(cellPosition);
             UpdateEdgeFringesAround(cellPosition + new Vector3Int(1, 0, 0));
@@ -169,7 +345,9 @@ namespace Willowstead.World
             UpdateEdgeFringesAround(cellPosition + new Vector3Int(0, 1, 0));
             UpdateEdgeFringesAround(cellPosition + new Vector3Int(0, -1, 0));
 
+#if UNITY_EDITOR
             Debug.Log($"[GridManager] Tilled tile at: {cellPosition}");
+#endif
         }
 
         private void UpdateEdgeFringesAround(Vector3Int cell)
@@ -180,65 +358,151 @@ namespace Willowstead.World
             // Fringes are only owned by tilled cells
             if (!_tilledCells.Contains(cell)) return;
 
-            Vector3Int[] directions = new Vector3Int[]
-            {
-                new Vector3Int(1, 0, 0),   // Right
-                new Vector3Int(-1, 0, 0),  // Left
-                new Vector3Int(0, 1, 0),   // Up
-                new Vector3Int(0, -1, 0)   // Down
-            };
+            bool tilledN = _tilledCells.Contains(cell + new Vector3Int(0, 1, 0));
+            bool tilledS = _tilledCells.Contains(cell + new Vector3Int(0, -1, 0));
+            bool tilledE = _tilledCells.Contains(cell + new Vector3Int(1, 0, 0));
+            bool tilledW = _tilledCells.Contains(cell + new Vector3Int(-1, 0, 0));
 
             System.Collections.Generic.List<GameObject> cellFringes = new System.Collections.Generic.List<GameObject>();
+            Vector3 cellWorldPos = CellToWorldCenter(cell);
 
-            foreach (var dir in directions)
+            // Get dynamic cell size to scale placement and graphics
+            Vector3 cellSize = CellSize;
+            float scaleX = cellSize.x;
+            float scaleY = cellSize.y;
+
+            // Helper to spawn a single grass fringe tuft
+            System.Action<Vector3, float> spawnTuft = (pos, sizeMult) =>
             {
-                Vector3Int neighbor = cell + dir;
-                // If neighbor is NOT tilled, we spawn grass edge overlays
-                if (!_tilledCells.Contains(neighbor))
+                if (_grassFringeSprites == null || _grassFringeSprites.Length == 0) return;
+
+                GameObject tuftGo = new GameObject("GrassEdgeFringe");
+                tuftGo.transform.parent = transform;
+                tuftGo.transform.position = pos;
+
+                // Scale the sprite physically to match the grid cell size
+                float scale = Random.Range(_fringeScaleMin, _fringeScaleMax) * sizeMult * scaleX;
+                tuftGo.transform.localScale = new Vector3(scale, scale, 1f);
+
+                SpriteRenderer sr = tuftGo.AddComponent<SpriteRenderer>();
+                sr.sprite = _grassFringeSprites[Random.Range(0, _grassFringeSprites.Length)];
+
+                // Dynamic sorting order so grass draws in front of the tilemap but correctly sorts with player
+                sr.sortingOrder = Mathf.RoundToInt(-pos.y * 100) - 5;
+                sr.color = Color.white;
+                sr.flipX = Random.value > 0.5f;
+
+                cellFringes.Add(tuftGo);
+            };
+
+            // Detect if isolated 1x1 tile
+            bool isIsolated = !tilledN && !tilledS && !tilledE && !tilledW;
+
+            if (isIsolated)
+            {
+                // Circular ring of 8 tufts around the cell, pulled in slightly
+                for (int angleDeg = 0; angleDeg < 360; angleDeg += 45)
                 {
-                    int tuftCount = Random.Range(2, 4); // 2 or 3 tufts
-                    Vector3 cellWorldPos = CellToWorldCenter(cell);
-                    Vector3 boundaryCenter = cellWorldPos + (Vector3)dir * _fringeBoundaryOffset;
+                    float angleRad = angleDeg * Mathf.Deg2Rad;
+                    float currentOffset = 0.44f;
 
-                    for (int i = 0; i < tuftCount; i++)
+                    // Push South-facing angles down to preserve bottom overhang
+                    if (angleDeg == 225 || angleDeg == 270 || angleDeg == 315)
                     {
-                        GameObject tuftGo = new GameObject("GrassEdgeFringe");
-                        tuftGo.transform.parent = transform;
+                        currentOffset = 0.68f;
+                    }
 
-                        // Space out along the boundary line
-                        float offsetPercent = (tuftCount > 1) ? ((float)i / (tuftCount - 1) - 0.5f) : 0f;
-                        float distOffset = offsetPercent * 0.45f;
+                    Vector3 pos = cellWorldPos + new Vector3(Mathf.Cos(angleRad) * currentOffset * scaleX, Mathf.Sin(angleRad) * currentOffset * scaleY, 0f);
+                    spawnTuft(pos, 0.95f);
+                }
+            }
+            else
+            {
+                // 1. STRAIGHT EDGES
+                // North edge
+                if (!tilledN && tilledE && tilledW)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float t = (i / 2.0f) - 0.5f;
+                        Vector3 pos = cellWorldPos + new Vector3(t * 0.7f * scaleX, 0.45f * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // South edge (keep tile overhang!)
+                if (!tilledS && tilledE && tilledW)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float t = (i / 2.0f) - 0.5f;
+                        Vector3 pos = cellWorldPos + new Vector3(t * 0.7f * scaleX, -0.68f * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // East edge (pulled inward to overlap the seam)
+                if (!tilledE && tilledN && tilledS)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float t = (i / 2.0f) - 0.5f;
+                        Vector3 pos = cellWorldPos + new Vector3(0.42f * scaleX, t * 0.7f * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // West edge (pulled inward to overlap the seam)
+                if (!tilledW && tilledN && tilledS)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float t = (i / 2.0f) - 0.5f;
+                        Vector3 pos = cellWorldPos + new Vector3(-0.42f * scaleX, t * 0.7f * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
 
-                        Vector3 position = boundaryCenter;
-                        if (dir.x != 0) // Vertical boundary
-                        {
-                            position.y += distOffset + Random.Range(-0.06f, 0.06f);
-                            position.x += Random.Range(-0.05f, 0.05f);
-                        }
-                        else // Horizontal boundary
-                        {
-                            position.x += distOffset + Random.Range(-0.06f, 0.06f);
-                            position.y += Random.Range(-0.05f, 0.05f);
-                        }
-
-                        tuftGo.transform.position = position;
-
-                        // Scale down slightly so they look like small edge fringes
-                        float scale = Random.Range(_fringeScaleMin, _fringeScaleMax);
-                        tuftGo.transform.localScale = new Vector3(scale, scale, 1f);
-
-                        SpriteRenderer sr = tuftGo.AddComponent<SpriteRenderer>();
-                        if (_grassFringeSprites != null && _grassFringeSprites.Length > 0)
-                        {
-                            sr.sprite = _grassFringeSprites[Random.Range(0, _grassFringeSprites.Length)];
-                        }
-                        
-                        // Draw on top of soil (-100) but below crops/player
-                        sr.sortingOrder = -90;
-                        sr.color = Color.white;
-                        sr.flipX = Random.value > 0.5f;
-
-                        cellFringes.Add(tuftGo);
+                // 2. CORNERS (ROUNDED CLUSTERS)
+                // Northwest Corner (NW)
+                if (!tilledN && !tilledW)
+                {
+                    for (int angleDeg = 90; angleDeg <= 180; angleDeg += 45)
+                    {
+                        float rad = angleDeg * Mathf.Deg2Rad;
+                        float offset = (angleDeg == 90) ? 0.45f : ((angleDeg == 180) ? 0.42f : 0.44f);
+                        Vector3 pos = cellWorldPos + new Vector3(Mathf.Cos(rad) * offset * scaleX, Mathf.Sin(rad) * offset * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // Northeast Corner (NE)
+                if (!tilledN && !tilledE)
+                {
+                    for (int angleDeg = 0; angleDeg <= 90; angleDeg += 45)
+                    {
+                        float rad = angleDeg * Mathf.Deg2Rad;
+                        float offset = (angleDeg == 90) ? 0.45f : ((angleDeg == 0) ? 0.42f : 0.44f);
+                        Vector3 pos = cellWorldPos + new Vector3(Mathf.Cos(rad) * offset * scaleX, Mathf.Sin(rad) * offset * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // Southwest Corner (SW) - South-facing parts pushed down!
+                if (!tilledS && !tilledW)
+                {
+                    for (int angleDeg = 180; angleDeg <= 270; angleDeg += 45)
+                    {
+                        float rad = angleDeg * Mathf.Deg2Rad;
+                        float offset = (angleDeg == 180) ? 0.42f : ((angleDeg == 270) ? 0.68f : 0.55f);
+                        Vector3 pos = cellWorldPos + new Vector3(Mathf.Cos(rad) * offset * scaleX, Mathf.Sin(rad) * offset * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
+                    }
+                }
+                // Southeast Corner (SE) - South-facing parts pushed down!
+                if (!tilledS && !tilledE)
+                {
+                    for (int angleDeg = 270; angleDeg <= 360; angleDeg += 45)
+                    {
+                        float rad = angleDeg * Mathf.Deg2Rad;
+                        float offset = (angleDeg == 360 || angleDeg == 0) ? 0.42f : ((angleDeg == 270) ? 0.68f : 0.55f);
+                        Vector3 pos = cellWorldPos + new Vector3(Mathf.Cos(rad) * offset * scaleX, Mathf.Sin(rad) * offset * scaleY, 0f);
+                        spawnTuft(pos, 1.0f);
                     }
                 }
             }
@@ -264,28 +528,70 @@ namespace Willowstead.World
             }
         }
 
+        private void RefreshFarmingNeighbours(Vector3Int cellPosition)
+        {
+            if (_farmingTilemap == null) return;
+            _farmingTilemap.RefreshTile(cellPosition);
+            _farmingTilemap.RefreshTile(cellPosition + Vector3Int.up);
+            _farmingTilemap.RefreshTile(cellPosition + Vector3Int.down);
+            _farmingTilemap.RefreshTile(cellPosition + Vector3Int.left);
+            _farmingTilemap.RefreshTile(cellPosition + Vector3Int.right);
+        }
+
         /// <summary>
         /// Waters the ground at the specified cell.
         /// </summary>
         public void WaterTile(Vector3Int cellPosition)
         {
             if (!_tilledCells.Contains(cellPosition)) return; // Only tilled soil can be watered
-            if (_wateredCells.Contains(cellPosition)) return;
 
             _wateredCells.Add(cellPosition);
+            _moistureLevels[cellPosition] = 2; // 2 = Wet (Yellow block)
 
-            if (_farmingTilemap != null && _wateredTile != null)
+            if (_farmingTilemap != null)
             {
-                _farmingTilemap.SetTile(cellPosition, _wateredTile);
-            }
-            else if (_farmingTilemap != null)
-            {
-                // Fallback: darken the tile color to show it is wet
-                _farmingTilemap.SetTileFlags(cellPosition, TileFlags.None);
-                _farmingTilemap.SetColor(cellPosition, new Color(0.5f, 0.5f, 0.5f, 1f));
+                RefreshFarmingNeighbours(cellPosition);
             }
 
+#if UNITY_EDITOR
             Debug.Log($"[GridManager] Watered tile at: {cellPosition}");
+#endif
+        }
+
+        /// <summary>
+        /// Increments the moisture level of a tilled tile by 1 (capped at Wet=2).
+        /// Called by RainSplash to nudge soil wetness toward Wet during a
+        /// storm without bypassing the player's manual watering action.
+        /// Non-tilled cells are silently ignored.
+        /// </summary>
+        public void IncreaseMoistureFromRain(Vector3Int cellPosition)
+        {
+            if (!_tilledCells.Contains(cellPosition)) return;
+
+            int current = 0;
+            _moistureLevels.TryGetValue(cellPosition, out current);
+            int next = Mathf.Min(2, current + 1);
+
+            // Avoid the RefreshTile syscall every drop — only when crossing into Wet
+            // does the visual state really change. (Dry=0, Moist=1, Wet=2).
+            if (next == current) return;
+
+            _moistureLevels[cellPosition] = next;
+
+            if (next >= 2 && !_wateredCells.Contains(cellPosition))
+            {
+                _wateredCells.Add(cellPosition);
+                if (_farmingTilemap != null)
+                {
+                    RefreshFarmingNeighbours(cellPosition);
+                }
+            }
+            else if (_farmingTilemap != null && _tilledTile is PlowedDirtAutoTile)
+            {
+                // Moist-but-not-Wet cells still benefit from a refresh so the
+                // PlowedDirtAutoTile can re-pick its Moist variant. Cheap enough.
+                RefreshFarmingNeighbours(cellPosition);
+            }
         }
 
         /// <summary>
@@ -295,20 +601,24 @@ namespace Willowstead.World
         {
             if (!IsCellTilled(cellPosition))
             {
-                Debug.LogWarning("[GridManager] Cannot plant crop: Ground must be tilled first.");
+#if UNITY_EDITOR
+                Debug.LogWarning($"[GridManager] Cannot plant crop at {cellPosition}: ground must be tilled first.");
+#endif
                 return false;
             }
 
             if (HasCrop(cellPosition))
             {
-                Debug.LogWarning("[GridManager] Cannot plant crop: A crop already exists here.");
+#if UNITY_EDITOR
+                Debug.LogWarning($"[GridManager] Cannot plant crop at {cellPosition}: a crop already exists here.");
+#endif
                 return false;
             }
 
             // Spawn the crop prefab at the center of the cell
             Vector3 worldPos = CellToWorldCenter(cellPosition);
             GameObject cropGo = Instantiate(cropPrefab, worldPos, Quaternion.identity, transform);
-            
+
             Farming.Crop cropComponent = cropGo.GetComponent<Farming.Crop>();
             if (cropComponent == null)
             {
@@ -318,7 +628,9 @@ namespace Willowstead.World
             cropComponent.Initialize(cropData, cellPosition);
             _activeCrops.Add(cellPosition, cropComponent);
 
+#if UNITY_EDITOR
             Debug.Log($"[GridManager] Planted {cropData.CropName} at: {cellPosition}. Total individual crops growing in the world: {GetTotalCropsPlanted()}");
+#endif
             return true;
         }
 
@@ -340,12 +652,15 @@ namespace Willowstead.World
 
         /// <summary>
         /// Simulates a day passing, advancing crop growth and drying out watered soil.
+        /// Also see AdvanceHalfDayGrowthTick for a midday growth-only tick.
         /// </summary>
         public void AdvanceDay()
         {
+#if UNITY_EDITOR
             Debug.Log("[GridManager] A new day begins!");
+#endif
 
-            // Grow crops
+            // Grow crops (midnight tick)
             foreach (var kvp in _activeCrops)
             {
                 Vector3Int cell = kvp.Key;
@@ -355,24 +670,50 @@ namespace Willowstead.World
                 crop.Grow(isWatered);
             }
 
-            // Dry the soil
+            // Decay soil moisture levels: Wet (2) -> Moist (1) -> Dry (0)
             _wateredCells.Clear();
+
+            List<Vector3Int> keys = new List<Vector3Int>(_moistureLevels.Keys);
+            foreach (Vector3Int cell in keys)
+            {
+                int currentMoisture = _moistureLevels[cell];
+                if (currentMoisture > 0)
+                {
+                    int nextMoisture = currentMoisture - 1;
+                    _moistureLevels[cell] = nextMoisture;
+
+                    if (nextMoisture > 0)
+                    {
+                        _wateredCells.Add(cell);
+                    }
+                }
+            }
 
             if (_farmingTilemap != null)
             {
-                foreach (Vector3Int cell in _tilledCells)
-                {
-                    // Revert tile back to dry tilled tile
-                    if (_tilledTile != null)
-                    {
-                        _farmingTilemap.SetTile(cell, _tilledTile);
-                    }
-                    else
-                    {
-                        // Reset fallback color
-                        _farmingTilemap.SetColor(cell, Color.white);
-                    }
-                }
+            foreach (Vector3Int cell in _tilledCells)
+            {
+                RefreshFarmingNeighbours(cell);
+                _moistureLevels[cell] = Mathf.Max(0, _moistureLevels[cell] - 1);
+                if (_moistureLevels[cell] > 0) _wateredCells.Add(cell);
+            }
+            }
+
+            CurrentDay++;
+        }
+
+        /// <summary>
+        /// Midday growth-only tick. Advances crops once based on current watered state
+        /// but does not change moisture/tiles. Call this around noon for half-day growth.
+        /// </summary>
+        public void AdvanceHalfDayGrowthTick()
+        {
+            foreach (var kvp in _activeCrops)
+            {
+                Vector3Int cell = kvp.Key;
+                Farming.Crop crop = kvp.Value;
+                bool isWatered = _wateredCells.Contains(cell) || (_moistureLevels.TryGetValue(cell, out int m) && m > 0);
+                crop.Grow(isWatered);
             }
         }
 
@@ -384,7 +725,9 @@ namespace Willowstead.World
             if (_activeCrops.ContainsKey(cellPosition))
             {
                 _activeCrops.Remove(cellPosition);
+#if UNITY_EDITOR
                 Debug.Log($"[GridManager] Crop harvested from: {cellPosition}. Total individual crops remaining in the world: {GetTotalCropsPlanted()}");
+#endif
             }
         }
     }

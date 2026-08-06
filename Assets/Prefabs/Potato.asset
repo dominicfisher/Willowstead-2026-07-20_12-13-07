@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7ca81f43f0bbe349b823492dd2835de, type: 3}
+  m_Name: Potato
+  m_EditorClassIdentifier: Assembly-CSharp::Willowstead.Farming.CropData
+  _cropName: Potato_seeds
+  _daysPerStage: 1
+  _growthStageSprites:
+  - {fileID: 8841213502578443225, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: 6744120113952542574, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: -5717444845911847329, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: -7564258813612767315, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  _seedIcon: {fileID: -8740812437999632262, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  _yieldItemName: Potato_item
+  _yieldCount: 1
+  _layoutMode: 1
+  _minVisualsPerTile: 1
+  _maxVisualsPerTile: 1
+  _scatterRadius: 0.22
+  _randomJitter: 0.05
+  _minScale: 0.8
+  _maxScale: 1.2
+  _allowHorizontalFlip: 1

@@ -5,11 +5,25 @@ namespace Willowstead.Player
 {
     /// <summary>
     /// Handles the visual display of the permanent Hotbar HUD at the bottom of the screen.
-    /// Programmatically constructs a clean, rounded Hotbar panel and slots using Unity's built-in sprites,
-    /// with smooth selection zoom scale animations and real-time count updates.
+    /// Programmatically constructs an 8-slot Hotbar panel, rendering items from slots 0-7,
+    /// and updates highlights based on the FarmingController selection.
     /// </summary>
     public class HotbarUI : MonoBehaviour
     {
+        [Header("Prefab Mode")]
+        [Tooltip("If true (default), the script binds to scene/prefab UI that you author — drag your canvas/prefab GameObjects into the matching _prefab* fields below. If false, the script builds the hotbar in code at runtime (the previous behaviour).")]
+        [SerializeField] private bool _usePrefabLayout = true;
+        [Tooltip("Root panel RectTransform for the Hotbar (already placed in scene/prefab).")]
+        [SerializeField] private RectTransform _prefabHotbarRoot;
+        [Tooltip("Container whose children are the 8 hotbar slot RectTransforms (order = slots 0..7).")]
+        [SerializeField] private Transform _prefabSlotsRoot;
+
+        [Header("Theme Sprites")]
+        [Tooltip("Optional: Hotbar frame/background sprite. If 9-sliced, set borders in Sprite Editor.")]
+        [SerializeField] private Sprite _hotbarFrameSprite;
+        [Tooltip("Optional: Slot background sprite. If 9-sliced, set borders in Sprite Editor.")]
+        [SerializeField] private Sprite _slotBackgroundSprite;
+
         [Header("Assets")]
         [Tooltip("The icon to represent the Hoe.")]
         [SerializeField] private Sprite _hoeIcon;
@@ -18,40 +32,109 @@ namespace Willowstead.Player
         [SerializeField] private Sprite _wateringCanIcon;
 
         [Tooltip("The icon to represent the seed item (e.g. CarrotSeed.png).")]
-        [SerializeField] private Sprite _seedIcon;
-
-        [Tooltip("The icon to represent the harvested crop item (e.g. Carrot.png).")]
+        [SerializeField] private Sprite _seedIcon;        [Tooltip("The icon to represent the harvested crop item (e.g. Carrot.png).")]
         [SerializeField] private Sprite _carrotIcon;
+
+        [Tooltip("The icon to represent the Axe tool.")]
+        [SerializeField] private Sprite _axeIcon;
+
+        [Tooltip("The icon to represent a stack of Logs.")]
+        [SerializeField] private Sprite _logIcon;
+
+        [System.Serializable] public class HotbarIconEntry
+        {
+            [Tooltip("Inventory item name, e.g. 'Potato Seeds' or 'Potato'.")]
+            public string itemName;
+            public Sprite icon;
+        }
+
+        [Header("Crop & Seed Icons")]
+        [Tooltip("Map every seed and harvested crop item name to its icon. Add one entry per item.")]
+        [SerializeField] private HotbarIconEntry[] _itemIcons = new HotbarIconEntry[0];
 
         private InventoryManager _inventory;
         private Farming.FarmingController _farmingController;
-        
+
         private GameObject _canvasGo;
         private GameObject _hotbarGo;
-        
+
         private RectTransform[] _slotTransforms;
         private Image[] _slotHighlights;
-        private Text _seedCountText;
-        private Text _carrotCountText;
+        private Image[] _slotIconImages;
+        private Text[] _slotCountTexts;
 
         /// <summary>
-        /// Returns the RectTransform of the Carrot Seeds slot (Slot index 2).
+        /// Returns the RectTransform of the slot currently holding Carrot Seeds.
+        /// Falls back to Slot 2 if not found.
         /// </summary>
-        public RectTransform SeedSlotRect => (_slotTransforms != null && _slotTransforms.Length > 2) ? _slotTransforms[2] : null;
+        public RectTransform SeedSlotRect
+        {
+            get
+            {
+                if (_inventory != null && _slotTransforms != null)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        var slot = _inventory.GetSlotItem(i);
+                        if (slot != null && slot.itemName == "Carrot Seeds") return _slotTransforms[i];
+                    }
+                }
+                return (_slotTransforms != null && _slotTransforms.Length > 2) ? _slotTransforms[2] : null;
+            }
+        }
 
-        /// <summary>
-        /// Returns the RectTransform of the Carrot crop slot (Slot index 3).
-        /// </summary>
-        public RectTransform CarrotSlotRect => (_slotTransforms != null && _slotTransforms.Length > 3) ? _slotTransforms[3] : null;
+        /// Returns the RectTransform of the hotbar slot that holds the given item name.
+        /// Falls back to slot 3 if not found.
+        public RectTransform GetSlotRectForItem(string itemName)
+        {
+            if (_inventory != null && _slotTransforms != null)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    var slot = _inventory.GetSlotItem(i);
+                    if (slot != null && slot.itemName == itemName)
+                        return _slotTransforms[i];
+                }
+            }
+            return (_slotTransforms != null && _slotTransforms.Length > 3) ? _slotTransforms[3] : null;
+        }
+
+        /// Backward-compat alias.
+        public RectTransform CarrotSlotRect => GetSlotRectForItem("Carrot");
 
 #if UNITY_EDITOR
-        private void OnValidate()
+    private void OnValidate()
+    {
+        // Helper: pick the largest sub-sprite from a multi-sprite texture (e.g., frames atlases)
+        Sprite LoadLargestSprite(string path)
         {
-            if (_hoeIcon == null) _hoeIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Hoe.png");
-            if (_wateringCanIcon == null) _wateringCanIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Watering can.png");
-            if (_seedIcon == null) _seedIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/CarrotSeed.png");
-            if (_carrotIcon == null) _carrotIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Carrot.png");
+            var all = UnityEditor.AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+            Sprite best = null; float bestArea = -1f;
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] is Sprite s)
+                {
+                    var r = s.rect; float a = r.width * r.height;
+                    if (a > bestArea) { best = s; bestArea = a; }
+                }
+            }
+            if (best != null) return best;
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
+
+        // Auto-fill theme sprites from your new folders if present
+        if (_hotbarFrameSprite == null)
+            _hotbarFrameSprite = LoadLargestSprite("Assets/Sprites/Inventory & chests/2/hotbar frame.png");
+        if (_slotBackgroundSprite == null)
+            _slotBackgroundSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Inventory & chests/2/brown slot.png");
+
+        if (_hoeIcon == null) _hoeIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Hoe.png");
+        if (_wateringCanIcon == null) _wateringCanIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Watering can.png");
+        if (_seedIcon == null) _seedIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/CarrotSeed.png");
+        if (_carrotIcon == null) _carrotIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Carrot.png");
+        if (_axeIcon == null) _axeIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Axe.png");
+        if (_logIcon == null) _logIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/log.png");
+    }
 #endif
 
         private System.Collections.Generic.Dictionary<RectTransform, Coroutine> _activePulses = new System.Collections.Generic.Dictionary<RectTransform, Coroutine>();
@@ -64,43 +147,145 @@ namespace Willowstead.Player
             _farmingController = GetComponent<Farming.FarmingController>();
             if (_farmingController == null) _farmingController = FindAnyObjectByType<Farming.FarmingController>();
 
-            CreateHotbarUI();
-            UpdateCounts();
+        #if UNITY_EDITOR
+            // Ensure themed sprites are assigned even if domain reload is disabled
+            if (_hotbarFrameSprite == null)
+            {
+                Sprite LoadLargest(string path)
+                {
+                    var all = UnityEditor.AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+                    Sprite best = null; float area = -1f;
+                    for (int i = 0; i < all.Length; i++) if (all[i] is Sprite s)
+                    { var r = s.rect; float a = r.width * r.height; if (a > area) { best = s; area = a; } }
+                    return best != null ? best : UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                }
+                _hotbarFrameSprite = LoadLargest("Assets/Sprites/Inventory & chests/2/hotbar frame.png");
+            }
+            if (_slotBackgroundSprite == null)
+            {
+                _slotBackgroundSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Inventory & chests/2/brown slot.png");
+            }
+        #endif
+
+        #if UNITY_EDITOR
+            // Ensure themed sprites are assigned even if domain reload is disabled
+            if (_hotbarFrameSprite == null)
+            {
+                Sprite LoadLargest(string path)
+                {
+                    var all = UnityEditor.AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+                    Sprite best = null; float area = -1f;
+                    for (int i = 0; i < all.Length; i++) if (all[i] is Sprite s)
+                    { var r = s.rect; float a = r.width * r.height; if (a > area) { best = s; area = a; } }
+                    return best != null ? best : UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                }
+                _hotbarFrameSprite = LoadLargest("Assets/Sprites/Inventory & chests/2/hotbar frame.png");
+            }
+            if (_slotBackgroundSprite == null)
+            {
+                _slotBackgroundSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Inventory & chests/2/brown slot.png");
+            }
+        #endif
+
+            if (_usePrefabLayout)
+            {
+                BindPrefabHotbar();
+            }
+            else
+            {
+                CreateHotbarUI();
+            }
+            RefreshUI();
         }
 
         private void Update()
         {
-            UpdateCounts();
-
-            // Detect active tool and update selection animation targets
+            // Sync selection highlight
             if (_farmingController != null)
             {
-                int selectedIndex = 0;
-                switch (_farmingController.CurrentTool)
+                UpdateSelection(_farmingController.SelectedSlotIndex);
+            }
+
+            // Realtime count check
+            RefreshUI();
+        }
+
+        /// <summary>
+        /// Rebuilds slot icons and quantity text indicators dynamically based on slots 0-7.
+        /// </summary>
+        public void RefreshUI()
+        {
+            // Don't try to render to allocated-but-unwired slot arrays when prefab
+            // refs are still null - the breadcrumb in BindPrefabHotbar() already
+            // logged the fix instructions to the developer.
+            if (_usePrefabLayout && (_prefabHotbarRoot == null || _prefabSlotsRoot == null)) return;
+            if (_inventory == null || _slotIconImages == null) return;
+
+            for (int i = 0; i < 8; i++)
+            {
+                InventorySlot slotData = _inventory.GetSlotItem(i);
+                if (slotData == null || slotData.IsEmpty)
                 {
-                    case Farming.FarmingController.FarmTool.Hoe:
-                        selectedIndex = 0;
-                        break;
-                    case Farming.FarmingController.FarmTool.WateringCan:
-                        selectedIndex = 1;
-                        break;
-                    case Farming.FarmingController.FarmTool.Seeds:
-                        selectedIndex = 2;
-                        break;
+                    _slotIconImages[i].sprite = null;
+                    _slotIconImages[i].enabled = false;
+                    if (_slotCountTexts[i] != null) _slotCountTexts[i].enabled = false;
                 }
-                UpdateSelection(selectedIndex);
+                else
+                {
+                    // Find correct sprite based on item name
+                    Sprite sprite = GetIconForItem(slotData.itemName);
+
+                    _slotIconImages[i].sprite = sprite;
+                    _slotIconImages[i].enabled = (sprite != null);
+
+                    // Fallback colors if sprite is missing
+                    if (sprite == null)
+                    {
+                        _slotIconImages[i].enabled = true;
+                        _slotIconImages[i].color = new Color(0.65f, 0.55f, 0.40f, 0.85f); // neutral tan
+                    }
+                    else
+                    {
+                        _slotIconImages[i].color = Color.white;
+                    }
+
+                    // Count display (hide for tools, show for seeds/crops/logs)
+                    if (_slotCountTexts[i] != null)
+                    {
+                        if (slotData.itemName == "Hoe" || slotData.itemName == "Watering Can" || slotData.itemName == "Axe")
+                        {
+                            _slotCountTexts[i].enabled = false;
+                        }
+                        else
+                        {
+                            _slotCountTexts[i].text = slotData.quantity.ToString();
+                            _slotCountTexts[i].enabled = true;
+                        }
+                    }
+                }
             }
         }
 
-        private void UpdateCounts()
+        private Sprite GetIconForItem(string itemName)
         {
-            if (_inventory == null) return;
+            if (itemName == "Hoe")          return _hoeIcon;
+            if (itemName == "Watering Can") return _wateringCanIcon;
+            if (itemName == "Axe")          return _axeIcon;
 
-            int seeds = _inventory.GetItemCount("Carrot Seeds");
-            int carrots = _inventory.GetItemCount("Carrot");
+            // Check the configurable mapping first
+            if (_itemIcons != null)
+            {
+                foreach (var entry in _itemIcons)
+                    if (entry != null && entry.itemName == itemName && entry.icon != null)
+                        return entry.icon;
+            }
 
-            if (_seedCountText != null) _seedCountText.text = seeds.ToString();
-            if (_carrotCountText != null) _carrotCountText.text = carrots.ToString();
+            // Legacy fallbacks
+            if (itemName == "Carrot Seeds") return _seedIcon;
+            if (itemName == "Carrot")       return _carrotIcon;
+            if (itemName == "Log")          return _logIcon;
+
+            return null;
         }
 
         private void UpdateSelection(int selectedIndex)
@@ -112,63 +297,147 @@ namespace Willowstead.Player
                 if (_slotTransforms[i] != null)
                 {
                     bool isSelected = (i == selectedIndex);
-                    
-                    // Juicy Lerp Animation: Selected slot scales up slightly (1.15x), unselected returns to normal (1.0x)
-                    Vector3 targetScale = isSelected ? new Vector3(1.15f, 1.15f, 1f) : Vector3.one;
+
+                    // Zoom active slot slightly
+                    Vector3 targetScale = isSelected ? new Vector3(1.14f, 1.14f, 1f) : Vector3.one;
                     _slotTransforms[i].localScale = Vector3.Lerp(_slotTransforms[i].localScale, targetScale, Time.deltaTime * 15f);
 
                     // Highlights the gold border when active, or drops to a subtle dark shadow when inactive
                     if (_slotHighlights != null && _slotHighlights[i] != null)
                     {
-                        _slotHighlights[i].color = isSelected 
-                            ? new Color(1f, 0.8f, 0.2f, 0.9f) // Vibrant Gold
-                            : new Color(0f, 0f, 0f, 0.35f);    // Subtle Dark Shadow border
+                        _slotHighlights[i].color = isSelected
+                            ? new Color(1f, 0.82f, 0.0f, 0.95f) // Vibrant Gold
+                            : new Color(0f, 0f, 0f, 0.45f);    // Subtle Dark Shadow border
                     }
                 }
             }
         }
 
-        private void CreateHotbarUI()
+        private void BindPrefabHotbar()
         {
-            // Spawn Canvas for HUD if it doesn't exist
-            _canvasGo = GameObject.Find("HUDCanvas");
-            if (_canvasGo == null)
+            if (_prefabHotbarRoot == null || _prefabSlotsRoot == null)
             {
-                _canvasGo = new GameObject("HUDCanvas");
-                Canvas canvas = _canvasGo.AddComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                _canvasGo.AddComponent<CanvasScaler>();
-                _canvasGo.AddComponent<GraphicRaycaster>();
+                Debug.LogWarning("[HotbarUI] Prefab mode is on but _prefabHotbarRoot or _prefabSlotsRoot is unset. " +
+                    "The hotbar will not render. Either assign a canvas/prefab root to _prefabHotbarRoot and a container with 8 child slot RectTransforms (order = slot 0..7) to _prefabSlotsRoot, " +
+                    "or uncheck _usePrefabLayout to fall back to runtime code-built UI.");
+                // Allocate empty arrays so Update / RefreshUI early-return cleanly instead of NRE'ing.
+                _slotTransforms = new RectTransform[8];
+                _slotHighlights = new Image[8];
+                _slotIconImages = new Image[8];
+                _slotCountTexts = new Text[8];
+                return;
             }
 
-            // Load Unity's built-in rounded UI panel sprite
-            Sprite roundedBg = Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
-            Sprite slotBg = Resources.GetBuiltinResource<Sprite>("UI/Skin/InputFieldBackground.psd");
+            _hotbarGo = _prefabHotbarRoot != null ? _prefabHotbarRoot.gameObject : null;
 
-            // Create Hotbar Panel at bottom-center of screen
+            int total = _prefabSlotsRoot != null ? _prefabSlotsRoot.childCount : 0;
+            if (total <= 0)
+            {
+                Debug.LogWarning("[HotbarUI] Prefab Slots Root has no children. Expected 8 for slots 0-7.");
+                total = 8;
+            }
+
+            _slotTransforms = new RectTransform[total];
+            _slotHighlights = new Image[total];
+            _slotIconImages = new Image[total];
+            _slotCountTexts = new Text[total];
+
+            for (int i = 0; i < total; i++)
+            {
+                Transform child = i < _prefabSlotsRoot.childCount ? _prefabSlotsRoot.GetChild(i) : null;
+                if (child == null) { continue; }
+
+                var rt = child as RectTransform;
+                if (rt == null) rt = child.gameObject.AddComponent<RectTransform>();
+                _slotTransforms[i] = rt;
+
+                // Ensure UIDragSlot exists with correct index (0..7)
+                var drag = child.GetComponent<UIDragSlot>();
+                if (drag == null) drag = child.gameObject.AddComponent<UIDragSlot>();
+                drag.slotIndex = i;
+
+                // Icon image
+                Image icon = UIResourceHelper.FindChildComponentByName<Image>(child,
+                    new [] { "SlotIconImage", "Icon", "ItemIcon" });
+                if (icon == null)
+                {
+                    var imgs = child.GetComponentsInChildren<Image>(true);
+                    if (imgs.Length > 0) icon = imgs[imgs.Length - 1];
+                }
+                if (icon != null) icon.raycastTarget = false;
+                _slotIconImages[i] = icon;
+
+                // Count text
+                Text count = UIResourceHelper.FindChildComponentByName<Text>(child,
+                    new [] { "SlotCountText", "CountText", "Qty", "Amount" });
+                _slotCountTexts[i] = count;
+                if (count != null)
+                {
+                    var rtCount = count.GetComponent<RectTransform>();
+                    if (rtCount != null)
+                    {
+                        rtCount.anchorMin = new Vector2(1f, 0f);
+                        rtCount.anchorMax = new Vector2(1f, 0f);
+                        rtCount.pivot     = new Vector2(1f, 0f);
+                        if (rtCount.sizeDelta == Vector2.zero) rtCount.sizeDelta = new Vector2(25f, 20f);
+                        rtCount.anchoredPosition = new Vector2(-12f, 12f);
+                    }
+                    if (count.GetComponent<Outline>() == null)
+                    {
+                        var ol = count.gameObject.AddComponent<Outline>();
+                        ol.effectColor = Color.black;
+                    }
+                }
+
+                // Optional highlight
+                Image highlight = UIResourceHelper.FindChildComponentByName<Image>(child, new [] { "HighlightBorder", "Highlight" });
+                if (highlight == icon)
+                {
+                    // If the found highlight is actually the icon, try another
+                    var imgs2 = child.GetComponentsInChildren<Image>(true);
+                    if (imgs2.Length > 1) highlight = imgs2[0];
+                }
+                _slotHighlights[i] = highlight;
+            }
+        }
+
+        private void CreateHotbarUI()
+        {
+            // Find or create HUDCanvas (with normalised CanvasScaler + GraphicRaycaster)
+            Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
+            _canvasGo = canvas != null ? canvas.gameObject : null;
+
+            // Choose theme sprites or fall back to built-ins if not assigned
+            Sprite roundedBg = _hotbarFrameSprite != null ? _hotbarFrameSprite : UIResourceHelper.GetBackgroundSprite();
+            Sprite slotBg = _slotBackgroundSprite != null ? _slotBackgroundSprite : UIResourceHelper.GetInputFieldBackgroundSprite();
+
+            // Create Hotbar Panel at bottom-center of screen (expanded width for 8 slots)
             _hotbarGo = new GameObject("HotbarPanel");
             _hotbarGo.transform.SetParent(_canvasGo.transform, false);
             Image bgImage = _hotbarGo.AddComponent<Image>();
             bgImage.sprite = roundedBg;
-            bgImage.type = Image.Type.Sliced; // Slices rounded corners nicely
-            bgImage.color = new Color(0.14f, 0.12f, 0.1f, 0.88f); // Warm Dark Slate Brown
+            bgImage.type = (roundedBg != null && roundedBg.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
+            // Always show provided art at full color; only tint if no sprite
+            bgImage.color = (roundedBg != null) ? Color.white : new Color(0.14f, 0.12f, 0.1f, 0.92f);
 
             RectTransform bgRect = _hotbarGo.GetComponent<RectTransform>();
             bgRect.anchorMin = new Vector2(0.5f, 0f);
             bgRect.anchorMax = new Vector2(0.5f, 0f);
             bgRect.pivot = new Vector2(0.5f, 0f);
-            bgRect.anchoredPosition = new Vector2(0f, 15f); // 15 pixels off the bottom
-            bgRect.sizeDelta = new Vector2(350f, 86f);
+            bgRect.anchoredPosition = new Vector2(0f, 15f);
+            bgRect.sizeDelta = new Vector2(660f, 86f);
 
-            // 4 slots: Hoe, Watering Can, Carrot Seeds, Carrots
-            int slotCount = 4;
+            int slotCount = 8;
             float slotWidth = 60f;
             float slotHeight = 60f;
-            float startX = -120f; // Centers 4 slots inside 350px width perfectly
+            float startX = -280f; // Centers 8 slots inside 660px width
             float spacing = 80f;
 
             _slotTransforms = new RectTransform[slotCount];
             _slotHighlights = new Image[slotCount];
+            _slotIconImages = new Image[slotCount];
+            _slotCountTexts = new Text[slotCount];
+
             Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             for (int i = 0; i < slotCount; i++)
@@ -181,13 +450,17 @@ namespace Willowstead.Player
                 slotRect.sizeDelta = new Vector2(slotWidth, slotHeight);
                 _slotTransforms[i] = slotRect;
 
+                // Add drag-and-drop capability
+                UIDragSlot dragComponent = slotGo.AddComponent<UIDragSlot>();
+                dragComponent.slotIndex = i;
+
                 // Slot border outline / shadow image
                 GameObject highlightGo = new GameObject("HighlightBorder");
                 highlightGo.transform.SetParent(slotRect, false);
                 Image highlightImg = highlightGo.AddComponent<Image>();
                 highlightImg.sprite = roundedBg;
-                highlightImg.type = Image.Type.Sliced;
-                highlightImg.color = new Color(0f, 0f, 0f, 0.35f);
+                highlightImg.type = (roundedBg != null && roundedBg.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
+                highlightImg.color = (highlightImg.type == Image.Type.Sliced) ? new Color(1f,1f,1f,1f) : new Color(0f, 0f, 0f, 0.45f);
                 RectTransform highRect = highlightGo.GetComponent<RectTransform>();
                 highRect.anchoredPosition = Vector2.zero;
                 highRect.sizeDelta = new Vector2(slotWidth + 8f, slotHeight + 8f);
@@ -198,8 +471,9 @@ namespace Willowstead.Player
                 innerBgGo.transform.SetParent(slotRect, false);
                 Image innerBgImg = innerBgGo.AddComponent<Image>();
                 innerBgImg.sprite = slotBg;
-                innerBgImg.type = Image.Type.Sliced;
-                innerBgImg.color = new Color(0.24f, 0.2f, 0.16f, 0.95f); // Dark warm slot interior
+                innerBgImg.type = (slotBg != null && slotBg.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
+                // Keep slot art colors; tint only if no sprite
+                innerBgImg.color = (slotBg != null) ? Color.white : new Color(0.24f, 0.2f, 0.16f, 0.95f);
                 RectTransform innerBgRect = innerBgGo.GetComponent<RectTransform>();
                 innerBgRect.anchoredPosition = Vector2.zero;
                 innerBgRect.sizeDelta = new Vector2(slotWidth, slotHeight);
@@ -207,75 +481,47 @@ namespace Willowstead.Player
                 // Slot Icon
                 GameObject iconGo = new GameObject("Icon");
                 iconGo.transform.SetParent(slotRect, false);
-                Image iconImg = iconGo.AddComponent<Image>();
+                _slotIconImages[i] = iconGo.AddComponent<Image>();
+                _slotIconImages[i].raycastTarget = false; // Let drags pass to slot
                 RectTransform iconRect = iconGo.GetComponent<RectTransform>();
                 iconRect.anchoredPosition = Vector2.zero;
                 iconRect.sizeDelta = new Vector2(slotWidth - 16f, slotHeight - 16f);
 
-                // Setup slot content mapping
-                if (i == 0)
-                {
-                    iconImg.sprite = _hoeIcon;
-                    if (_hoeIcon == null) iconImg.color = new Color(0.55f, 0.45f, 0.35f, 0.85f); // Hoe fallback color
-                }
-                else if (i == 1)
-                {
-                    iconImg.sprite = _wateringCanIcon;
-                    if (_wateringCanIcon == null) iconImg.color = new Color(0.3f, 0.55f, 0.85f, 0.85f); // Watering Can fallback color
-                }
-                else if (i == 2)
-                {
-                    iconImg.sprite = _seedIcon;
-                    if (_seedIcon == null) iconImg.color = new Color(0.75f, 0.65f, 0.45f, 0.85f);
+                // Quantity Count Text label
+                GameObject countGo = new GameObject("CountText");
+                countGo.transform.SetParent(slotRect, false);
+                _slotCountTexts[i] = countGo.AddComponent<Text>();
+                _slotCountTexts[i].font = legacyFont;
+                _slotCountTexts[i].fontSize = 14;
+                _slotCountTexts[i].fontStyle = FontStyle.Bold;
+                _slotCountTexts[i].alignment = TextAnchor.LowerRight;
+                _slotCountTexts[i].color = Color.white;
+                _slotCountTexts[i].raycastTarget = false;
 
-                    // Add count text label
-                    GameObject countGo = new GameObject("CountText");
-                    countGo.transform.SetParent(slotRect, false);
-                    _seedCountText = countGo.AddComponent<Text>();
-                    _seedCountText.font = legacyFont;
-                    _seedCountText.fontSize = 14;
-                    _seedCountText.fontStyle = FontStyle.Bold;
-                    _seedCountText.alignment = TextAnchor.LowerRight;
-                    _seedCountText.color = Color.white;
+                // Black text outline for readability
+                countGo.AddComponent<Outline>().effectColor = Color.black;
 
-                    // Black text outline for readability
-                    countGo.AddComponent<Outline>().effectColor = Color.black;
-
-                    RectTransform countRect = countGo.GetComponent<RectTransform>();
-                    countRect.anchoredPosition = new Vector2(12f, -12f);
-                    countRect.sizeDelta = new Vector2(25f, 20f);
-                }
-                else if (i == 3)
-                {
-                    iconImg.sprite = _carrotIcon;
-                    if (_carrotIcon == null) iconImg.color = new Color(0.95f, 0.5f, 0.15f, 0.85f);
-
-                    // Add count text label
-                    GameObject countGo = new GameObject("CountText");
-                    countGo.transform.SetParent(slotRect, false);
-                    _carrotCountText = countGo.AddComponent<Text>();
-                    _carrotCountText.font = legacyFont;
-                    _carrotCountText.fontSize = 14;
-                    _carrotCountText.fontStyle = FontStyle.Bold;
-                    _carrotCountText.alignment = TextAnchor.LowerRight;
-                    _carrotCountText.color = Color.white;
-
-                    // Black text outline for readability
-                    countGo.AddComponent<Outline>().effectColor = Color.black;
-
-                    RectTransform countRect = countGo.GetComponent<RectTransform>();
-                    countRect.anchoredPosition = new Vector2(12f, -12f);
-                    countRect.sizeDelta = new Vector2(25f, 20f);
-                }
+                RectTransform countRect = countGo.GetComponent<RectTransform>();
+                countRect.anchoredPosition = new Vector2(12f, -12f);
+                countRect.sizeDelta = new Vector2(25f, 20f);
             }
         }
 
-        /// <summary>
-        /// Backward compatibility helper for carrot slot pulsing.
-        /// </summary>
-        public void PulseCarrotSlot()
+        public void PulseCarrotSlot() => PulseItemSlot("Carrot");
+
+        public void PulseItemSlot(string itemName)
         {
-            PulseSlot(3);
+            if (_inventory == null) return;
+            for (int i = 0; i < 8; i++)
+            {
+                var slot = _inventory.GetSlotItem(i);
+                if (slot != null && slot.itemName == itemName)
+                {
+                    PulseSlot(i);
+                    return;
+                }
+            }
+            PulseSlot(3); // fallback
         }
 
         /// <summary>
@@ -298,7 +544,7 @@ namespace Willowstead.Player
         {
             float duration = 0.18f;
             float elapsed = 0f;
-            Vector3 originalScale = Vector3.one;
+            Vector3 originalScale = rect.localScale;
 
             while (elapsed < duration)
             {

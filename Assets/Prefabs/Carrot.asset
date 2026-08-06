@@ -12,21 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7ca81f43f0bbe349b823492dd2835de, type: 3}
   m_Name: Carrot
   m_EditorClassIdentifier: Assembly-CSharp::Willowstead.Farming.CropData
-  _cropName: Carrot
+  _cropName: Carrot_seeds
   _daysPerStage: 1
   _growthStageSprites:
-  - {fileID: 6718816339643664956, guid: 2413ef3469c3a5b489af6b65dfa9c776, type: 3}
-  - {fileID: -6169061642764596326, guid: c9e36a7dabb712545846fe1859d0b030, type: 3}
-  - {fileID: 8352161429003705112, guid: e22979e37ee3da944b881759e26f792f, type: 3}
-  - {fileID: 163593410248777286, guid: d8ff7975921138b47a84e9eba42ea483, type: 3}
-  - {fileID: 1682160722827331984, guid: 0648880c782b2c8408d70cd6d4230406, type: 3}
-  - {fileID: -8377141496382673428, guid: f765fbbfa92183f42b9767f5aabc8e3c, type: 3}
-  _seedIcon: {fileID: 0}
-  _yieldItemName: Carrot
-  _yieldCount: 1
+  - {fileID: 313030696364952809, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: 194035269617077776, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: 1079560837105733530, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: -5673650048505527787, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - {fileID: 2675936961960497111, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  _seedIcon: {fileID: 313030696364952809, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  _yieldItemName: Carrot_item
+  _yieldCount: 3
   _layoutMode: 1
   _minVisualsPerTile: 1
-  _maxVisualsPerTile: 4
+  _maxVisualsPerTile: 1
   _scatterRadius: 0.22
   _randomJitter: 0.05
   _minScale: 0.8

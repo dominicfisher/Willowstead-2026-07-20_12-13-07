@@ -4,9 +4,27 @@ using UnityEngine;
 namespace Willowstead.Player
 {
     /// <summary>
-    /// Manages the player's items (seeds, crops, etc.) using a basic dictionary.
-    /// Supports starting items configuration in the Inspector and provides helper methods
-    /// to add, remove, and check item quantities.
+    /// Represents a single slot in the inventory.
+    /// </summary>
+    [System.Serializable]
+    public class InventorySlot
+    {
+        public string itemName;
+        public int quantity;
+
+        public bool IsEmpty => string.IsNullOrEmpty(itemName) || quantity <= 0;
+
+        public void Clear()
+        {
+            itemName = "";
+            quantity = 0;
+        }
+    }
+
+    /// <summary>
+    /// Manages the player's items using a unified slot-based system (24 slots total).
+    /// Index 0-7 represents the Hotbar slots, and index 8-23 represents the main inventory slots.
+    /// Gold is tracked separately as a currency and does not occupy a slot.
     /// </summary>
     public class InventoryManager : MonoBehaviour
     {
@@ -18,51 +36,210 @@ namespace Willowstead.Player
         }
 
         [Header("Starting Items")]
-        [Tooltip("Configure items the player starts with in their inventory.")]
+        [Tooltip("Configure additional starting items. Hoe, Watering Can, and Axe are force-equipped in hotbar slots 0, 1, and 2 automatically.")]
         [SerializeField] private List<StartingItem> _startingItems = new List<StartingItem>
         {
+            // Axe is also force-equipped via slots[2] below, so AddItem's
+            // "prefer main inventory" path can't accidentally bury it.
             new StartingItem { itemName = "Carrot Seeds", quantity = 10 },
             new StartingItem { itemName = "Gold", quantity = 100 }
         };
 
-        private Dictionary<string, int> _inventory = new Dictionary<string, int>();
+        // 24 Slots: 0-7 for Hotbar, 8-23 for main Inventory panel.
+        public InventorySlot[] slots = new InventorySlot[24];
+
+        private int _gold = 0;
+
+        public static InventoryManager Instance { get; private set; }
 
         private void Awake()
         {
-            // Populate inventory with starting items
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+
+            // Initialize slot array
+            for (int i = 0; i < slots.Length; i++)
+            {
+                slots[i] = new InventorySlot();
+            }
+
+            // 1. Force equip tools in first slots
+            slots[0].itemName = "Hoe";
+            slots[0].quantity = 1;
+
+            slots[1].itemName = "Watering Can";
+            slots[1].quantity = 1;
+
+            // Force Axe into hotbar slot 2 unconditionally — sidesteps both
+            // AddItem's "prefer main inventory" preference and any scene-side
+            // _startingItems serialization override that could otherwise keep
+            // the woodcutting tool out of the player's 1-8 quick-swap.
+            slots[2].itemName = "Axe";
+            slots[2].quantity = 1;
+
+            // 2. Distribute additional starting items configuration
             foreach (var item in _startingItems)
             {
-                if (!string.IsNullOrEmpty(item.itemName))
+                if (string.IsNullOrEmpty(item.itemName)) continue;
+
+                if (item.itemName == "Gold")
                 {
-                    _inventory[item.itemName] = item.quantity;
+                    _gold = item.quantity;
+                }
+                else
+                {
+                    // Skip tools if already assigned
+                    if (item.itemName == "Hoe" || item.itemName == "Watering Can") continue;
+
+                    // Place starting items in remaining slots
+                    AddItem(item.itemName, item.quantity);
                 }
             }
+
+#if UNITY_EDITOR
             PrintInventory();
+#endif
         }
 
         /// <summary>
-        /// Adds a quantity of an item to the inventory.
+        /// Swaps the items in two inventory/hotbar slots.
+        /// </summary>
+        public void SwapSlots(int indexA, int indexB)
+        {
+            if (indexA < 0 || indexA >= slots.Length || indexB < 0 || indexB >= slots.Length) return;
+
+            InventorySlot temp = new InventorySlot
+            {
+                itemName = slots[indexA].itemName,
+                quantity = slots[indexA].quantity
+            };
+
+            slots[indexA].itemName = slots[indexB].itemName;
+            slots[indexA].quantity = slots[indexB].quantity;
+
+            slots[indexB].itemName = temp.itemName;
+            slots[indexB].quantity = temp.quantity;
+
+#if UNITY_EDITOR
+            Debug.Log($"[InventoryManager] Swapped Slot {indexA} with Slot {indexB}");
+            PrintInventory();
+#endif
+        }
+
+        /// <summary>
+        /// Returns the item inside a specific slot.
+        /// </summary>
+        public InventorySlot GetSlotItem(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= slots.Length) return null;
+            return slots[slotIndex];
+        }
+
+        /// <summary>
+        /// Deducts quantity directly from a specified slot.
+        /// </summary>
+        public void RemoveItemFromSlot(int slotIndex, int amount)
+        {
+            if (slotIndex < 0 || slotIndex >= slots.Length) return;
+            InventorySlot slot = slots[slotIndex];
+
+            if (slot.IsEmpty || amount <= 0) return;
+
+            int toRemove = Mathf.Min(slot.quantity, amount);
+            slot.quantity -= toRemove;
+
+            if (ItemNotificationManager.Instance != null)
+            {
+                ItemNotificationManager.Instance.TriggerPickupNotification(slot.itemName, -toRemove);
+            }
+
+            if (slot.quantity <= 0)
+            {
+                slot.Clear();
+            }
+
+#if UNITY_EDITOR
+            PrintInventory();
+#endif
+        }
+
+        /// <summary>
+        /// Adds a quantity of an item to the slots (or gold account).
         /// </summary>
         public void AddItem(string itemName, int amount)
         {
             if (amount <= 0) return;
 
-            if (_inventory.ContainsKey(itemName))
+            if (itemName == "Gold")
             {
-                _inventory[itemName] += amount;
+                _gold += amount;
+                if (ItemNotificationManager.Instance != null)
+                {
+                    ItemNotificationManager.Instance.TriggerPickupNotification(itemName, amount);
+                }
+                return;
             }
-            else
+
+            int remaining = amount;
+
+            // Step 1: Try to stack in existing slots of the same item type
+            for (int i = 0; i < slots.Length; i++)
             {
-                _inventory[itemName] = amount;
+                if (!slots[i].IsEmpty && slots[i].itemName == itemName)
+                {
+                    // Unlimited stack limit for dev convenience, or 99
+                    slots[i].quantity += remaining;
+                    remaining = 0;
+                    break;
+                }
+            }
+
+            // Step 2: Try to find an empty slot (prefer main inventory 8-23 for testing/testing visuals)
+            if (remaining > 0)
+            {
+                // Check main inventory first (8-23)
+                for (int i = 8; i < slots.Length; i++)
+                {
+                    if (slots[i].IsEmpty)
+                    {
+                        slots[i].itemName = itemName;
+                        slots[i].quantity = remaining;
+                        remaining = 0;
+                        break;
+                    }
+                }
+
+                // Fallback to hotbar (0-7) if main inventory is full
+                if (remaining > 0)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        if (slots[i].IsEmpty)
+                        {
+                            slots[i].itemName = itemName;
+                            slots[i].quantity = remaining;
+                            remaining = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (remaining > 0)
+            {
+                Debug.LogWarning($"[InventoryManager] Inventory is full! Could not add {remaining}x {itemName}");
             }
 
             if (ItemNotificationManager.Instance != null)
             {
-                ItemNotificationManager.Instance.TriggerPickupNotification(itemName, amount);
+                ItemNotificationManager.Instance.TriggerPickupNotification(itemName, amount - remaining);
             }
 
-            Debug.Log($"[Inventory] Added {amount}x {itemName}. New total: {_inventory[itemName]}");
+#if UNITY_EDITOR
             PrintInventory();
+#endif
         }
 
         /// <summary>
@@ -72,21 +249,54 @@ namespace Willowstead.Player
         {
             if (amount <= 0) return true;
 
-            if (!_inventory.ContainsKey(itemName) || _inventory[itemName] < amount)
+            if (itemName == "Gold")
             {
-                Debug.LogWarning($"[Inventory] Cannot remove {amount}x {itemName}; not enough items!");
+                if (_gold >= amount)
+                {
+                    _gold -= amount;
+                    if (ItemNotificationManager.Instance != null)
+                    {
+                        ItemNotificationManager.Instance.TriggerPickupNotification(itemName, -amount);
+                    }
+                    return true;
+                }
                 return false;
             }
 
-            _inventory[itemName] -= amount;
+            if (GetItemCount(itemName) < amount)
+            {
+                Debug.LogWarning($"[InventoryManager] Cannot remove {amount}x {itemName}; not enough items!");
+                return false;
+            }
+
+            int remaining = amount;
+
+            // Remove from slots containing the item, starting from hotbar to main inventory
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (!slots[i].IsEmpty && slots[i].itemName == itemName)
+                {
+                    int toSubtract = Mathf.Min(slots[i].quantity, remaining);
+                    slots[i].quantity -= toSubtract;
+                    remaining -= toSubtract;
+
+                    if (slots[i].quantity <= 0)
+                    {
+                        slots[i].Clear();
+                    }
+
+                    if (remaining <= 0) break;
+                }
+            }
 
             if (ItemNotificationManager.Instance != null)
             {
                 ItemNotificationManager.Instance.TriggerPickupNotification(itemName, -amount);
             }
 
-            Debug.Log($"[Inventory] Removed {amount}x {itemName}. New total: {_inventory[itemName]}");
+#if UNITY_EDITOR
             PrintInventory();
+#endif
             return true;
         }
 
@@ -96,27 +306,106 @@ namespace Willowstead.Player
         public bool HasItem(string itemName, int amount)
         {
             if (amount <= 0) return true;
-            return _inventory.ContainsKey(itemName) && _inventory[itemName] >= amount;
+            return GetItemCount(itemName) >= amount;
         }
 
         /// <summary>
-        /// Returns the current quantity of an item.
+        /// Returns the total quantity of an item across all slots (or gold balance).
         /// </summary>
+        // ─── Save / load hooks ─────────────────────────────────────────
+        /// <summary>Read every slot out for serialization.</summary>
+        public List<Willowstead.Persistence.SavedInventorySlot> CaptureInventory()
+        {
+            var list = new List<Willowstead.Persistence.SavedInventorySlot>(slots != null ? slots.Length : 0);
+            if (slots == null) return list;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                var slot = slots[i];
+                list.Add(new Willowstead.Persistence.SavedInventorySlot
+                {
+                    itemName = (slot != null && !slot.IsEmpty) ? slot.itemName : string.Empty,
+                    quantity = slot != null ? slot.quantity : 0,
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Restore every slot + gold from a save. Overwrites any
+        /// starting-items logic so a reloaded save exactly matches what
+        /// the player put down before quitting.
+        /// </summary>
+        public void RestoreInventory(List<Willowstead.Persistence.SavedInventorySlot> data, int gold)
+        {
+            if (slots == null) return;
+            int n = Mathf.Min(data != null ? data.Count : 0, slots.Length);
+            for (int i = 0; i < n; i++)
+            {
+                var slot = slots[i];
+                if (slot == null) continue;
+                if (data[i] == null || string.IsNullOrEmpty(data[i].itemName))
+                {
+                    slot.itemName = string.Empty;
+                    slot.quantity = 0;
+                }
+                else
+                {
+                    slot.itemName = data[i].itemName;
+                    slot.quantity = Mathf.Max(0, data[i].quantity);
+                }
+            }
+            // Pad any new slots the save didn't fill (shouldn't normally happen).
+            for (int i = n; i < slots.Length; i++)
+            {
+                if (slots[i] == null) continue;
+                slots[i].itemName = string.Empty;
+                slots[i].quantity = 0;
+            }
+
+            // Restore gold as an AddItem delta against the current count,
+            // because gold lives as a regular stack like any other item.
+            int currentGold = GetItemCount("Gold");
+            int delta = gold - currentGold;
+            if (delta != 0) AddItem("Gold", delta);
+        }
+
         public int GetItemCount(string itemName)
         {
-            if (_inventory.TryGetValue(itemName, out int count))
+            if (itemName == "Gold") return _gold;
+
+            int count = 0;
+            foreach (var slot in slots)
             {
-                return count;
+                if (!slot.IsEmpty && slot.itemName == itemName)
+                {
+                    count += slot.quantity;
+                }
             }
-            return 0;
+            return count;
         }
 
         /// <summary>
-        /// Exposes a copy of the internal inventory dictionary safely.
+        /// Compiles a Dictionary containing total quantities of all items (backward-compatible).
         /// </summary>
         public Dictionary<string, int> GetInventoryData()
         {
-            return new Dictionary<string, int>(_inventory);
+            Dictionary<string, int> data = new Dictionary<string, int>();
+            data["Gold"] = _gold;
+
+            foreach (var slot in slots)
+            {
+                if (slot.IsEmpty) continue;
+
+                if (data.ContainsKey(slot.itemName))
+                {
+                    data[slot.itemName] += slot.quantity;
+                }
+                else
+                {
+                    data[slot.itemName] = slot.quantity;
+                }
+            }
+            return data;
         }
 
         /// <summary>
@@ -124,14 +413,20 @@ namespace Willowstead.Player
         /// </summary>
         public void PrintInventory()
         {
+#if UNITY_EDITOR
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine("--- Current Inventory ---");
-            foreach (var kvp in _inventory)
+            sb.AppendLine("--- Current Inventory Slots ---");
+            sb.AppendLine($"- Gold: {_gold}");
+            for (int i = 0; i < slots.Length; i++)
             {
-                sb.AppendLine($"- {kvp.Key}: {kvp.Value}");
+                if (!slots[i].IsEmpty)
+                {
+                    sb.AppendLine($"- Slot {i}: {slots[i].itemName} x{slots[i].quantity}");
+                }
             }
-            sb.AppendLine("-------------------------");
+            sb.AppendLine("-------------------------------");
             Debug.Log(sb.ToString());
+#endif
         }
     }
 }

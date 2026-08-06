@@ -29,6 +29,91 @@ namespace Willowstead.Farming
         /// </summary>
         public bool IsMature => _cropData != null && _currentStage >= _cropData.TotalStages - 1;
 
+        /// <summary>
+        /// Snap the crop straight to a saved growth stage without playing
+        /// the pop-up animation. Used only by SaveGameManager to restore
+        /// worlds exactly where they left off.
+        /// </summary>
+        public void ForceStage(int stage)
+        {
+            ForceStage(stage, overrideVisualsCount: -1);
+        }
+
+        /// <summary>
+        /// Restore a crop to a saved stage + (optionally) saved visuals
+        /// count. Pass overrideVisualsCount &gt;= 1 to undo the random
+        /// re-roll inside <see cref="Initialize"/>; otherwise the saved
+        /// visualsCount is ignored and the crop relayouts itself. Skips
+        /// the bounce-in coroutine on the first frame so a save-load
+        /// doesn't pop every crop visibly.
+        /// </summary>
+        public void ForceStage(int stage, int overrideVisualsCount)
+        {
+            if (_cropData == null) return;
+            if (overrideVisualsCount >= 1)
+            {
+                _visualsCount = Mathf.Max(1, overrideVisualsCount);
+                // Rebuild visual layout so the saved spread/radius sticks.
+                SetupRenderers();
+            }
+            int max = Mathf.Max(0, _cropData.TotalStages - 1);
+            _currentStage = Mathf.Clamp(stage, 0, max);
+            _daysInCurrentStage = 0;
+            UpdateSprite(silent: Willowstead.Persistence.SaveGameManager.IsLoadingFromSave);
+        }
+
+        /// <summary>
+        /// Same as UpdateSprite, but the optional <paramref name="silent"/>
+        /// flag suppresses the per-stage bounce-in pop-up animation. Used
+        /// by <see cref="ForceStage"/> during save-load so the loaded
+        /// world doesn't re-animate every crop.
+        /// </summary>
+        private void UpdateSprite(bool silent = false)
+        {
+            if (_cropData == null || _cropData.GrowthStageSprites == null) return;
+            ApplySpriteToRenderers();
+            if (!silent && gameObject.activeInHierarchy)
+            {
+                if (_activeAnimation != null) StopCoroutine(_activeAnimation);
+                _activeAnimation = StartCoroutine(PlayPopUpAnimation());
+            }
+        }
+
+        private void ApplySpriteToRenderers()
+        {
+            if (_cropData == null || _cropData.GrowthStageSprites == null) return;
+            if (_currentStage < 0 || _currentStage >= _cropData.TotalStages) return;
+            Sprite stageSprite = _cropData.GrowthStageSprites[_currentStage];
+
+            if (_visualsCount > 1)
+            {
+                for (int i = 0; i < _childRenderers.Count; i++)
+                {
+                    SpriteRenderer childSr = _childRenderers[i];
+                    if (childSr == null) continue;
+                    if (_currentStage == 0)
+                    {
+                        if (i == 0) { childSr.transform.localPosition = Vector3.zero; childSr.sprite = stageSprite; childSr.enabled = true; }
+                        else childSr.enabled = false;
+                    }
+                    else
+                    {
+                        if (_originalChildPositions != null && i < _originalChildPositions.Length)
+                            childSr.transform.localPosition = _originalChildPositions[i];
+                        childSr.sprite = stageSprite;
+                        childSr.enabled = true;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var renderer in _childRenderers)
+                {
+                    if (renderer != null) renderer.sprite = stageSprite;
+                }
+            }
+        }
+
         private void Awake()
         {
             _spriteRenderer = GetComponent<SpriteRenderer>();
@@ -199,7 +284,9 @@ namespace Willowstead.Farming
                     _daysInCurrentStage = 0;
                     UpdateSprite();
                     
+#if UNITY_EDITOR
                     Debug.Log($"[Crop] {_cropData.CropName} grew to stage {_currentStage} at {_gridPosition}");
+#endif
                 }
             }
         }
@@ -223,7 +310,9 @@ namespace Willowstead.Farming
             int count = Mathf.Max(1, _visualsCount) * _cropData.YieldCount;
             string itemName = _cropData.YieldItemName;
             
+#if UNITY_EDITOR
             Debug.Log($"[Crop] Harvested {count}x {itemName}!");
+#endif
 
             // Tell GridManager we are gone immediately so the cell space is cleared
             World.GridManager.Instance.RemoveCrop(_gridPosition);
@@ -297,11 +386,10 @@ namespace Willowstead.Farming
                 yield return null;
             }
 
-            // Spawn the flying carrot animation from the plucked position
+            // Spawn the flying crop animation from the plucked position
             Player.HotbarUI hotbar = FindAnyObjectByType<Player.HotbarUI>();
-            RectTransform targetSlot = (hotbar != null) ? hotbar.CarrotSlotRect : null;
-
             string yieldItemName = _cropData.YieldItemName;
+            RectTransform targetSlot = (hotbar != null) ? hotbar.GetSlotRectForItem(yieldItemName) : null;
             int singleYield = _cropData.YieldCount;
             Player.InventoryManager inventory = FindAnyObjectByType<Player.InventoryManager>();
 
@@ -323,67 +411,7 @@ namespace Willowstead.Farming
 
         private Coroutine _activeAnimation;
 
-        private void UpdateSprite()
-        {
-            if (_cropData == null || _cropData.GrowthStageSprites == null) return;
-
-            if (_currentStage >= 0 && _currentStage < _cropData.TotalStages)
-            {
-                Sprite stageSprite = _cropData.GrowthStageSprites[_currentStage];
-
-                // If visuals count is > 1 and we are at the initial sprout stage (Stage 0),
-                // only render 1 sprout in the center.
-                if (_visualsCount > 1)
-                {
-                    for (int i = 0; i < _childRenderers.Count; i++)
-                    {
-                        SpriteRenderer childSr = _childRenderers[i];
-                        if (childSr == null) continue;
-
-                        if (_currentStage == 0)
-                        {
-                            if (i == 0)
-                            {
-                                childSr.transform.localPosition = Vector3.zero;
-                                childSr.sprite = stageSprite;
-                                childSr.enabled = true;
-                            }
-                            else
-                            {
-                                childSr.enabled = false;
-                            }
-                        }
-                        else
-                        {
-                            // Restore original offset position and enable
-                            if (_originalChildPositions != null && i < _originalChildPositions.Length)
-                            {
-                                childSr.transform.localPosition = _originalChildPositions[i];
-                            }
-                            childSr.sprite = stageSprite;
-                            childSr.enabled = true;
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (var renderer in _childRenderers)
-                    {
-                        if (renderer != null)
-                        {
-                            renderer.sprite = stageSprite;
-                        }
-                    }
-                }
-
-                // Play dynamic pop-up animation on growth/spawn
-                if (gameObject.activeInHierarchy)
-                {
-                    if (_activeAnimation != null) StopCoroutine(_activeAnimation);
-                    _activeAnimation = StartCoroutine(PlayPopUpAnimation());
-                }
-            }
-        }
+        private void UpdateSprite() => UpdateSprite(silent: false);
 
         private System.Collections.IEnumerator PlayPopUpAnimation()
         {

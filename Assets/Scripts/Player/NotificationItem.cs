@@ -23,7 +23,7 @@ namespace Willowstead.Player
             _canvasGroup.alpha = 0f;
 
             Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            Sprite roundedBg = Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
+            Sprite roundedBg = UIResourceHelper.GetBackgroundSprite();
 
             // 1. Background sliced panel
             _bgImage = gameObject.AddComponent<Image>();

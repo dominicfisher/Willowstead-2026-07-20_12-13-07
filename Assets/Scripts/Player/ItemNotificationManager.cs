@@ -9,7 +9,20 @@ namespace Willowstead.Player
     /// </summary>
     public class ItemNotificationManager : MonoBehaviour
     {
-        public static ItemNotificationManager Instance { get; private set; }
+        private static ItemNotificationManager _instance;
+        public static ItemNotificationManager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    GameObject go = new GameObject("[ItemNotificationManager]");
+                    _instance = go.AddComponent<ItemNotificationManager>();
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         [Header("Assets")]
         [Tooltip("The icon sprite to represent Carrot Seeds.")]
@@ -21,6 +34,9 @@ namespace Willowstead.Player
         [Tooltip("The icon/circle sprite to represent Gold.")]
         [SerializeField] private Sprite _coinIcon;
 
+        [Tooltip("The icon sprite to represent a stack of Logs (dropped from trees).")]
+        [SerializeField] private Sprite _logIcon;
+
         private GameObject _canvasGo;
         private GameObject _containerGo;
         private RectTransform _containerRect;
@@ -31,14 +47,15 @@ namespace Willowstead.Player
             if (_seedIcon == null) _seedIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/CarrotSeed.png");
             if (_carrotIcon == null) _carrotIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Carrot.png");
             if (_coinIcon == null) _coinIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/gold coin.png");
+            if (_logIcon == null) _logIcon = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/log.png");
         }
 #endif
 
         private void Awake()
         {
-            if (Instance == null)
+            if (_instance == null || _instance == this)
             {
-                Instance = this;
+                _instance = this;
                 DontDestroyOnLoad(gameObject);
                 CreateContainer();
             }
@@ -50,16 +67,9 @@ namespace Willowstead.Player
 
         private void CreateContainer()
         {
-            // Find or setup HUDCanvas
-            _canvasGo = GameObject.Find("HUDCanvas");
-            if (_canvasGo == null)
-            {
-                _canvasGo = new GameObject("HUDCanvas");
-                Canvas canvas = _canvasGo.AddComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                _canvasGo.AddComponent<CanvasScaler>();
-                _canvasGo.AddComponent<GraphicRaycaster>();
-            }
+            // Find or create HUDCanvas (with normalised CanvasScaler + GraphicRaycaster)
+            Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
+            _canvasGo = canvas != null ? canvas.gameObject : null;
 
             // Create notification stacking group
             _containerGo = new GameObject("NotificationContainer");
@@ -82,6 +92,26 @@ namespace Willowstead.Player
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = false;
             layout.childAlignment = TextAnchor.LowerRight; // Stack from bottom up
+        }
+
+        /// <summary>
+        /// Triggers a toast notification popup in the bottom right of the screen with arbitrary text and icon.
+        /// </summary>
+        public void TriggerNotification(string textContent, Sprite icon = null, Color? iconColor = null)
+        {
+            if (_containerRect == null) CreateContainer();
+
+            if (icon == null) icon = UIResourceHelper.GetSaveIconSprite();
+            Color col = iconColor ?? Color.white;
+
+            GameObject rowGo = new GameObject("NotificationRow");
+            rowGo.transform.SetParent(_containerRect, false);
+
+            RectTransform rect = rowGo.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(180f, 34f);
+
+            NotificationItem rowItem = rowGo.AddComponent<NotificationItem>();
+            rowItem.Initialize(icon, textContent, col);
         }
 
         /// <summary>
@@ -108,11 +138,15 @@ namespace Willowstead.Player
                 icon = _coinIcon;
                 iconColor = new Color(1.0f, 0.82f, 0.0f, 1f); // Gold coin tint
             }
+            else if (itemName == "Log")
+            {
+                icon = _logIcon;
+            }
 
             // Default fallback if icon sprite is not loaded/assigned
-            if (icon == null) icon = Resources.GetBuiltinResource<Sprite>("UI/Skin/InputFieldBackground.psd");
+            if (icon == null) icon = UIResourceHelper.GetInputFieldBackgroundSprite();
 
-            // Create row row container
+            // Create row container
             GameObject rowGo = new GameObject("NotificationRow");
             rowGo.transform.SetParent(_containerRect, false);
 

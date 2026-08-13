@@ -104,6 +104,94 @@ namespace Willowstead.Player
             return _cachedSaveIconSprite;
         }
 
+        private static Sprite _cachedCircleSprite;
+
+        public static Sprite GetCircleSprite()
+        {
+            if (_cachedCircleSprite != null) return _cachedCircleSprite;
+
+            int radius = 16;
+            int size = radius * 2;
+            Texture2D tex = new Texture2D(size, size);
+            tex.filterMode = FilterMode.Point;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(radius, radius));
+                    if (dist <= radius - 0.5f)
+                        tex.SetPixel(x, y, Color.white);
+                    else
+                        tex.SetPixel(x, y, new Color(0, 0, 0, 0));
+                }
+            }
+            tex.Apply();
+            _cachedCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
+            return _cachedCircleSprite;
+        }
+
+        private static System.Collections.Generic.Dictionary<string, Sprite> _iconCache = new System.Collections.Generic.Dictionary<string, Sprite>();
+
+        public static Sprite GetItemIconSprite(string itemName)
+        {
+            if (string.IsNullOrEmpty(itemName)) return null;
+            if (_iconCache.TryGetValue(itemName, out Sprite cached) && cached != null) return cached;
+
+#if UNITY_EDITOR
+            string path = null;
+            if (itemName == "Hoe") path = "Assets/Sprites/Hoe.png";
+            else if (itemName == "Watering Can") path = "Assets/Sprites/Watering can.png";
+            else if (itemName == "Axe") path = "Assets/Sprites/Axe.png";
+            else if (itemName == "Carrot Seeds" || itemName == "Seed") path = "Assets/Sprites/CarrotSeed.png";
+            else if (itemName == "Carrot") path = "Assets/Sprites/Carrot.png";
+            else if (itemName == "Wood" || itemName == "Log") path = "Assets/Sprites/log.png";
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                Sprite asset = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (asset != null)
+                {
+                    _iconCache[itemName] = asset;
+                    return asset;
+                }
+            }
+#endif
+
+            Sprite generated = CreateProceduralItemIcon(itemName);
+            _iconCache[itemName] = generated;
+            return generated;
+        }
+
+        private static Sprite CreateProceduralItemIcon(string itemName)
+        {
+            int size = 24;
+            Texture2D tex = new Texture2D(size, size);
+            tex.filterMode = FilterMode.Point;
+            Color transparent = new Color(0, 0, 0, 0);
+
+            Color mainColor;
+            if (itemName == "Hoe") mainColor = new Color(0.7f, 0.45f, 0.25f, 1f);
+            else if (itemName == "Watering Can") mainColor = new Color(0.2f, 0.55f, 0.9f, 1f);
+            else if (itemName == "Axe") mainColor = new Color(0.6f, 0.65f, 0.7f, 1f);
+            else if (itemName.Contains("Seed")) mainColor = new Color(0.35f, 0.75f, 0.35f, 1f);
+            else if (itemName == "Carrot") mainColor = new Color(1.0f, 0.5f, 0.1f, 1f);
+            else if (itemName == "Wood" || itemName == "Log") mainColor = new Color(0.55f, 0.35f, 0.2f, 1f);
+            else mainColor = new Color(0.85f, 0.75f, 0.45f, 1f);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    if (x < 2 || x > size - 3 || y < 2 || y > size - 3)
+                        tex.SetPixel(x, y, transparent);
+                    else
+                        tex.SetPixel(x, y, mainColor);
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
         private static Sprite CreateFallbackSprite()
         {
             // Create a small 2x2 white texture and return it as a sprite

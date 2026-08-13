@@ -146,9 +146,14 @@ namespace Willowstead.World
         [Tooltip("Looping storm ambience clips with baked-in thunder rumble — fades in proportional to rain intensity so Light rain has no rumble but a Storm gets continuous rumbling thunder. Drag files like 'Rain & Thunder.mp3' and 'Rain & Thunder (Variation).mp3' here. Storm is muted when SetIndoors(true).")]
         [SerializeField] private AudioClip[] _stormAmbienceLoops;
 
+        [Header("Weather Transitions")]
+        [Tooltip("Time in seconds for rain and wind intensity to smoothly fade between weather states.")]
+        [SerializeField] private float _weatherTransitionDuration = 5f;
+
         // ─── Runtime state ────────────────────────────────────────────────
         private WeatherType _currentWeather = WeatherType.Clear;
         private WindIntensity _currentIntensity = WindIntensity.Light;
+        private float _currentRainIntensityLerped = 0f;
         private float _lastTime01;
         private float _fallbackTimer;
         private float _spawnTimer;
@@ -168,12 +173,9 @@ namespace Willowstead.World
         public WindDirection CurrentWindDirection => _windDirection;
 
         /// <summary>
-        /// Returns a normalised 0..1 rain intensity. Only non-zero when the
-        /// current weather is Rainy. Used by RainRenderer / RainAudio /
-        /// RainSplash to scale visible drops, ambient volume, and watering
-        /// aggressiveness. Light=0.33, Moderate=0.66, Strong=1.0.
+        /// Target 0..1 rain intensity based on current state settings.
         /// </summary>
-        public float RainIntensity
+        public float TargetRainIntensity
         {
             get
             {
@@ -187,6 +189,12 @@ namespace Willowstead.World
                 }
             }
         }
+
+        /// <summary>
+        /// Returns the smoothly interpolated 0..1 rain intensity.
+        /// Used by RainRenderer / RainAudio / RainSplash to scale drops and audio smoothly.
+        /// </summary>
+        public float RainIntensity => _currentRainIntensityLerped;
 
         /// <summary>
         /// Fires whenever the rain intensity crosses a meaningful threshold
@@ -226,8 +234,24 @@ namespace Willowstead.World
         private void Update()
         {
             CheckForWeatherTransition();
+            UpdateIntensityTransition();
             UpdateWindVisuals();
             TickLightning();
+        }
+
+        private void UpdateIntensityTransition()
+        {
+            float target = TargetRainIntensity;
+            if (Mathf.Abs(_currentRainIntensityLerped - target) > 0.001f)
+            {
+                float rate = 1f / Mathf.Max(0.1f, _weatherTransitionDuration);
+                _currentRainIntensityLerped = Mathf.MoveTowards(_currentRainIntensityLerped, target, rate * Time.deltaTime);
+                EmitIntensityChanged();
+            }
+            else
+            {
+                _currentRainIntensityLerped = target;
+            }
         }
 
         private void OnDestroy()

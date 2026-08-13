@@ -367,6 +367,9 @@ namespace Willowstead.Player
             int currentGold = GetItemCount("Gold");
             int delta = gold - currentGold;
             if (delta != 0) AddItem("Gold", delta);
+
+            if (HotbarUI.Instance != null) HotbarUI.Instance.RefreshUI();
+            if (InventoryUI.Instance != null) InventoryUI.Instance.RefreshUI();
         }
 
         public int GetItemCount(string itemName)

@@ -234,6 +234,9 @@ namespace Willowstead.World
             int target = Mathf.RoundToInt(_currentIntensity * _dropPool.Length);
             target = Mathf.Clamp(target, 0, _dropPool.Length);
 
+            // Calculate global rain alpha scale to smoothly fade drops near 0 intensity
+            float alphaScale = Mathf.Clamp01(_currentIntensity * 4f);
+
             // Lower counts deactivate drops from the END of the pool (preserves
             // oldest-active entries, looks less "popping"). Higher counts activate
             // fresh entries from the FIRST inactive slot.
@@ -242,6 +245,9 @@ namespace Willowstead.World
                 if (i < target)
                 {
                     if (!_dropPool[i].isActive) ActivateDrop(_dropPool[i]);
+                    Color c = _dropTint;
+                    c.a *= alphaScale;
+                    _dropPool[i].renderer.color = c;
                 }
                 else
                 {

@@ -116,6 +116,16 @@ namespace Willowstead.Farming
 
         private void OnEnable()
         {
+            if (_inputReader == null)
+            {
+                _inputReader = Resources.Load<Input.InputReader>("InputReader");
+                if (_inputReader == null)
+                {
+                    var readers = Resources.FindObjectsOfTypeAll<Input.InputReader>();
+                    if (readers != null && readers.Length > 0) _inputReader = readers[0];
+                }
+            }
+
             if (_inputReader != null)
             {
                 _inputReader.AttackEvent += OnUseToolInput;
@@ -142,7 +152,19 @@ namespace Willowstead.Farming
         {
             HandleToolSelectionInput();
             HandleDebugTimeInput();
-            HandleDragTilling();
+
+            // Direct left-click fallback for tool usage (hoe, watering can, planting seeds, harvesting)
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            {
+                if (!Input.InputReader.BlockGameplayInput)
+                {
+                    Debug.Log($"[FarmingController] Left Click detected. Using tool: {_currentTool}");
+                    OnUseToolInput();
+                }
+            }
+
+            HandleDragFarmingActions();
         }
 
         /// <summary>
@@ -172,8 +194,10 @@ namespace Willowstead.Farming
                 }
             }
 
+            // Only scroll hotbar if Alt is NOT held (Alt + mouse scroll is reserved for camera zoom)
+            bool isAltHeld = keyboard != null && (keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed);
             var mouse = UnityEngine.InputSystem.Mouse.current;
-            if (mouse != null)
+            if (!isAltHeld && mouse != null)
             {
                 float scroll = mouse.scroll.ReadValue().y;
                 if (scroll > 0f)
@@ -380,23 +404,75 @@ namespace Willowstead.Farming
             if (tree != null) tree.Chop();
         }
 
+        private Vector3Int _lastDragCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+
         /// <summary>
-        /// While the attack button is held and the hoe is equipped, till each new cell
-        /// the selector moves over. Moving back to an already-tilled cell during the
-        /// same drag will not re-trigger the action.
+        /// While left click or attack button is held down, execute continuous drag actions
+        /// (tilling with Hoe, watering with Watering Can, or planting with Seeds) across cells.
         /// </summary>
-        private void HandleDragTilling()
+        private void HandleDragFarmingActions()
         {
-            if (!_isAttackHeld) return;
-            if (_currentTool != FarmTool.Hoe) return;
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            bool isMouseClickHeld = mouse != null && mouse.leftButton.isPressed;
+            bool isHeld = (_isAttackHeld || isMouseClickHeld) && !Input.InputReader.BlockGameplayInput;
+
+            if (!isHeld)
+            {
+                _lastDragCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+                return;
+            }
+
             if (_gridSelector == null || !_gridSelector.IsCellInRange) return;
             if (World.GridManager.Instance == null) return;
 
             Vector3Int currentCell = _gridSelector.CurrentCell;
-            if (currentCell != _lastDragHoeCell)
+            if (currentCell != _lastDragCell)
             {
-                UseHoeAtCell(currentCell);
-                _lastDragHoeCell = currentCell;
+                _lastDragCell = currentCell;
+
+                switch (_currentTool)
+                {
+                    case FarmTool.Hoe:
+                        UseHoeAtCell(currentCell);
+                        break;
+
+                    case FarmTool.WateringCan:
+                        WaterCell(currentCell);
+                        break;
+
+                    case FarmTool.Seeds:
+                        PlantSeedAtCell(currentCell);
+                        break;
+
+                    case FarmTool.Axe:
+                        UseAxeAtCell(currentCell);
+                        break;
+                }
+            }
+        }
+
+        private void WaterCell(Vector3Int cell)
+        {
+            if (World.GridManager.Instance == null) return;
+            if (World.GridManager.Instance.IsCellTilled(cell))
+            {
+                World.GridManager.Instance.WaterTile(cell);
+            }
+        }
+
+        private void PlantSeedAtCell(Vector3Int cell)
+        {
+            if (World.GridManager.Instance == null) return;
+            if (_currentCropData != null && _cropPrefab != null)
+            {
+                Player.InventorySlot seedSlot = _inventory.GetSlotItem(_selectedSlotIndex);
+                if (seedSlot == null || seedSlot.IsEmpty) return;
+
+                bool success = World.GridManager.Instance.PlantCrop(cell, _currentCropData, _cropPrefab);
+                if (success)
+                {
+                    _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
+                }
             }
         }
 

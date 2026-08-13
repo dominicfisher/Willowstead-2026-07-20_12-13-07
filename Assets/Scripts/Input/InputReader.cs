@@ -88,9 +88,14 @@ namespace Willowstead.Input
 
         public void OnAttack(InputAction.CallbackContext context)
         {
-            if (BlockGameplayInput) return;
+            if (BlockGameplayInput)
+            {
+                Debug.Log("[InputDebug] OnAttack input received but BlockGameplayInput is TRUE (blocked by UI/Console).");
+                return;
+            }
             if (context.phase == InputActionPhase.Performed)
             {
+                Debug.Log("[InputDebug] OnAttack Performed (Use Tool / Attack event).");
                 AttackEvent.Invoke();
             }
             else if (context.phase == InputActionPhase.Canceled)
@@ -101,9 +106,14 @@ namespace Willowstead.Input
 
         public void OnInteract(InputAction.CallbackContext context)
         {
-            if (BlockGameplayInput) return;
+            if (BlockGameplayInput)
+            {
+                Debug.Log("[InputDebug] OnInteract input received but BlockGameplayInput is TRUE (blocked by UI/Console).");
+                return;
+            }
             if (context.phase == InputActionPhase.Performed)
             {
+                Debug.Log("[InputDebug] OnInteract Performed (Interact event).");
                 InteractEvent.Invoke();
             }
             else if (context.phase == InputActionPhase.Canceled)

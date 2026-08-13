@@ -48,7 +48,9 @@ namespace Willowstead.Player
 
         [Header("Prefab Mode")]
         [Tooltip("If true (default), the script binds to scene/prefab UI that you author — drag your canvas/prefab GameObjects into the matching _prefab* fields below. If false, the script builds the shop panel in code at runtime (the previous behaviour).")]
-        [SerializeField] private bool _usePrefabLayout = true;
+#pragma warning disable 0414
+        [SerializeField] private bool _usePrefabLayout = false;
+#pragma warning restore 0414
         [Tooltip("Root panel RectTransform for the Shop UI (active/inactive toggled here).")]
         [SerializeField] private RectTransform _prefabPanelRoot;
         [Tooltip("Container whose children are the Buy rows in order, one per ShopEntry.")]
@@ -124,6 +126,51 @@ namespace Willowstead.Player
 
         // ─── Unity lifecycle ──────────────────────────────────────────────────
 
+        private void EnsureDefaultShopEntries()
+        {
+            if (_shopEntries != null && _shopEntries.Length > 0) return;
+
+            _shopEntries = new ShopEntry[]
+            {
+                new ShopEntry
+                {
+                    seedItemName = "Carrot Seeds",
+                    seedSprite = UIResourceHelper.GetItemIconSprite("Carrot Seeds"),
+                    seedBuyPrice = 15,
+                    yieldItemName = "Carrot",
+                    yieldSprite = UIResourceHelper.GetItemIconSprite("Carrot"),
+                    yieldSellPrice = 25
+                },
+                new ShopEntry
+                {
+                    seedItemName = "Potato Seeds",
+                    seedSprite = UIResourceHelper.GetItemIconSprite("Potato Seeds"),
+                    seedBuyPrice = 20,
+                    yieldItemName = "Potato",
+                    yieldSprite = UIResourceHelper.GetItemIconSprite("Potato"),
+                    yieldSellPrice = 35
+                },
+                new ShopEntry
+                {
+                    seedItemName = "Tomato Seeds",
+                    seedSprite = UIResourceHelper.GetItemIconSprite("Tomato Seeds"),
+                    seedBuyPrice = 25,
+                    yieldItemName = "Tomato",
+                    yieldSprite = UIResourceHelper.GetItemIconSprite("Tomato"),
+                    yieldSellPrice = 45
+                },
+                new ShopEntry
+                {
+                    seedItemName = "",
+                    seedSprite = null,
+                    seedBuyPrice = 0,
+                    yieldItemName = "Wood",
+                    yieldSprite = UIResourceHelper.GetItemIconSprite("Wood"),
+                    yieldSellPrice = 10
+                }
+            };
+        }
+
         private void Start()
         {
             _inventory = GetComponent<InventoryManager>();
@@ -131,26 +178,25 @@ namespace Willowstead.Player
 
             if (_coinSprite == null) _coinSprite = UIResourceHelper.GetBackgroundSprite();
 
-            if (_usePrefabLayout)
-            {
-                BindPrefabShopUI();
-            }
-            else
-            {
-                CreateShopUI();
-            }
+            EnsureDefaultShopEntries();
+
+            _usePrefabLayout = false;
+            CreateShopUI();
             SetUIActive(false);
         }
 
         private void Update()
         {
-            // Toggle shop on P — gated so the background trigger doesn't open a
+            // Toggle shop on P or B key — gated so the background trigger doesn't open a
             // competing UI panel while the dev console has focus. UpdateHudGold
             // below runs unconditionally so the gold readout stays current.
             if (!InputReader.BlockGameplayInput &&
                 Keyboard.current != null &&
-                Keyboard.current.pKey.wasPressedThisFrame)
+                (Keyboard.current.pKey.wasPressedThisFrame || Keyboard.current.bKey.wasPressedThisFrame))
+            {
+                Debug.Log("[InputDebug] P/B key pressed -> Toggling Shop UI.");
                 ToggleUI();
+            }
 
             UpdateHudGold();
         }

@@ -6,13 +6,150 @@ namespace Willowstead.Player
     /// <summary>
     /// Handles player movement, physics interactions, and updates the facing direction.
     /// Decoupled from direct inputs; listens to events from the InputReader ScriptableObject.
+    ///
+    /// SINGLETON DESIGN: The scene Player registers itself in Awake(). Nothing outside this
+    /// class should ever create a Player object. EnsurePlayerInstance() is a last-resort
+    /// fallback only; it will never run if the scene has a Player with this component.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(AudioSource))]
     public class PlayerController : MonoBehaviour
     {
+        private static PlayerController _instance;
+
         /// <summary>Singleton hook used by SaveGameManager + dev console + UI.</summary>
-        public static PlayerController Instance { get; private set; }
+        public static PlayerController Instance => _instance;
+
+#if UNITY_EDITOR
+        [ContextMenu("Setup Permanent Player Components")]
+        private void SetupComponentsInEditor()
+        {
+            if (GetComponent<InventoryManager>() == null) gameObject.AddComponent<InventoryManager>();
+            if (GetComponent<Farming.FarmingController>() == null) gameObject.AddComponent<Farming.FarmingController>();
+            if (GetComponent<HotbarUI>() == null) gameObject.AddComponent<HotbarUI>();
+            if (GetComponent<InventoryUI>() == null) gameObject.AddComponent<InventoryUI>();
+            if (GetComponent<ShopUI>() == null) gameObject.AddComponent<ShopUI>();
+            Debug.Log("[PlayerController] All player components attached to GameObject in Editor! Press Ctrl+S to save.");
+        }
+#endif
+
+        /// <summary>
+        /// True last-resort fallback: only spawns a Player if there is genuinely no
+        /// PlayerController anywhere in the scene. Called by MainMenuUI and save system
+        /// but will do nothing if the scene already has a Player registered.
+        /// </summary>
+        public static PlayerController EnsurePlayerInstance()
+        {
+            if (_instance != null) return _instance;
+
+            // 1. PlayerController component directly on any GameObject
+            PlayerController existing = FindAnyObjectByType<PlayerController>();
+            if (existing != null)
+            {
+                _instance = existing;
+                Debug.Log($"[PlayerBootstrap] Found existing scene PlayerController on '{existing.gameObject.name}'.");
+                return _instance;
+            }
+
+            // 2. Search by tag "Player"
+            GameObject playerGo = null;
+            try { playerGo = GameObject.FindWithTag("Player"); } catch {}
+
+            // 3. Search by name containing "player" (case-insensitive)
+            if (playerGo == null)
+            {
+                GameObject[] allGos = FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+                foreach (var go in allGos)
+                {
+                    if (go.name.IndexOf("player", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        playerGo = go;
+                        Debug.Log($"[PlayerBootstrap] Found scene object by name: '{go.name}' — will attach PlayerController to it.");
+                        break;
+                    }
+                }
+            }
+
+            // 4. Last resort: nothing in the scene matches — dump all scene objects for debugging
+            if (playerGo == null)
+            {
+                var allGos = FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+                var names = new System.Text.StringBuilder();
+                names.AppendLine("[PlayerBootstrap] Scene search failed. All GameObjects found in scene:");
+                foreach (var go in allGos)
+                    names.AppendLine($"  - '{go.name}' (tag='{go.tag}', active={go.activeInHierarchy})");
+                Debug.LogWarning(names.ToString());
+
+                Debug.Log("[PlayerBootstrap] No Player GameObject found in scene — creating runtime fallback Player.");
+                playerGo = new GameObject("Player");
+                playerGo.transform.position = Vector3.zero;
+                try { playerGo.tag = "Player"; } catch {}
+            }
+
+            // ── Ensure all required physics / audio components ───────────────────
+            if (playerGo.GetComponent<Rigidbody2D>() == null)
+            {
+                var rb = playerGo.AddComponent<Rigidbody2D>();
+                rb.gravityScale = 0f;
+                rb.freezeRotation = true;
+                rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            }
+
+            if (playerGo.GetComponent<CircleCollider2D>() == null)
+            {
+                var col = playerGo.AddComponent<CircleCollider2D>();
+                col.radius = 0.4f;
+            }
+
+            if (playerGo.GetComponent<SpriteRenderer>() == null)
+            {
+                var sr = playerGo.AddComponent<SpriteRenderer>();
+                sr.sprite = UIResourceHelper.GetCircleSprite();
+                sr.color = new Color(0.95f, 0.85f, 0.55f, 1f);
+                sr.sortingOrder = 50;
+            }
+
+            if (playerGo.GetComponent<AudioSource>() == null)
+            {
+                var audio = playerGo.AddComponent<AudioSource>();
+                audio.playOnAwake = false;
+            }
+
+            // ── Ensure all gameplay scripts ──────────────────────────────────────
+            if (playerGo.GetComponent<InventoryManager>() == null)
+                playerGo.AddComponent<InventoryManager>();
+
+            if (playerGo.GetComponent<Farming.FarmingController>() == null)
+                playerGo.AddComponent<Farming.FarmingController>();
+
+            if (playerGo.GetComponent<HotbarUI>() == null)
+                playerGo.AddComponent<HotbarUI>();
+
+            if (playerGo.GetComponent<InventoryUI>() == null)
+                playerGo.AddComponent<InventoryUI>();
+
+            if (playerGo.GetComponent<ShopUI>() == null)
+                playerGo.AddComponent<ShopUI>();
+
+            // ── Attach PlayerController last (its Awake sets _instance) ──────────
+            PlayerController pc = playerGo.GetComponent<PlayerController>();
+            if (pc == null) pc = playerGo.AddComponent<PlayerController>();
+
+            // ── Auto-resolve InputReader ─────────────────────────────────────────
+            if (pc._inputReader == null)
+            {
+                pc._inputReader = Resources.Load<Input.InputReader>("InputReader");
+                if (pc._inputReader == null)
+                {
+                    var readers = Resources.FindObjectsOfTypeAll<Input.InputReader>();
+                    if (readers != null && readers.Length > 0) pc._inputReader = readers[0];
+                }
+            }
+
+            Debug.Log($"[PlayerBootstrap] Player fully bootstrapped on '{playerGo.name}' with all components.");
+            return _instance;
+        }
+
 
 
         [Header("References")]
@@ -50,15 +187,50 @@ namespace Willowstead.Player
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
-            else if (Instance != this) { Destroy(gameObject); return; }
-            _rb = GetComponent<Rigidbody2D>();
-            _animator = GetComponent<Animator>();
-            _spriteRenderer = GetComponent<SpriteRenderer>();
+            if (_instance == null)
+            {
+                _instance = this;
+                Debug.Log($"[PlayerController] Scene Player registered: '{gameObject.name}'");
+            }
+            else if (_instance != this)
+            {
+                // A second PlayerController tried to register — remove the component only,
+                // never destroy the whole GameObject.
+                Debug.LogWarning($"[PlayerController] Ignoring duplicate PlayerController on '{gameObject.name}' — scene Player already registered.");
+                Destroy(this);
+                return;
+            }
 
-            // Ensure an AudioSource exists for footstep sounds. If the scene already
-            // has one, use it; otherwise create it at runtime so footstep audio works
-            // without manual scene setup.
+
+
+            _rb = GetComponent<Rigidbody2D>();
+            if (_rb == null) _rb = gameObject.AddComponent<Rigidbody2D>();
+
+            _animator = GetComponent<Animator>();
+
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+            if (_spriteRenderer == null)
+            {
+                _spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+            }
+
+            if (_spriteRenderer.sprite == null)
+            {
+                _spriteRenderer.sprite = UIResourceHelper.GetCircleSprite();
+            }
+
+            _spriteRenderer.enabled = true;
+            Color sc = _spriteRenderer.color;
+            if (sc.a < 0.1f) sc.a = 1f;
+            _spriteRenderer.color = sc;
+            if (_spriteRenderer.sortingOrder < 1) _spriteRenderer.sortingOrder = 10;
+
+            if (transform.localScale.sqrMagnitude < 0.01f)
+            {
+                transform.localScale = Vector3.one;
+            }
+
+            // Ensure an AudioSource exists for footstep sounds.
             _audioSource = GetComponent<AudioSource>();
             if (_audioSource == null)
             {
@@ -82,16 +254,26 @@ namespace Willowstead.Player
         {
             if (_spriteRenderer != null)
             {
-                // Dynamic Y-sorting: objects lower on the screen (more negative Y) render in front of objects higher up
-                _spriteRenderer.sortingOrder = Mathf.RoundToInt(-transform.position.y * 100);
+                // Dynamic Y-sorting: objects lower on screen render in front, clamped so player is always above terrain
+                _spriteRenderer.sortingOrder = Mathf.Max(10, Mathf.RoundToInt(-transform.position.y * 100) + 10);
             }
         }
 
         private void OnEnable()
         {
+            if (_inputReader == null)
+            {
+                _inputReader = Resources.Load<Input.InputReader>("InputReader");
+                if (_inputReader == null)
+                {
+                    var readers = Resources.FindObjectsOfTypeAll<Input.InputReader>();
+                    if (readers != null && readers.Length > 0) _inputReader = readers[0];
+                }
+            }
+
             if (_inputReader != null)
             {
-                _inputReader.EnableGameplayInput(); // Force initialization to bypass Unity Editor domain reload bugs
+                _inputReader.EnableGameplayInput();
                 _inputReader.MoveEvent += OnMoveInput;
                 _inputReader.SprintEvent += OnSprintStart;
                 _inputReader.SprintCanceledEvent += OnSprintEnd;
@@ -120,6 +302,12 @@ namespace Willowstead.Player
                 _inputReader.SprintCanceledEvent -= OnSprintEnd;
                 _inputReader.DisableGameplayInput();
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+                _instance = null;
         }
 
         private void FixedUpdate()

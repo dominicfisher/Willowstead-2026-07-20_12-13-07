@@ -62,6 +62,11 @@ namespace Willowstead.Player
         {
             if (_camera == null) return;
 
+            if (_target == null && PlayerController.Instance != null)
+            {
+                _target = PlayerController.Instance.transform;
+            }
+
             // 1) Position follow
             if (_target != null)
             {
@@ -80,18 +85,21 @@ namespace Willowstead.Player
         {
             float scrollDelta = 0f;
 
-            // Mouse wheel (preferred path). Mouse.current can be null on platforms
-            // without a mouse attached, so guard.
+            Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
-            if (mouse != null)
+
+            // Require Left Alt (or Right Alt) to be held while scrolling to zoom the camera,
+            // keeping normal mouse scroll free for hotbar slot selection.
+            bool isAltHeld = keyboard != null && (keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed);
+
+            if (isAltHeld && mouse != null)
             {
                 scrollDelta += mouse.scroll.ReadValue().y;
             }
 
-            // Optional keyboard fallback for gamepad-only users.
-            if (_allowKeyboardZoom && Mathf.Approximately(scrollDelta, 0f))
+            // Optional keyboard fallback when Alt is held
+            if (_allowKeyboardZoom && isAltHeld && Mathf.Approximately(scrollDelta, 0f))
             {
-                Keyboard keyboard = Keyboard.current;
                 if (keyboard != null)
                 {
                     if (keyboard.eKey.isPressed) scrollDelta += 1f;
@@ -101,8 +109,7 @@ namespace Willowstead.Player
 
             if (Mathf.Approximately(scrollDelta, 0f)) return;
 
-            // Mouse wheel up (positive y) zooms IN (smaller ortho size is closer),
-            // mouse wheel down zooms OUT.
+            // Mouse wheel up (positive y) zooms IN (smaller ortho size), mouse wheel down zooms OUT.
             float newSize = _targetOrthographicSize - scrollDelta * _zoomSensitivity;
             _targetOrthographicSize = Mathf.Clamp(newSize, _minOrthographicSize, _maxOrthographicSize);
         }

@@ -139,20 +139,78 @@ namespace Willowstead.Player
 
 #if UNITY_EDITOR
             string path = null;
+            string subSpriteName = null;
+
             if (itemName == "Hoe") path = "Assets/Sprites/Hoe.png";
             else if (itemName == "Watering Can") path = "Assets/Sprites/Watering can.png";
             else if (itemName == "Axe") path = "Assets/Sprites/Axe.png";
-            else if (itemName == "Carrot Seeds" || itemName == "Seed") path = "Assets/Sprites/CarrotSeed.png";
-            else if (itemName == "Carrot") path = "Assets/Sprites/Carrot.png";
             else if (itemName == "Wood" || itemName == "Log") path = "Assets/Sprites/log.png";
+            else if (itemName == "Gold Coin" || itemName == "Coin") path = "Assets/Sprites/gold coin.png";
+            
+            // Crops.png slices according to the Crops Sprite Sheet Guide
+            else if (itemName == "Carrot Seeds" || itemName == "Carrot Seed" || itemName == "Seed")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_0_0"; // Row 0, Col 0: Seed Bag
+            }
+            else if (itemName == "Carrot")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_8_0"; // Row 0, Col 8: Yield B
+            }
+            else if (itemName == "Potato Seeds" || itemName == "Potato Seed")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_0_2"; // Row 2, Col 0: Seed Bag
+            }
+            else if (itemName == "Potato")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_8_2"; // Row 2, Col 8: Yield B
+            }
+            else if (itemName == "Tomato Seeds" || itemName == "Tomato Seed")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_0_6"; // Row 6, Col 0: Seed Bag
+            }
+            else if (itemName == "Tomato")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_8_6"; // Row 6, Col 8: Yield B
+            }
+            else if (itemName == "Corn Seeds" || itemName == "Corn Seed")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_0_9"; // Row 9, Col 0: Seed Bag
+            }
+            else if (itemName == "Corn")
+            {
+                path = "Assets/Sprites/Crops.png";
+                subSpriteName = "Crops_8_9"; // Row 9, Col 8: Yield B
+            }
 
             if (!string.IsNullOrEmpty(path))
             {
-                Sprite asset = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
-                if (asset != null)
+                if (!string.IsNullOrEmpty(subSpriteName))
                 {
-                    _iconCache[itemName] = asset;
-                    return asset;
+                    Object[] assets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+                    foreach (Object obj in assets)
+                    {
+                        if (obj is Sprite sp && sp.name == subSpriteName)
+                        {
+                            _iconCache[itemName] = sp;
+                            return sp;
+                        }
+                    }
+                }
+                else
+                {
+                    Sprite asset = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                    if (asset != null)
+                    {
+                        _iconCache[itemName] = asset;
+                        return asset;
+                    }
                 }
             }
 #endif

@@ -650,6 +650,8 @@ namespace Willowstead.World
             return noiseVal < _grassThreshold;
         }
 
+
+
 	        // ─── Puddles / Ponds ────────────────────────────────────────────────────
 
 	        private void SpawnPuddlesForChunk(Vector2Int chunkCoord, Transform parent)
@@ -962,12 +964,10 @@ namespace Willowstead.World
 	        }
 	        private bool IsNearPuddle(Vector2Int pos, int radius)
 	        {
-	            if (radius <= 0) return IsPuddleAt(pos);
 	            for (int dx = -radius; dx <= radius; dx++)
 	            {
 	                for (int dy = -radius; dy <= radius; dy++)
 	                {
-	                    if (dx == 0 && dy == 0) continue;
 	                    if (_puddleCells.Contains(new Vector2Int(pos.x + dx, pos.y + dy))) return true;
 	                }
 	            }
@@ -1114,6 +1114,8 @@ namespace Willowstead.World
 	                            // Check separation from any tree in this chunk
 	                            Vector2 jitter = DeterministicJitter(x, y, 1129, _jitterRange * 0.7f);
 	                            Vector2 objPos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
+	                            Vector2Int objCell = new Vector2Int(Mathf.FloorToInt(objPos.x), Mathf.FloorToInt(objPos.y));
+	                            if (IsPuddleAt(objCell) || IsNearPuddle(objCell, _minDecorDistanceFromPuddle)) continue;
 	                            bool tooClose = false;
 	                            for (int i = 0; i < treePositions.Count; i++)
 	                            {
@@ -1333,6 +1335,14 @@ namespace Willowstead.World
         {
             if (_grassBiomes == null || _grassBiomes.Length == 0) return null;
             if (_grassBiomes.Length == 1) return _grassBiomes[0].tile;
+
+            // Secondary biomes (e.g. GrassRuleTile 3) are restricted to interior grass tiles.
+            // Edge tiles that border dirt or water must always use the primary base grass (element 0)
+            // so Rule Tile edge transitions remain clean and don't mix tile set borders.
+            if (!IsInteriorGrassTile(new Vector2Int(x, y)))
+            {
+                return _grassBiomes[0].tile;
+            }
 
             // Ensure the weight table is ready (may be null after domain reload).
             if (_biomeCumulativeWeights == null || _biomeCumulativeWeights.Length != _grassBiomes.Length)

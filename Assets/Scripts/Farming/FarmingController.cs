@@ -157,14 +157,17 @@ namespace Willowstead.Farming
             var mouse = UnityEngine.InputSystem.Mouse.current;
             if (mouse != null && mouse.leftButton.wasPressedThisFrame)
             {
-                if (!Input.InputReader.BlockGameplayInput)
+                if (!Input.InputReader.BlockGameplayInput && !Player.UIResourceHelper.IsPointerOverAnyUI())
                 {
                     Debug.Log($"[FarmingController] Left Click detected. Using tool: {_currentTool}");
                     OnUseToolInput();
                 }
             }
 
-            HandleDragFarmingActions();
+            if (!Player.UIResourceHelper.IsPointerOverAnyUI())
+            {
+                HandleDragFarmingActions();
+            }
         }
 
         /// <summary>

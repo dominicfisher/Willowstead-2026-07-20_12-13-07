@@ -66,6 +66,15 @@ namespace Willowstead.UI
             UIResourceHelper.EnsureEventSystem();
             BuildHierarchy(canvas);
 
+            if (_rootGo != null)
+            {
+                // Ensure PauseMenu panel renders on top of all HUD panels (Shop, Inventory, Hotbar)
+                Canvas pauseCanvas = _rootGo.AddComponent<Canvas>();
+                pauseCanvas.overrideSorting = true;
+                pauseCanvas.sortingOrder = 1000;
+                _rootGo.AddComponent<GraphicRaycaster>();
+            }
+
             _rootGo.SetActive(false);
         }
 

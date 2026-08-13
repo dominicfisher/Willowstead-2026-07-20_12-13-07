@@ -395,22 +395,25 @@ namespace Willowstead.Player
         /// Quick scale-pop: grows to 1.35× then snaps back. Signals a successful action.
         private IEnumerator ScalePopAnimation(RectTransform rt)
         {
-            Vector3 original    = rt.localScale;
-            float   popDuration = 0.15f;
-            float   dropDuration = 0.10f;
+            if (rt == null) yield break;
+            Vector3 original = Vector3.one;
+            float popDuration = 0.15f;
+            float dropDuration = 0.10f;
 
             for (float t = 0f; t < popDuration; t += Time.deltaTime)
             {
+                if (rt == null) yield break;
                 rt.localScale = original * Mathf.Lerp(1f, 1.35f, t / popDuration);
                 yield return null;
             }
             for (float t = 0f; t < dropDuration; t += Time.deltaTime)
             {
+                if (rt == null) yield break;
                 rt.localScale = original * Mathf.Lerp(1.35f, 1f, t / dropDuration);
                 yield return null;
             }
 
-            rt.localScale = original;
+            if (rt != null) rt.localScale = original;
         }
 
         /// Horizontal shake + red flash. Signals a failed action.

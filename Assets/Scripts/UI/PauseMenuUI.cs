@@ -473,8 +473,69 @@ namespace Willowstead.UI
         {
             BuildHeader(parent, "Gameplay");
 
+            // --- World Name section (editable by host) ---
+            GameObject wnHeader = NewChild(parent, "WorldNameHeader");
+            RectTransform whRt = SetAnchoredTopBand(wnHeader.transform, 60f, 95f);
+            TextMeshProUGUI whTxt = wnHeader.AddComponent<TextMeshProUGUI>();
+            whTxt.text = "World Name";
+            whTxt.fontSize = 18f;
+            whTxt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
+            whTxt.alignment = TextAlignmentOptions.Center;
+            whTxt.richText = false;
+
+            GameObject wnRow = new GameObject("WorldNameRow", typeof(RectTransform), typeof(Image));
+            wnRow.transform.SetParent(parent, false);
+            RectTransform wnRt = (RectTransform)wnRow.transform;
+            wnRt.anchorMin = new Vector2(0.5f, 1f);
+            wnRt.anchorMax = new Vector2(0.5f, 1f);
+            wnRt.pivot = new Vector2(0.5f, 1f);
+            wnRt.anchoredPosition = new Vector2(0f, -100f);
+            wnRt.sizeDelta = new Vector2(400f, 44f);
+            Image wnBg = wnRow.GetComponent<Image>();
+            wnBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            wnBg.type = Image.Type.Sliced;
+            wnBg.color = new Color(0.06f, 0.05f, 0.05f, 0.98f);
+
+            GameObject wnTextArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+            wnTextArea.transform.SetParent(wnRow.transform, false);
+            RectTransform wntaRt = (RectTransform)wnTextArea.transform;
+            wntaRt.anchorMin = Vector2.zero; wntaRt.anchorMax = Vector2.one;
+            wntaRt.offsetMin = new Vector2(14f, 4f); wntaRt.offsetMax = new Vector2(-14f, -4f);
+
+            GameObject wnTextGo = new GameObject("Text", typeof(RectTransform));
+            wnTextGo.transform.SetParent(wnTextArea.transform, false);
+            RectTransform wntRt = (RectTransform)wnTextGo.transform;
+            wntRt.anchorMin = Vector2.zero; wntRt.anchorMax = Vector2.one;
+            wntRt.offsetMin = Vector2.zero; wntRt.offsetMax = Vector2.zero;
+            TextMeshProUGUI wnTxt = wnTextGo.AddComponent<TextMeshProUGUI>();
+            wnTxt.fontSize = 17f;
+            wnTxt.fontStyle = FontStyles.Bold;
+            wnTxt.color = new Color(0.96f, 0.94f, 0.88f, 1f);
+            wnTxt.alignment = TextAlignmentOptions.MidlineLeft;
+
+            TMP_InputField wnField = wnRow.AddComponent<TMP_InputField>();
+            wnField.targetGraphic = wnBg;
+            wnField.textViewport = wntaRt;
+            wnField.textComponent = wnTxt;
+            wnField.lineType = TMP_InputField.LineType.SingleLine;
+            wnField.characterLimit = 32;
+            string currentName = SaveGameManager.Instance != null ? SaveGameManager.Instance.ActiveSaveName : "My Willowstead";
+            wnField.text = currentName;
+            wnField.onEndEdit.AddListener(newName =>
+            {
+                if (SaveGameManager.Instance != null && !string.IsNullOrWhiteSpace(newName))
+                {
+                    SaveGameManager.Instance.SetActiveSaveName(newName);
+                    if (ItemNotificationManager.Instance != null)
+                    {
+                        ItemNotificationManager.Instance.TriggerNotification($"World renamed: {newName.Trim()}", UIResourceHelper.GetSaveIconSprite(), new Color(0.4f, 1f, 0.4f));
+                    }
+                }
+            });
+
+            // --- Autosave section ---
             GameObject asHeader = NewChild(parent, "AutosaveHeader");
-            RectTransform ahRt = SetAnchoredTopBand(asHeader.transform, 60f, 100f);
+            RectTransform ahRt = SetAnchoredTopBand(asHeader.transform, 160f, 195f);
             TextMeshProUGUI ahTxt = asHeader.AddComponent<TextMeshProUGUI>();
             ahTxt.text = "Autosave interval";
             ahTxt.fontSize = 18f;
@@ -502,7 +563,7 @@ namespace Willowstead.UI
                 rt.anchorMax = new Vector2(0.5f, 1f);
                 rt.pivot = new Vector2(0.5f, 1f);
                 rt.sizeDelta = new Vector2(btnWidth, 52f);
-                rt.anchoredPosition = new Vector2(xPos, -160f);
+                rt.anchoredPosition = new Vector2(xPos, -245f);
 
                 Image img = presetGo.GetComponent<Image>();
                 img.color = new Color(0.20f, 0.18f, 0.14f, 1f);
@@ -540,7 +601,7 @@ namespace Willowstead.UI
             fhRt.offsetMin = new Vector2(0f, 60f);
             fhRt.offsetMax = new Vector2(0f, 110f);
             TextMeshProUGUI fhTxt = hint.AddComponent<TextMeshProUGUI>();
-            fhTxt.text = "More tunables (day length, weather cadence) coming soon —\nfor now, the dev console `weather` command can reroll the active weather.";
+            fhTxt.text = "Host can rename the active world at any time.\nChanges will save automatically.";
             fhTxt.fontSize = 13f;
             fhTxt.fontStyle = FontStyles.Italic;
             fhTxt.color = new Color(0.78f, 0.72f, 0.62f, 0.85f);
@@ -548,7 +609,7 @@ namespace Willowstead.UI
             fhTxt.richText = false;
             fhTxt.textWrappingMode = TextWrappingModes.Normal;
 
-            BuildMenuButton(parent, "Back", new Vector2(0f, -420f), new Vector2(220f, 50f), Back);
+            BuildMenuButton(parent, "Back", new Vector2(0f, -440f), new Vector2(220f, 50f), Back);
         }
 
 

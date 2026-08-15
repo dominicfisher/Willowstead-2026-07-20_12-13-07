@@ -19,8 +19,7 @@ namespace Willowstead.UI
     public class SaveSlotsUI : MonoBehaviour
     {
         public static SaveSlotsUI Instance { get; private set; }
-
-        public enum Mode { Load, Save }
+        public enum Mode { Load, Save, HostCoop }
         private Mode _mode = Mode.Load;
 
         private GameObject _panelGo;
@@ -62,6 +61,13 @@ namespace Willowstead.UI
         public void ShowSaveMode()
         {
             _mode = Mode.Save;
+            Refresh();
+            Show();
+        }
+
+        public void ShowHostCoopMode()
+        {
+            _mode = Mode.HostCoop;
             Refresh();
             Show();
         }
@@ -164,13 +170,21 @@ namespace Willowstead.UI
 
         private void Refresh()
         {
-            if (_cardContainer == null || SaveGameManager.Instance == null) return;
+            if (_cardContainer == null) return;
+            if (SaveGameManager.Instance == null) return;
 
-            foreach (var c in _cards) { if (c != null) Destroy(c); }
+            foreach (var c in _cards)
+            {
+                if (c != null) Destroy(c);
+            }
             _cards.Clear();
 
             if (_headerLabel != null)
-                _headerLabel.text = _mode == Mode.Load ? "Loading Saves" : "Save to a Slot";
+            {
+                if (_mode == Mode.HostCoop) _headerLabel.text = "Choose World to Host";
+                else if (_mode == Mode.Save) _headerLabel.text = "Save to a Slot";
+                else _headerLabel.text = "Loading Saves";
+            }
 
             List<SaveSlotSummary> slots = SaveGameManager.Instance.ListSlots();
 
@@ -219,8 +233,12 @@ namespace Willowstead.UI
                 color: new Color(0.92f, 0.84f, 0.72f, 1f), fontSize: 14, style: FontStyles.Normal,
                 alignment: TextAlignmentOptions.TopLeft);
 
-            // Action buttons: primary + delete (or only primary when slot is empty in Load mode).
-            BuildCardButton(card.transform, summary, _mode == Mode.Save ? "Save Here" : "Load",
+            // Action buttons: primary + delete
+            string btnLabel = "Load";
+            if (_mode == Mode.HostCoop) btnLabel = summary.exists ? "Host World" : "New & Host";
+            else if (_mode == Mode.Save) btnLabel = "Save Here";
+
+            BuildCardButton(card.transform, summary, btnLabel,
                 anchoredPos: new Vector2(0f, -134f), size: new Vector2(160f, 38f),
                 onClick: () => OnPrimaryClicked(summary));
             if (summary.exists)
@@ -274,10 +292,10 @@ namespace Willowstead.UI
             return t;
         }
 
-        private static void BuildCardButton(Transform parent, SaveSlotSummary summary,
-            string label, Vector2 anchoredPos, Vector2 size, UnityEngine.Events.UnityAction onClick)
+        private static void BuildCardButton(Transform parent, SaveSlotSummary summary, string label,
+            Vector2 anchoredPos, Vector2 size, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Btn_{label}", typeof(RectTransform), typeof(Image));
+            GameObject go = new GameObject($"Btn_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0f, 1f);
@@ -286,13 +304,13 @@ namespace Willowstead.UI
             rt.sizeDelta = size;
             rt.anchoredPosition = anchoredPos;
             Image img = go.GetComponent<Image>();
-            img.color = new Color(0.24f, 0.20f, 0.16f, 1f);
+            img.color = new Color(0.24f, 0.20f, 0.15f, 1f);
 
-            Button btn = go.AddComponent<Button>();
+            Button btn = go.GetComponent<Button>();
             btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
-            cb.normalColor = new Color(0.24f, 0.20f, 0.16f, 1f);
-            cb.highlightedColor = new Color(0.40f, 0.32f, 0.22f, 1f);
+            cb.normalColor = new Color(0.24f, 0.20f, 0.15f, 1f);
+            cb.highlightedColor = new Color(0.42f, 0.34f, 0.24f, 1f);
             cb.pressedColor = new Color(0.12f, 0.10f, 0.08f, 1f);
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
@@ -315,7 +333,27 @@ namespace Willowstead.UI
         private void OnPrimaryClicked(SaveSlotSummary summary)
         {
             if (SaveGameManager.Instance == null) return;
-            if (_mode == Mode.Load)
+
+            if (_mode == Mode.HostCoop)
+            {
+                if (summary.exists)
+                {
+                    SaveGameManager.Instance.LoadFromPath(summary.fullPath);
+                }
+                else
+                {
+                    int freshSeed = World.WorldSeedService.Instance != null ? World.WorldSeedService.Instance.GenerateRandomSeed() : 1337;
+                    if (World.WorldSeedService.Instance != null) World.WorldSeedService.Instance.SetSeed(freshSeed, userProvided: true);
+                    SaveGameManager.Instance.SaveToSlot(summary.slotIndex > 0 ? summary.slotIndex : 1, "Co-op Farm");
+                }
+
+                Hide();
+                if (MultiplayerLobbyUI.Instance != null)
+                {
+                    MultiplayerLobbyUI.Instance.ShowHostLobby();
+                }
+            }
+            else if (_mode == Mode.Load)
             {
                 if (!summary.exists) return;
                 SaveGameManager.Instance.LoadFromPath(summary.fullPath);

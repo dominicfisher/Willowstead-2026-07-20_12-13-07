@@ -18,6 +18,7 @@ namespace Willowstead.UI
         public static WorldSetupUI Instance { get; private set; }
 
         private GameObject _panelGo;
+        private TMP_InputField _nameInput;
         private TMP_InputField _seedInput;
         private TextMeshProUGUI _statusLabel;
         private Button _createButton;
@@ -50,12 +51,6 @@ namespace Willowstead.UI
             {
                 WorldSeedService.Instance.OnSeedChanged += HandleSeedChanged;
             }
-        }
-
-        private void Start()
-        {
-            if (WorldSeedService.Instance == null) return;
-            ShowIfFirstLaunch();
         }
 
         private void OnDestroy()
@@ -99,14 +94,19 @@ namespace Willowstead.UI
             _panelGo.SetActive(true);
             Input.InputReader.BlockGameplayInput = true;
 
-            if (WorldSeedService.Instance != null && _seedInput != null)
-            {
-                if (string.IsNullOrEmpty(_seedInput.text))
-                    _seedInput.text = !string.IsNullOrEmpty(WorldSeedService.Instance.CurrentSeedString)
-                        ? WorldSeedService.Instance.CurrentSeedString
-                        : WorldSeedService.Instance.CurrentSeed.ToString();
-            }
             EnsureStatusRefresh();
+
+            if (_seedInput != null && string.IsNullOrEmpty(_seedInput.text))
+            {
+                int current = WorldSeedService.Instance != null
+                    ? WorldSeedService.Instance.CurrentSeed
+                    : 1337;
+                _seedInput.text = current.ToString();
+            }
+            if (_nameInput != null && string.IsNullOrEmpty(_nameInput.text))
+            {
+                _nameInput.text = "My Willowstead";
+            }
         }
 
         public void Hide()
@@ -137,6 +137,9 @@ namespace Willowstead.UI
             RectTransform rootRt = (RectTransform)_panelGo.transform;
             rootRt.anchorMin = Vector2.zero;
             rootRt.anchorMax = Vector2.one;
+            rootRt.pivot = new Vector2(0.5f, 0.5f);
+            rootRt.offsetMin = Vector2.zero;
+            rootRt.offsetMax = Vector2.zero;
             rootRt.sizeDelta = Vector2.zero;
 
             Image rootDim = _panelGo.GetComponent<Image>();
@@ -149,7 +152,7 @@ namespace Willowstead.UI
             winRt.anchorMin = new Vector2(0.5f, 0.5f);
             winRt.anchorMax = new Vector2(0.5f, 0.5f);
             winRt.pivot = new Vector2(0.5f, 0.5f);
-            winRt.sizeDelta = new Vector2(640f, 420f);
+            winRt.sizeDelta = new Vector2(640f, 490f);
             winRt.anchoredPosition = Vector2.zero;
 
             GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
@@ -234,12 +237,13 @@ namespace Willowstead.UI
             closeImg.color = new Color(0.48f, 0.18f, 0.18f, 0.95f);
 
             _closeButton = closeGo.GetComponent<Button>();
+            _closeButton.targetGraphic = closeImg;
             ColorBlock closeCb = _closeButton.colors;
             closeCb.normalColor = new Color(0.48f, 0.18f, 0.18f, 0.95f);
             closeCb.highlightedColor = new Color(0.68f, 0.24f, 0.24f, 1f);
             closeCb.pressedColor = new Color(0.30f, 0.12f, 0.12f, 1f);
             _closeButton.colors = closeCb;
-            _closeButton.onClick.AddListener(Hide);
+            _closeButton.onClick.AddListener(OnCloseClicked);
 
             GameObject closeTxtGo = new GameObject("X", typeof(RectTransform));
             closeTxtGo.transform.SetParent(closeGo.transform, false);
@@ -261,17 +265,21 @@ namespace Willowstead.UI
             subRt.anchorMax = new Vector2(0.5f, 1f);
             subRt.pivot = new Vector2(0.5f, 1f);
             subRt.anchoredPosition = new Vector2(0f, -72f);
-            subRt.sizeDelta = new Vector2(540f, 44f);
+            subRt.sizeDelta = new Vector2(540f, 40f);
 
             TextMeshProUGUI sub = subGo.AddComponent<TextMeshProUGUI>();
             if (font != null) sub.font = font;
-            sub.text = "Enter a custom seed to forge a deterministic world. Identical seeds reproduce the exact same landscape, rivers, and ponds.";
+            sub.text = "Name your world and enter a seed to forge a deterministic realm.";
             sub.fontSize = 14f;
             sub.color = new Color(0.85f, 0.82f, 0.75f, 0.95f);
             sub.alignment = TextAlignmentOptions.Top;
             sub.textWrappingMode = TextWrappingModes.Normal;
 
-            _seedInput = BuildSeedInputRow(innerGo.transform, font);
+            // Row 1: World Name Input
+            _nameInput = BuildInputRow(innerGo.transform, "World Name:", "My Willowstead", -125f, font);
+
+            // Row 2: World Seed Input
+            _seedInput = BuildInputRow(innerGo.transform, "World Seed:", "1337", -190f, font);
 
             GameObject stGo = new GameObject("Status", typeof(RectTransform));
             stGo.transform.SetParent(innerGo.transform, false);
@@ -290,26 +298,26 @@ namespace Willowstead.UI
             _statusLabel.alignment = TextAlignmentOptions.Center;
 
             _randomButton = BuildButton(innerGo.transform, "Randomize ⚄",
-                new Vector2(-130f, 38f), new Vector2(210f, 48f), font,
+                new Vector2(-130f, 32f), new Vector2(210f, 48f), font,
                 new Color(0.30f, 0.22f, 0.15f, 1f), OnRandomizeClicked);
 
             _createButton = BuildButton(innerGo.transform, "Embark World ✦",
-                new Vector2(130f, 38f), new Vector2(210f, 48f), font,
+                new Vector2(130f, 32f), new Vector2(210f, 48f), font,
                 new Color(0.24f, 0.42f, 0.22f, 1f), OnCreateClicked);
 
             _panelGo.SetActive(false);
         }
 
-        private TMP_InputField BuildSeedInputRow(Transform parent, TMP_FontAsset font)
+        private TMP_InputField BuildInputRow(Transform parent, string labelText, string placeholderText, float yPos, TMP_FontAsset font)
         {
-            GameObject rowGo = new GameObject("SeedRow", typeof(RectTransform), typeof(Image));
+            GameObject rowGo = new GameObject($"Row_{labelText}", typeof(RectTransform), typeof(Image));
             rowGo.transform.SetParent(parent, false);
             RectTransform rowRt = (RectTransform)rowGo.transform;
             rowRt.anchorMin = new Vector2(0.5f, 1f);
             rowRt.anchorMax = new Vector2(0.5f, 1f);
             rowRt.pivot = new Vector2(0.5f, 1f);
-            rowRt.anchoredPosition = new Vector2(0f, -145f);
-            rowRt.sizeDelta = new Vector2(520f, 52f);
+            rowRt.anchoredPosition = new Vector2(0f, yPos);
+            rowRt.sizeDelta = new Vector2(520f, 48f);
 
             Image rowBg = rowGo.GetComponent<Image>();
             rowBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
@@ -326,18 +334,18 @@ namespace Willowstead.UI
             borderImg.type = Image.Type.Sliced;
             borderImg.color = new Color(0.72f, 0.58f, 0.32f, 0.55f);
 
-            GameObject lblGo = new GameObject("SeedLabel", typeof(RectTransform));
+            GameObject lblGo = new GameObject("Label", typeof(RectTransform));
             lblGo.transform.SetParent(rowGo.transform, false);
             RectTransform lblRt = (RectTransform)lblGo.transform;
             lblRt.anchorMin = new Vector2(0f, 0f);
             lblRt.anchorMax = new Vector2(0f, 1f);
             lblRt.pivot = new Vector2(0f, 0.5f);
             lblRt.offsetMin = new Vector2(16f, 0f);
-            lblRt.offsetMax = new Vector2(110f, 0f);
+            lblRt.offsetMax = new Vector2(120f, 0f);
 
             TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
             if (font != null) lbl.font = font;
-            lbl.text = "World Seed:";
+            lbl.text = labelText;
             lbl.fontSize = 15f;
             lbl.fontStyle = FontStyles.Bold;
             lbl.color = new Color(1f, 0.88f, 0.52f, 1f);
@@ -349,8 +357,8 @@ namespace Willowstead.UI
             textAreaRt.anchorMin = new Vector2(0f, 0f);
             textAreaRt.anchorMax = new Vector2(1f, 1f);
             textAreaRt.pivot = new Vector2(0.5f, 0.5f);
-            textAreaRt.offsetMin = new Vector2(120f, 6f);
-            textAreaRt.offsetMax = new Vector2(-16f, -6f);
+            textAreaRt.offsetMin = new Vector2(130f, 4f);
+            textAreaRt.offsetMax = new Vector2(-16f, -4f);
 
             GameObject inputTextGo = new GameObject("Text", typeof(RectTransform));
             inputTextGo.transform.SetParent(textArea.transform, false);
@@ -360,7 +368,7 @@ namespace Willowstead.UI
 
             TextMeshProUGUI itText = inputTextGo.AddComponent<TextMeshProUGUI>();
             if (font != null) itText.font = font;
-            itText.fontSize = 18f;
+            itText.fontSize = 17f;
             itText.fontStyle = FontStyles.Bold;
             itText.color = new Color(0.96f, 0.94f, 0.88f, 1f);
             itText.alignment = TextAlignmentOptions.MidlineLeft;
@@ -373,10 +381,10 @@ namespace Willowstead.UI
 
             TextMeshProUGUI phText = phGo.AddComponent<TextMeshProUGUI>();
             if (font != null) phText.font = font;
-            phText.text = "Type any seed (e.g. Willowstead or 1234)...";
-            phText.fontSize = 15f;
+            phText.text = placeholderText;
+            phText.fontSize = 16f;
             phText.fontStyle = FontStyles.Italic;
-            phText.color = new Color(1f, 1f, 1f, 0.35f);
+            phText.color = new Color(0.6f, 0.58f, 0.52f, 0.5f);
             phText.alignment = TextAlignmentOptions.MidlineLeft;
 
             TMP_InputField field = rowGo.AddComponent<TMP_InputField>();
@@ -411,6 +419,8 @@ namespace Willowstead.UI
             img.raycastTarget = true;
 
             Button btn = go.GetComponent<Button>();
+            if (btn == null) btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
             cb.normalColor = btnColor;
             cb.highlightedColor = btnColor * 1.35f;
@@ -436,6 +446,15 @@ namespace Willowstead.UI
             return btn;
         }
 
+        private void OnCloseClicked()
+        {
+            Hide();
+            if (!MainMenuUI.HasGameStarted && MainMenuUI.Instance != null)
+            {
+                MainMenuUI.Instance.Show();
+            }
+        }
+
         private void EnsureStatusRefresh()
         {
             if (_statusLabel == null || WorldSeedService.Instance == null) return;
@@ -458,6 +477,10 @@ namespace Willowstead.UI
         {
             if (_seedInput == null || WorldSeedService.Instance == null) return;
 
+            string worldName = _nameInput != null && !string.IsNullOrWhiteSpace(_nameInput.text)
+                ? _nameInput.text.Trim()
+                : "My Willowstead";
+
             string raw = _seedInput.text == null ? string.Empty : _seedInput.text.Trim();
             if (string.IsNullOrEmpty(raw))
             {
@@ -467,6 +490,12 @@ namespace Willowstead.UI
             else
             {
                 WorldSeedService.Instance.SetSeed(raw, userProvided: true);
+            }
+
+            if (Persistence.SaveGameManager.Instance != null)
+            {
+                Persistence.SaveGameManager.Instance.SetActiveSaveName(worldName);
+                Persistence.SaveGameManager.Instance.SaveToSlot(1, worldName);
             }
 
             if (_statusLabel != null) _statusLabel.color = new Color(0.92f, 0.80f, 0.52f, 1f);

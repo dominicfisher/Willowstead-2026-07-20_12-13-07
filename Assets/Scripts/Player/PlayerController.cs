@@ -279,6 +279,11 @@ namespace Willowstead.Player
                 _audioSource.playOnAwake = false;
             }
 
+            if (GetComponent<PlayerNameplate>() == null)
+            {
+                gameObject.AddComponent<PlayerNameplate>();
+            }
+
             // - No gravity because it's top-down.
             // - Freeze rotation so the player doesn't spin when colliding with walls.
             // - Enable interpolation to smooth out physics updates at high framerates

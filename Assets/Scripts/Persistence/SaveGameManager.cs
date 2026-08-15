@@ -117,6 +117,27 @@ namespace Willowstead.Persistence
         /// <summary>Currently allowed to autosave.</summary>
         public bool AutosaveEnabled => _enableAutosave;
 
+        /// <summary>Current active world name.</summary>
+        public string ActiveSaveName { get; private set; } = "My Willowstead";
+
+        /// <summary>Current active save slot index (1..3, 0 for autosave, -1 for unsaved).</summary>
+        public int ActiveSlotIndex { get; private set; } = -1;
+
+        /// <summary>Updates the active world name (can be changed by host in settings).</summary>
+        public void SetActiveSaveName(string newName)
+        {
+            if (string.IsNullOrWhiteSpace(newName)) return;
+            ActiveSaveName = newName.Trim();
+            if (ActiveSlotIndex > 0)
+            {
+                SaveToSlot(ActiveSlotIndex, ActiveSaveName);
+            }
+            else if (ActiveSlotIndex == 0)
+            {
+                SaveToAutosave(ActiveSaveName);
+            }
+        }
+
         /// <summary>
         /// Update the autosave interval from gameplay UI (PauseMenu Gameplay panel).
         /// Clamps to ≥ 0 and resets the rolling timer so the next save doesn't
@@ -183,7 +204,9 @@ namespace Willowstead.Persistence
                 string json = JsonUtility.ToJson(data, prettyPrint: false);
                 File.WriteAllText(path, json);
 
+                ActiveSaveName = saveName;
                 int slotNum = InferSlotFromPath(path);
+                ActiveSlotIndex = slotNum;
                 if (slotNum >= 0) OnSaveCompleted?.Invoke(slotNum);
                 return true;
             }
@@ -230,6 +253,8 @@ namespace Willowstead.Persistence
             }
 
             int slotNum = InferSlotFromPath(path);
+            ActiveSlotIndex = slotNum;
+            ActiveSaveName = !string.IsNullOrEmpty(data.saveName) ? data.saveName : "Untitled";
             OnLoadStarted?.Invoke(slotNum <= 0 ? -1 : slotNum);
             try
             {

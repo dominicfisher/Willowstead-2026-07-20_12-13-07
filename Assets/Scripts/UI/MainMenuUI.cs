@@ -54,7 +54,15 @@ namespace Willowstead.UI
         {
             // Only auto-show when there's no save in progress already.
             if (SaveGameManager.IsLoadingFromSave) return;
-            Show();
+
+            if (!CharacterCreationUI.HasCharacterCreated())
+            {
+                if (CharacterCreationUI.Instance != null) CharacterCreationUI.Instance.Show();
+            }
+            else
+            {
+                Show();
+            }
         }
 
         public static bool HasGameStarted { get; private set; } = false;
@@ -222,7 +230,7 @@ namespace Willowstead.UI
             cardRt.anchorMin = new Vector2(0.5f, 0.5f);
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
-            cardRt.sizeDelta = new Vector2(540f, 620f);
+            cardRt.sizeDelta = new Vector2(540f, 690f);
             cardRt.anchoredPosition = Vector2.zero;
             Image cardBg = cardGo.GetComponent<Image>();
             cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
@@ -284,8 +292,10 @@ namespace Willowstead.UI
                 new Vector2(0f, -350f), OnJoinMultiplayerClicked);
             BuildMenuButton(cardGo.transform, "Load Saves",
                 new Vector2(0f, -420f), OnLoadSavesClicked);
+            BuildMenuButton(cardGo.transform, "Character & Profile",
+                new Vector2(0f, -490f), OnCharacterProfileClicked);
             BuildMenuButton(cardGo.transform, "Quit",
-                new Vector2(0f, -490f), OnQuitClicked);
+                new Vector2(0f, -560f), OnQuitClicked);
             _continueLabel = _continueButton.GetComponentInChildren<Text>();
 
             GameObject hintGo = new GameObject("Hint", typeof(RectTransform));
@@ -296,8 +306,15 @@ namespace Willowstead.UI
             hintRt.pivot = new Vector2(0.5f, 0f);
             hintRt.sizeDelta = new Vector2(500f, 30f);
             hintRt.anchoredPosition = new Vector2(0f, 18f);
-            BuildText(hintGo, "Tip: press F5 anywhere in-game to save current world to slot 1.",
+            BuildText(hintGo, "Tip: press Enter in-game to open chat with friends.",
                 new Color(0.78f, 0.72f, 0.62f, 0.85f), fontSize: 13, style: FontStyles.Italic);
+        }
+
+        private void OnCharacterProfileClicked()
+        {
+            if (CharacterCreationUI.Instance != null)
+                CharacterCreationUI.Instance.Show();
+            Hide();
         }
 
         private static void BuildText(GameObject parent, string text, Color color, float fontSize, FontStyles style)
@@ -389,8 +406,8 @@ namespace Willowstead.UI
         private void OnHostMultiplayerClicked()
         {
             PlayerController.EnsurePlayerInstance();
-            if (MultiplayerLobbyUI.Instance != null)
-                MultiplayerLobbyUI.Instance.ShowHostLobby();
+            if (SaveSlotsUI.Instance != null)
+                SaveSlotsUI.Instance.ShowHostCoopMode();
             Hide();
         }
 

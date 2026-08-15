@@ -222,7 +222,7 @@ namespace Willowstead.UI
             cardRt.anchorMin = new Vector2(0.5f, 0.5f);
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
-            cardRt.sizeDelta = new Vector2(540f, 520f);
+            cardRt.sizeDelta = new Vector2(540f, 620f);
             cardRt.anchoredPosition = Vector2.zero;
             Image cardBg = cardGo.GetComponent<Image>();
             cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
@@ -275,13 +275,17 @@ namespace Willowstead.UI
                 new Color(0.92f, 0.86f, 0.74f, 1f), fontSize: 16, style: FontStyles.Italic);
 
             _continueButton = BuildMenuButton(cardGo.transform, "Continue (Most Recent)",
-                new Vector2(0f, -145f), OnContinueClicked);
+                new Vector2(0f, -140f), OnContinueClicked);
             BuildMenuButton(cardGo.transform, "New World",
-                new Vector2(0f, -225f), OnNewWorldClicked);
+                new Vector2(0f, -210f), OnNewWorldClicked);
+            BuildMenuButton(cardGo.transform, "Host Co-op",
+                new Vector2(0f, -280f), OnHostMultiplayerClicked);
+            BuildMenuButton(cardGo.transform, "Join Co-op with Code",
+                new Vector2(0f, -350f), OnJoinMultiplayerClicked);
             BuildMenuButton(cardGo.transform, "Load Saves",
-                new Vector2(0f, -305f), OnLoadSavesClicked);
+                new Vector2(0f, -420f), OnLoadSavesClicked);
             BuildMenuButton(cardGo.transform, "Quit",
-                new Vector2(0f, -385f), OnQuitClicked);
+                new Vector2(0f, -490f), OnQuitClicked);
             _continueLabel = _continueButton.GetComponentInChildren<Text>();
 
             GameObject hintGo = new GameObject("Hint", typeof(RectTransform));
@@ -379,6 +383,22 @@ namespace Willowstead.UI
             PlayerController.EnsurePlayerInstance();
             if (WorldSetupUI.Instance != null)
                 WorldSetupUI.Instance.Show();
+            Hide();
+        }
+
+        private void OnHostMultiplayerClicked()
+        {
+            PlayerController.EnsurePlayerInstance();
+            if (MultiplayerLobbyUI.Instance != null)
+                MultiplayerLobbyUI.Instance.ShowHostLobby();
+            Hide();
+        }
+
+        private void OnJoinMultiplayerClicked()
+        {
+            PlayerController.EnsurePlayerInstance();
+            if (MultiplayerLobbyUI.Instance != null)
+                MultiplayerLobbyUI.Instance.ShowJoinLobby();
             Hide();
         }
 

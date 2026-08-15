@@ -232,14 +232,15 @@ namespace Willowstead.Player
             {
                 _animator = gameObject.AddComponent<Animator>();
             }
+            _animator.enabled = true;
 
-            if (_animator.runtimeAnimatorController == null)
-            {
 #if UNITY_EDITOR
+            if (_animator.runtimeAnimatorController == null || _animator.runtimeAnimatorController.name != "PlayerAnimatorController")
+            {
                 var ctrl = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Scripts/Player/PlayerAnimatorController.controller");
                 if (ctrl != null) _animator.runtimeAnimatorController = ctrl;
-#endif
             }
+#endif
 
             _spriteRenderer = GetComponent<SpriteRenderer>();
             if (_spriteRenderer == null)
@@ -247,10 +248,13 @@ namespace Willowstead.Player
                 _spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
             }
 
-            if (_spriteRenderer.sprite == null)
+#if UNITY_EDITOR
+            if (_spriteRenderer.sprite == null || _spriteRenderer.sprite.name.StartsWith("Player_"))
             {
-                _spriteRenderer.sprite = UIResourceHelper.GetCircleSprite();
+                var fullSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/PlayerFrames/Idle/South/frame_0.png");
+                if (fullSprite != null) _spriteRenderer.sprite = fullSprite;
             }
+#endif
 
             if (UI.MainMenuUI.Instance != null && !UI.MainMenuUI.HasGameStarted)
             {
@@ -260,10 +264,8 @@ namespace Willowstead.Player
             {
                 _spriteRenderer.enabled = true;
             }
-            Color sc = _spriteRenderer.color;
-            if (sc.a < 0.1f) sc.a = 1f;
-            _spriteRenderer.color = sc;
-            if (_spriteRenderer.sortingOrder < 1) _spriteRenderer.sortingOrder = 10;
+            _spriteRenderer.color = Color.white;
+            _spriteRenderer.sortingOrder = 50;
 
             if (transform.localScale.sqrMagnitude < 0.01f)
             {
@@ -292,6 +294,15 @@ namespace Willowstead.Player
         {
             if (_spriteRenderer != null)
             {
+                if (UI.MainMenuUI.Instance != null && UI.MainMenuUI.Instance.IsVisible && !UI.MainMenuUI.HasGameStarted)
+                {
+                    if (_spriteRenderer.enabled) _spriteRenderer.enabled = false;
+                }
+                else
+                {
+                    if (!_spriteRenderer.enabled) _spriteRenderer.enabled = true;
+                }
+
                 // Dynamic Y-sorting: objects lower on screen render in front, clamped so player is always above terrain
                 _spriteRenderer.sortingOrder = Mathf.Max(10, Mathf.RoundToInt(-transform.position.y * 100) + 10);
             }

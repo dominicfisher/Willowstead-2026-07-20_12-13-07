@@ -25,7 +25,6 @@ namespace Willowstead.Debugging
     /// </summary>
     public class DevConsole : MonoBehaviour
     {
-        // ─── Static command registry ─────────────────────────────────────
         private static readonly Dictionary<string, DevConsoleCommand> _commands
             = new Dictionary<string, DevConsoleCommand>(System.StringComparer.OrdinalIgnoreCase);
 
@@ -49,7 +48,6 @@ namespace Willowstead.Debugging
         /// <summary>True when the console panel is visible (any view: Mini or Full).</summary>
         public bool IsOpen => _currentView != ConsoleView.Closed;
 
-        // ─── Bootstrap ───────────────────────────────────────────────────
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
@@ -58,7 +56,6 @@ namespace Willowstead.Debugging
             DontDestroyOnLoad(go);
             go.AddComponent<DevConsole>();
 
-            // Register default commands. Plugins / mods may call Register() too.
             Register(new Commands.HelpCommand());
             Register(new Commands.GiveCommand());
             Register(new Commands.GoldCommand());
@@ -76,7 +73,6 @@ namespace Willowstead.Debugging
             Register(new Commands.SeedCommand());
         }
 
-        // ─── Instance state ──────────────────────────────────────────────
         private GameObject _panelGo;
         private RectTransform _panelRt;
         private TMP_InputField _inputField;
@@ -99,13 +95,11 @@ namespace Willowstead.Debugging
         private int _completionIdx;
         private string _completionAnchor;
 
-        // FPS overlay state
         private TextMeshProUGUI _fpsText;
         private bool _fpsOn;
         private float _fpsAccum;
         private int _fpsFrames;
 
-        // ─── Lifecycle ───────────────────────────────────────────────────
         private void Awake()
         {
             Instance = this;
@@ -121,32 +115,68 @@ namespace Willowstead.Debugging
 
         private void BuildPanel(Canvas canvas)
         {
-            // ── Root panel (bottom-left text box) ────────────────────────
             _panelGo = new GameObject("DevConsolePanel");
             _panelRt = _panelGo.AddComponent<RectTransform>();
             _panelRt.SetParent(canvas.transform, false);
             _panelRt.anchorMin = new Vector2(0f, 0f);
             _panelRt.anchorMax = new Vector2(0f, 0f);
             _panelRt.pivot = new Vector2(0f, 0f);
-            _panelRt.anchoredPosition = new Vector2(16f, 16f);
-            _panelRt.sizeDelta = new Vector2(640f, 240f);
+            _panelRt.anchoredPosition = new Vector2(24f, 24f);
+            _panelRt.sizeDelta = new Vector2(680f, 320f);
 
+            // Cozy wood frame container
             Image bg = _panelGo.AddComponent<Image>();
-            bg.color = new Color(0.04f, 0.05f, 0.08f, 0f);
-            bg.raycastTarget = true;
             bg.sprite = UIResourceHelper.GetBackgroundSprite();
+            bg.type = Image.Type.Sliced;
+            bg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f); // Warm dark walnut wood
+            bg.raycastTarget = true;
 
-            // No panel border or dark background by request; keep the Image so the
-            // console still blocks pointer raycasts behind the text.
+            // Inner dark parchment board
+            GameObject innerBoard = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
+            innerBoard.transform.SetParent(_panelGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerBoard.transform;
+            innerRt.anchorMin = Vector2.zero;
+            innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(8f, 8f);
+            innerRt.offsetMax = new Vector2(-8f, -8f);
+            Image innerBg = innerBoard.GetComponent<Image>();
+            innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerBg.type = Image.Type.Sliced;
+            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f); // Deep cozy dark board
 
-            // ── History viewport (ScrollRect with a Mask) ──────────────────
-            _historyRoot = BuildHistory(_panelRt);
+            // Top Header Banner
+            GameObject headerGo = new GameObject("HeaderBanner", typeof(RectTransform), typeof(Image));
+            headerGo.transform.SetParent(innerBoard.transform, false);
+            RectTransform headerRt = (RectTransform)headerGo.transform;
+            headerRt.anchorMin = new Vector2(0f, 1f);
+            headerRt.anchorMax = new Vector2(1f, 1f);
+            headerRt.pivot = new Vector2(0.5f, 1f);
+            headerRt.sizeDelta = new Vector2(0f, 32f);
+            headerRt.anchoredPosition = Vector2.zero;
+            Image headerBg = headerGo.GetComponent<Image>();
+            headerBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            headerBg.type = Image.Type.Sliced;
+            headerBg.color = new Color(0.35f, 0.24f, 0.15f, 1f); // Warm banner
 
-            // ── Prompt + input bar ────────────────────────────────────────
-            BuildInputBar(_panelRt);
+            GameObject titleTextGo = new GameObject("TitleText", typeof(RectTransform));
+            titleTextGo.transform.SetParent(headerGo.transform, false);
+            RectTransform titleRt = (RectTransform)titleTextGo.transform;
+            titleRt.anchorMin = Vector2.zero;
+            titleRt.anchorMax = Vector2.one;
+            titleRt.offsetMin = new Vector2(12f, 0f);
+            titleRt.offsetMax = new Vector2(-12f, 0f);
+            var titleText = titleTextGo.AddComponent<TextMeshProUGUI>();
+            titleText.text = "DEVELOPER CONSOLE";
+            titleText.fontSize = 14f;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.color = new Color(1f, 0.88f, 0.45f, 1f);
+            titleText.alignment = TextAlignmentOptions.MidlineLeft;
+
+            _historyRoot = BuildHistory(innerRt);
+            BuildInputBar(innerRt);
 
             _panelGo.SetActive(false);
-            Print("[DevConsole] Press ` to toggle. Type 'help' for commands.");
+            Print("<color=#FFD670>[DevConsole]</color> Ready. Press <color=#FFD670>`</color> to toggle. Type <color=#80D27F>help</color> for commands.");
         }
 
         private Transform BuildHistory(RectTransform parent)
@@ -158,17 +188,11 @@ namespace Willowstead.Debugging
             srRt.anchorMin = new Vector2(0f, 0f);
             srRt.anchorMax = new Vector2(1f, 1f);
             srRt.pivot = new Vector2(0.5f, 0.5f);
-            srRt.offsetMin = new Vector2(10f, 56f);   // leave room for input bar
-            srRt.offsetMax = new Vector2(-10f, -10f); // leave room for top border
+            srRt.offsetMin = new Vector2(10f, 54f);   // leave room for input bar
+            srRt.offsetMax = new Vector2(-10f, -38f); // leave room for header banner
 
             Image srImg = srGo.GetComponent<Image>();
-            // Solid dark-navy scrollview background so the "shadow" doesn't read as
-            // fading/transparent when the panel toggles in/out. The panel itself still
-            // flips via SetActive, but the shadow itself is now ~opaque instead of
-            // 25%-alpha black. RGB matches the existing panel palette for visual
-            // continuity; alpha 0.96 instead of 1.0 keeps a hair of softness so it
-            // doesn't read as cheap matte-black under the white history text.
-            srImg.color = new Color(0.04f, 0.05f, 0.08f, 0.96f);
+            srImg.color = new Color(0.08f, 0.06f, 0.04f, 0.80f); // Parchment scroll background
             srImg.raycastTarget = true;
 
             Mask srMask = srGo.GetComponent<Mask>();
@@ -199,13 +223,12 @@ namespace Willowstead.Debugging
             textRt.anchorMin = new Vector2(0f, 0f);
             textRt.anchorMax = new Vector2(1f, 1f);
             textRt.pivot = new Vector2(0f, 0f);
-            textRt.offsetMin = new Vector2(2f, 0f);
-            textRt.offsetMax = new Vector2(-2f, 0f);
+            textRt.offsetMin = new Vector2(6f, 4f);
+            textRt.offsetMax = new Vector2(-6f, -4f);
 
             _historyText = textGo.AddComponent<TextMeshProUGUI>();
-            _historyText.fontSize = 16f;
-            _historyText.color = new Color(0.92f, 0.94f, 0.96f, 1f);
-            // TMP 4.x renamed `enableWordWrapping` (obsolete) to `textWrappingMode`.
+            _historyText.fontSize = 15f;
+            _historyText.color = new Color(0.92f, 0.88f, 0.78f, 1f);
             _historyText.alignment = TextAlignmentOptions.BottomLeft;
             _historyText.textWrappingMode = TextWrappingModes.Normal;
             _historyText.richText = true;
@@ -218,35 +241,34 @@ namespace Willowstead.Debugging
 
         private void BuildInputBar(RectTransform parent)
         {
-            // "> " prompt label
             GameObject promptGo = new GameObject("PromptLabel");
             RectTransform promptRt = promptGo.AddComponent<RectTransform>();
             promptRt.SetParent(parent, false);
             promptRt.anchorMin = new Vector2(0f, 0f);
             promptRt.anchorMax = new Vector2(0f, 0f);
             promptRt.pivot = new Vector2(0f, 0f);
-            promptRt.anchoredPosition = new Vector2(14f, 12f);
-            promptRt.sizeDelta = new Vector2(28f, 32f);
+            promptRt.anchoredPosition = new Vector2(12f, 10f);
+            promptRt.sizeDelta = new Vector2(24f, 34f);
             var promptText = promptGo.AddComponent<TextMeshProUGUI>();
-            promptText.text = ">";
-            promptText.fontSize = 22f;
-            promptText.color = new Color(0.95f, 0.78f, 0.32f, 1f);
+            promptText.text = "❯";
+            promptText.fontSize = 20f;
+            promptText.color = new Color(1f, 0.88f, 0.45f, 1f); // Cozy gold prompt
             promptText.fontStyle = FontStyles.Bold;
             promptText.alignment = TextAlignmentOptions.MidlineLeft;
 
-            // Input field
             GameObject inputGo = new GameObject("Input", typeof(RectTransform), typeof(Image));
             RectTransform inputRt = inputGo.GetComponent<RectTransform>();
             inputRt.SetParent(parent, false);
             inputRt.anchorMin = new Vector2(0f, 0f);
             inputRt.anchorMax = new Vector2(1f, 0f);
             inputRt.pivot = new Vector2(0f, 0f);
-            inputRt.offsetMin = new Vector2(40f, 8f);
-            inputRt.offsetMax = new Vector2(-8f, 44f);
+            inputRt.offsetMin = new Vector2(36f, 8f);
+            inputRt.offsetMax = new Vector2(-10f, 44f);
 
             Image inputBg = inputGo.GetComponent<Image>();
             inputBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
-            inputBg.color = new Color(0.06f, 0.06f, 0.10f, 0.95f);
+            inputBg.type = Image.Type.Sliced;
+            inputBg.color = new Color(0.18f, 0.14f, 0.10f, 0.95f); // Rich warm input box
 
             GameObject textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
             RectTransform textAreaRt = textArea.GetComponent<RectTransform>();
@@ -254,10 +276,9 @@ namespace Willowstead.Debugging
             textAreaRt.anchorMin = new Vector2(0f, 0f);
             textAreaRt.anchorMax = new Vector2(1f, 1f);
             textAreaRt.pivot = new Vector2(0.5f, 0.5f);
-            textAreaRt.offsetMin = new Vector2(8f, 6f);
-            textAreaRt.offsetMax = new Vector2(-8f, -6f);
+            textAreaRt.offsetMin = new Vector2(10f, 4f);
+            textAreaRt.offsetMax = new Vector2(-10f, -4f);
 
-            // Placeholder (shown when input is empty)
             GameObject placeholderGo = new GameObject("Placeholder");
             RectTransform phRt = placeholderGo.AddComponent<RectTransform>();
             phRt.SetParent(textArea.transform, false);
@@ -267,12 +288,11 @@ namespace Willowstead.Debugging
             phRt.offsetMax = Vector2.zero;
             var phText = placeholderGo.AddComponent<TextMeshProUGUI>();
             phText.text = "type 'help' and press Enter…";
-            phText.fontSize = 16f;
+            phText.fontSize = 15f;
             phText.fontStyle = FontStyles.Italic;
-            phText.color = new Color(1f, 1f, 1f, 0.34f);
+            phText.color = new Color(0.80f, 0.74f, 0.64f, 0.45f);
             phText.alignment = TextAlignmentOptions.MidlineLeft;
 
-            // Real input text (overlays the placeholder when content present)
             GameObject inputTextGo = new GameObject("Text");
             RectTransform itRt = inputTextGo.AddComponent<RectTransform>();
             itRt.SetParent(textArea.transform, false);
@@ -281,9 +301,8 @@ namespace Willowstead.Debugging
             itRt.offsetMin = Vector2.zero;
             itRt.offsetMax = Vector2.zero;
             var itText = inputTextGo.AddComponent<TextMeshProUGUI>();
-            itText.fontSize = 18f;
-            itText.color = new Color(0.92f, 0.94f, 0.96f, 1f);
-            // TMP uses `richText`, not the UnityEngine.UI.Text-style `supportRichText`.
+            itText.fontSize = 16f;
+            itText.color = new Color(0.98f, 0.94f, 0.86f, 1f);
             itText.richText = false;
             itText.alignment = TextAlignmentOptions.MidlineLeft;
 
@@ -295,50 +314,14 @@ namespace Willowstead.Debugging
             _inputField.lineType = TMP_InputField.LineType.SingleLine;
             _inputField.characterLimit = 256;
             _inputField.restoreOriginalTextOnEscape = false;
-            // Disable keyboard focus traversal — otherwise Tab would move focus
-            // off the input field before our completion logic ever saw it.
             _inputField.navigation = new Navigation { mode = Navigation.Mode.None };
             _inputField.onSubmit.AddListener(OnSubmit);
         }
 
-        private static void AddBorder(RectTransform parent, float thicknessPx, Color color)
-        {
-            Vector2 size = parent.sizeDelta; // already-set explicit size
-            float h = Mathf.Max(1, size.y);
-            float w = Mathf.Max(1, size.x);
-            float yFrac = thicknessPx / h;
-            float xFrac = thicknessPx / w;
-
-            AddBorderEdge(parent, color, new Vector2(0f, 1f - yFrac), new Vector2(1f, 1f));           // top
-            AddBorderEdge(parent, color, new Vector2(0f, 0f),         new Vector2(1f, yFrac));       // bottom
-            AddBorderEdge(parent, color, new Vector2(0f, 0f),         new Vector2(xFrac, 1f));      // left
-            AddBorderEdge(parent, color, new Vector2(1f - xFrac, 0f), new Vector2(1f, 1f));          // right
-        }
-
-        private static void AddBorderEdge(RectTransform parent, Color color, Vector2 anchorMin, Vector2 anchorMax)
-        {
-            GameObject edge = new GameObject("BorderEdge", typeof(RectTransform), typeof(Image));
-            RectTransform rt = edge.GetComponent<RectTransform>();
-            rt.SetParent(parent, false);
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-            Image img = edge.GetComponent<Image>();
-            img.color = color;
-            img.raycastTarget = false;
-        }
-
-        // ─── Open/close ──────────────────────────────────────────────────
-        // Backquote cycles: Closed -> Mini (input only) -> Full -> Closed.
         public void Toggle()
         {
             if (_panelGo == null) return;
-
             if (_currentView == ConsoleView.Closed)
-                SetView(ConsoleView.Mini);
-            else if (_currentView == ConsoleView.Mini)
                 SetView(ConsoleView.Full);
             else
                 SetView(ConsoleView.Closed);
@@ -351,21 +334,16 @@ namespace Willowstead.Debugging
             if (_panelGo != null)
                 _panelGo.SetActive(view != ConsoleView.Closed);
 
-            // Block gameplay input while any console view is open so background WASD /
-            // interact / hotbar digits don't move the character or open other UI.
+            // Block gameplay input while console is open
             InputReader.BlockGameplayInput = view != ConsoleView.Closed;
 
-            if (_historyRoot != null)
-                _historyRoot.gameObject.SetActive(view == ConsoleView.Full);
-
-            if (_panelRt != null)
-                _panelRt.sizeDelta = view == ConsoleView.Full ? new Vector2(640f, 240f) : new Vector2(480f, 60f);
-
             if (view != ConsoleView.Closed && _inputField != null)
+            {
                 _inputField.ActivateInputField();
+                _inputField.Select();
+            }
         }
 
-        // ─── Update loop ─────────────────────────────────────────────────
         private void Update()
         {
             Keyboard kb = Keyboard.current;
@@ -475,9 +453,6 @@ namespace Willowstead.Debugging
 
         private void LateUpdate()
         {
-            // Defence-in-depth: if TMP's input module managed to inject a '\t'
-            // character after our Tab handler ran (Unity's input phase order is
-            // not strictly defined versus MonoBehaviour Update), strip it now so
             // it never reaches OnSubmit.
             if (_inputField == null) return;
             string cur = _inputField.text;
@@ -499,7 +474,6 @@ namespace Willowstead.Debugging
 
             if (!_history.Contains(trimmed)) _history.Add(trimmed);
             _recallIndex = -1;
-            // Reset Tab-completion cycling state — the next command starts fresh.
             _completionAnchor = null;
             _completionMatches.Clear();
             _completionIdx = 0;
@@ -529,7 +503,6 @@ namespace Willowstead.Debugging
             }
         }
 
-        // ─── Print API (commands call these) ─────────────────────────────
         public void Print(string text)      => AppendLine($"<color=#c8dfe6>{Escape(text)}</color>");
         public void PrintOk(string text)    => AppendLine($"<color=#80d27f>[ok] {Escape(text)}</color>");
         public void PrintError(string text) => AppendLine($"<color=#ff8585>[err] {Escape(text)}</color>");
@@ -552,7 +525,6 @@ namespace Willowstead.Debugging
             return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
         }
 
-        // ─── FPS overlay (static so commands can call it) ────────────────
         public static void ToggleFps()
         {
             DevConsole self = Instance;
@@ -601,7 +573,6 @@ namespace Willowstead.Debugging
 
         private void OnDestroy()
         {
-            // Clear the gameplay-input gate so movement resumes after the console's
             // GameObject is destroyed (manual destroy, domain reload, scene tear-down).
             // Without this, a transient Instance could leave BlockGameplayInput stuck
             // true if our pointer was cleared mid-frame, freezing background input.

@@ -22,7 +22,6 @@ namespace Willowstead.Player
     /// </summary>
     public class ShopUI : MonoBehaviour
     {
-        // ─── Shop catalogue entry ─────────────────────────────────────────────
         [System.Serializable]
         public class ShopEntry
         {
@@ -41,7 +40,6 @@ namespace Willowstead.Player
             public int yieldSellPrice = 25;
         }
 
-        // ─── Inspector fields ─────────────────────────────────────────────────
         [Header("Shop Catalogue")]
         [Tooltip("One entry per crop type. Add as many as you like.")]
         [SerializeField] private ShopEntry[] _shopEntries = new ShopEntry[0];
@@ -72,21 +70,17 @@ namespace Willowstead.Player
 	        [Header("Assets")] 
 	        [SerializeField] private Sprite _coinSprite;
 
-        // ─── Private state ────────────────────────────────────────────────────
         private InventoryManager _inventory;
         private GameObject       _canvasGo;
         private GameObject       _panelGo;
         private bool             _isOpen           = false;
         private Coroutine        _bounceCoroutine;
 
-        // Button rects — kept in entry order for fly-animation origins
         private readonly List<RectTransform> _buyButtonRects  = new List<RectTransform>();
         private readonly List<RectTransform> _sellButtonRects = new List<RectTransform>();
 
-        // Sell-count Text references; index matches _shopEntries index
         private readonly List<Text> _sellCountLabels = new List<Text>();
 
-        // Tab UI state
         private GameObject _buyContent;
         private GameObject _sellContent;
         private int _activeTab = 0;          // 0 = Buy, 1 = Sell
@@ -94,7 +88,6 @@ namespace Willowstead.Player
         private Image _sellTabImg;
         private readonly List<Text> _ownedCountLabels = new List<Text>();
 
-        // Permanent gold HUD
         private Text          _hudGoldText;
         private RectTransform _hudGoldRect;
         private Coroutine     _hudPulseCoroutine;
@@ -102,7 +95,6 @@ namespace Willowstead.Player
 
         public bool IsOpen => _isOpen;
 
-        // ─── Layout constants ─────────────────────────────────────────────────
         private const float PANEL_WIDTH = 700f;
         private const float ROW_HEIGHT  = 72f;
         private const float HEADER_H    = 150f;
@@ -124,7 +116,6 @@ namespace Willowstead.Player
 	        }
 	#endif
 
-        // ─── Unity lifecycle ──────────────────────────────────────────────────
 
         private void EnsureDefaultShopEntries()
         {
@@ -187,8 +178,6 @@ namespace Willowstead.Player
 
         private void Update()
         {
-            // Toggle shop on P or B key — gated so the background trigger doesn't open a
-            // competing UI panel while the dev console has focus. UpdateHudGold
             // below runs unconditionally so the gold readout stays current.
             if (!InputReader.BlockGameplayInput &&
                 Keyboard.current != null &&
@@ -201,7 +190,6 @@ namespace Willowstead.Player
             UpdateHudGold();
         }
 
-        // ─── Open / Close ─────────────────────────────────────────────────────
 
         public void CloseUI()
         {
@@ -258,7 +246,6 @@ namespace Willowstead.Player
             if (_panelGo != null) _panelGo.SetActive(active);
         }
 
-        // ─── Permanent gold HUD ───────────────────────────────────────────────
 
         /// Called every frame; updates the HUD label and triggers a pulse only when the value changes.
         private void UpdateHudGold()
@@ -292,7 +279,6 @@ namespace Willowstead.Player
             _hudPulseCoroutine = null;
         }
 
-        // ─── Sell-count labels ────────────────────────────────────────────────
 
         /// Refreshes every sell button's label with the current inventory count.
         /// Called when the shop opens and after each successful sale.
@@ -311,7 +297,6 @@ namespace Willowstead.Player
 
         private static string FormatSellLabel(int price, int count) => $"+{price}g  \u00d7{count}";
 
-        // ─── Transactions ─────────────────────────────────────────────────────
 
         private void BuySeed(ShopEntry entry, RectTransform buyBtnRect)
         {
@@ -330,11 +315,9 @@ namespace Willowstead.Player
                 _inventory.RemoveItem("Gold", entry.seedBuyPrice);
             }
 
-            // Success: scale-pop + sparkle burst
             StartCoroutine(ScalePopAnimation(buyBtnRect));
             SpawnSparkleBurst(buyBtnRect.position);
 
-            // Fly seed icon from buy button toward inventory
             Vector3 startPos = GetWorldPos(buyBtnRect);
             Sprite  icon     = entry.seedSprite != null ? entry.seedSprite : _coinSprite;
 
@@ -360,16 +343,13 @@ namespace Willowstead.Player
 
             int remaining = _inventory.GetItemCount(entry.yieldItemName);
 
-            // Update sell label immediately so it stays in sync
             if (sellCountLabel != null)
                 sellCountLabel.text = FormatSellLabel(entry.yieldSellPrice, remaining);
 
-            // Update owned count label for this entry
             int idx = Array.IndexOf(_shopEntries, entry);
             if (idx >= 0 && idx < _ownedCountLabels.Count && _ownedCountLabels[idx] != null)
                 _ownedCountLabels[idx].text = $"\u00d7{remaining}";
 
-            // Fly coin from sell button to the permanent HUD gold display
             Vector3 startPos  = GetWorldPos(sellBtnRect);
             Color   goldColor = new Color(1f, 0.82f, 0f, 1f);
 
@@ -390,7 +370,6 @@ namespace Willowstead.Player
             return world;
         }
 
-        // ─── Button animations ────────────────────────────────────────────────
 
         /// Quick scale-pop: grows to 1.35× then snaps back. Signals a successful action.
         private IEnumerator ScalePopAnimation(RectTransform rt)
@@ -433,7 +412,6 @@ namespace Willowstead.Player
                 float t = elapsed / duration;
                 rt.anchoredPosition = originalPos + new Vector2(Mathf.Sin(elapsed * freq) * amp * (1f - t), 0f);
 
-                // Fade back to original color in the second half of the shake
                 if (img != null && t > 0.5f)
                     img.color = Color.Lerp(Color.red, originalColor, (t - 0.5f) / 0.5f);
 
@@ -444,7 +422,6 @@ namespace Willowstead.Player
             if (img != null) img.color = originalColor;
         }
 
-        // ─── Sparkle burst ────────────────────────────────────────────────────
 
         /// Spawns 5 small golden squares that fly outward and fade from the given screen position.
         private void SpawnSparkleBurst(Vector2 screenPos)
@@ -453,7 +430,6 @@ namespace Willowstead.Player
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 canvasRect, screenPos, null, out Vector2 localPos);
 
-            // Five distinct gold/yellow tints for variety
             Color[] palette =
             {
                 new Color(1.00f, 0.84f, 0.00f, 1f),
@@ -475,7 +451,6 @@ namespace Willowstead.Player
                 sparkleRt.sizeDelta       = new Vector2(9f, 9f);
                 sparkleRt.anchoredPosition = localPos;
 
-                // Evenly distribute outward directions with a small phase offset
                 float angle = i * 72f * Mathf.Deg2Rad + 0.30f;
                 Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
@@ -517,7 +492,6 @@ namespace Willowstead.Player
             if (_sellTabImg != null) _sellTabImg.color = tab == 1 ? sellActive : dimmed;
         }
 
-        //  Prefab binding (no programmatic layout) 
         private void BindPrefabShopUI()
         {
             if (_prefabPanelRoot == null || _buyContentRoot == null || _sellContentRoot == null)
@@ -532,7 +506,6 @@ namespace Willowstead.Player
             _buyContent = _buyContentRoot != null ? _buyContentRoot.gameObject : null;
             _sellContent = _sellContentRoot != null ? _sellContentRoot.gameObject : null;
 
-            // Tabs (optional)
             var buyTabBtn = UIResourceHelper.FindChildComponentByName<Button>(_prefabPanelRoot, new[] { "BuyTab", "Buy Seeds", "Buy" });
             var sellTabBtn = UIResourceHelper.FindChildComponentByName<Button>(_prefabPanelRoot, new[] { "SellTab", "Sell Crops", "Sell" });
             _buyTabImg = buyTabBtn != null ? buyTabBtn.GetComponent<Image>() : null;
@@ -540,7 +513,6 @@ namespace Willowstead.Player
             if (buyTabBtn != null) buyTabBtn.onClick.AddListener(() => SwitchTab(0));
             if (sellTabBtn != null) sellTabBtn.onClick.AddListener(() => SwitchTab(1));
 
-            // Permanent HUD gold binding
             if (_prefabHudGoldText != null)
             {
                 _hudGoldText = _prefabHudGoldText;
@@ -572,7 +544,6 @@ namespace Willowstead.Player
             {
                 var entry = _shopEntries[i];
 
-                // ---- Buy row ----
                 Transform buyRow = (_buyContentRoot != null && i < _buyContentRoot.childCount) ? _buyContentRoot.GetChild(i) : null;
                 if (buyRow == null)
                 {
@@ -580,7 +551,6 @@ namespace Willowstead.Player
                 }
                 else
                 {
-                    // Icon
                     var buyIcon = UIResourceHelper.FindChildComponentByName<Image>(buyRow, new[] { "BuyIcon", "Icon", "SeedIcon" });
                     if (buyIcon != null)
                     {
@@ -589,11 +559,9 @@ namespace Willowstead.Player
                         buyIcon.color = buyIcon.sprite != null ? Color.white : new Color(0.6f, 0.5f, 0.3f, 0.6f);
                     }
 
-                    // Name
                     var buyName = UIResourceHelper.FindChildComponentByName<Text>(buyRow, new[] { "BuyName", "Name", "ItemName" });
                     if (buyName != null) buyName.text = entry.seedItemName;
 
-                    // Button
                     var buyBtn = UIResourceHelper.FindChildComponentByName<Button>(buyRow, new[] { "BuyButton", "Buy", "Button" }) ?? buyRow.GetComponentInChildren<Button>(true);
                     if (buyBtn != null)
                     {
@@ -613,7 +581,6 @@ namespace Willowstead.Player
                     }
                 }
 
-                // ---- Sell row ----
                 Transform sellRow = (_sellContentRoot != null && i < _sellContentRoot.childCount) ? _sellContentRoot.GetChild(i) : null;
                 if (sellRow == null)
                 {
@@ -621,7 +588,6 @@ namespace Willowstead.Player
                 }
                 else
                 {
-                    // Icon
                     var sellIcon = UIResourceHelper.FindChildComponentByName<Image>(sellRow, new[] { "SellIcon", "Icon", "YieldIcon" });
                     if (sellIcon != null)
                     {
@@ -630,17 +596,14 @@ namespace Willowstead.Player
                         sellIcon.color = sellIcon.sprite != null ? Color.white : new Color(0.6f, 0.5f, 0.3f, 0.6f);
                     }
 
-                    // Name
                     var sellName = UIResourceHelper.FindChildComponentByName<Text>(sellRow, new[] { "SellName", "Name", "ItemName" });
                     if (sellName != null) sellName.text = entry.yieldItemName;
 
-                    // Owned count
                     int initCount = _inventory != null ? _inventory.GetItemCount(entry.yieldItemName) : 0;
                     var owned = UIResourceHelper.FindChildComponentByName<Text>(sellRow, new[] { "OwnedCount", "Owned", "Count" });
                     if (owned != null) owned.text = $"\u00d7{initCount}";
                     _ownedCountLabels.Add(owned);
 
-                    // Button
                     var sellBtn = UIResourceHelper.FindChildComponentByName<Button>(sellRow, new[] { "SellButton", "Sell", "Button" }) ?? sellRow.GetComponentInChildren<Button>(true);
                     Text sellLabel = null;
                     RectTransform sellRt = null;
@@ -665,16 +628,12 @@ namespace Willowstead.Player
                 }
             }
 
-            // Default to Buy tab visible
             SwitchTab(0);
         }
 
 
-        //      UI construction                                         
-
         private void CreateShopUI()
         {
-            // ── Canvas + EventSystem ──
             Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
             _canvasGo = canvas != null ? canvas.gameObject : null;
             UIResourceHelper.EnsureEventSystem();
@@ -685,7 +644,6 @@ namespace Willowstead.Player
             float  panelH   = HEADER_H + entries * ROW_HEIGHT + FOOTER_H;
             float  halfH    = panelH * 0.5f;
 
-            // ── Permanent gold HUD ─
             CreateGoldHud(bgSprite, font);
 
             // ── Main Wooden Panel ──────────────────────────────────────────────
@@ -695,14 +653,12 @@ namespace Willowstead.Player
             panelRect.sizeDelta     = new Vector2(PANEL_WIDTH, panelH);
             panelRect.anchoredPosition = Vector2.zero;
 
-            // Wooden Board Outer Frame
             Image bgFrame = CreateGO<Image>("OuterFrame", _panelGo.transform);
             bgFrame.sprite = UIResourceHelper.GetBackgroundSprite();
             bgFrame.type   = Image.Type.Sliced;
             bgFrame.color  = new Color(0.18f, 0.13f, 0.09f, 0.98f); // Rich warm dark wood
             Rect(bgFrame, 0f, 0f, PANEL_WIDTH, panelH);
 
-            // Inner Board Panel
             Image bgInner = CreateGO<Image>("InnerBoard", _panelGo.transform);
             bgInner.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             bgInner.type   = Image.Type.Sliced;
@@ -742,12 +698,10 @@ namespace Willowstead.Player
             _sellTabImg = sellTabRect.GetComponent<Image>();
             sellTabRect.GetComponent<Button>().onClick.AddListener(() => SwitchTab(1));
 
-            // Wooden Divider line
             Image divider = CreateGO<Image>("Divider", _panelGo.transform);
             divider.color = new Color(0.40f, 0.30f, 0.20f, 0.8f);
             Rect(divider, 0f, halfH - 116f, PANEL_WIDTH - 48f, 3f);
 
-            // Content containers
             _buyContent = new GameObject("BuyContent");
             _buyContent.transform.SetParent(_panelGo.transform, false);
             _buyContent.AddComponent<RectTransform>();
@@ -767,14 +721,12 @@ namespace Willowstead.Player
                 ShopEntry entry = _shopEntries[i];
                 float rowY = halfH - HEADER_H - i * ROW_HEIGHT - ROW_HEIGHT * 0.5f;
 
-                // ── Buy Row Card ──────────────────────────────────────────────
                 Image buyRowPlank = CreateGO<Image>($"BuyRowPlank_{i}", _buyContent.transform);
                 buyRowPlank.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 buyRowPlank.type   = Image.Type.Sliced;
                 buyRowPlank.color  = new Color(0.18f, 0.14f, 0.10f, 0.92f);
                 Rect(buyRowPlank, 0f, rowY, PANEL_WIDTH - 48f, ROW_HEIGHT - 10f);
 
-                // Slot Box
                 Image buySlotBox = CreateGO<Image>($"BuySlotBox_{i}", _buyContent.transform);
                 buySlotBox.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 buySlotBox.type   = Image.Type.Sliced;
@@ -810,14 +762,12 @@ namespace Willowstead.Player
                 buyRect.GetComponent<Button>().onClick.AddListener(
                     () => BuySeed(_shopEntries[capturedI], _buyButtonRects[capturedI]));
 
-                // ── Sell Row Card ─────────────────────────────────────────────
                 Image sellRowPlank = CreateGO<Image>($"SellRowPlank_{i}", _sellContent.transform);
                 sellRowPlank.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 sellRowPlank.type   = Image.Type.Sliced;
                 sellRowPlank.color  = new Color(0.18f, 0.14f, 0.10f, 0.92f);
                 Rect(sellRowPlank, 0f, rowY, PANEL_WIDTH - 48f, ROW_HEIGHT - 10f);
 
-                // Slot Box
                 Image sellSlotBox = CreateGO<Image>($"SellSlotBox_{i}", _sellContent.transform);
                 sellSlotBox.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 sellSlotBox.type   = Image.Type.Sliced;
@@ -870,7 +820,6 @@ namespace Willowstead.Player
 
             SwitchTab(0);
 
-            // ── Footer ────────────────────────────────────────────────────────
             Text help = CreateGO<Text>("HelpText", _panelGo.transform);
             help.text      = "Press  'P'  to close";
             help.font      = font;
@@ -880,51 +829,112 @@ namespace Willowstead.Player
             Rect(help, 0f, -halfH + 26f, 240f, 26f);
         }
 
-        /// Builds the permanent gold HUD anchored to the top-right corner of the screen.
+        /// Builds the permanent gold HUD anchored to the top-left corner of the screen.
         private void CreateGoldHud(Sprite bgSprite, Font font)
         {
-            GameObject hudGo = new GameObject("GoldHUD");
+            GameObject hudGo = new GameObject("GoldHUD", typeof(RectTransform));
             hudGo.transform.SetParent(_canvasGo.transform, false);
 
-            // Image component auto-creates RectTransform when none exists
-            Image hudBg = hudGo.AddComponent<Image>();
-            hudBg.sprite = bgSprite;
-            hudBg.type   = Image.Type.Sliced;
-            hudBg.color  = new Color(0.14f, 0.12f, 0.10f, 0.92f);
-
-            // Anchor top-right; pivot top-right; 20 px inset from corner
-            RectTransform hudRect = hudGo.GetComponent<RectTransform>();
-            hudRect.anchorMin        = new Vector2(1f, 1f);
-            hudRect.anchorMax        = new Vector2(1f, 1f);
-            hudRect.pivot            = new Vector2(1f, 1f);
-            hudRect.anchoredPosition = new Vector2(-20f, -20f);
-            hudRect.sizeDelta        = new Vector2(200f, 54f);
-
-            // Children use the default center anchor (0.5, 0.5) relative to the HUD's centre.
-            // HUD is 200×54, so centre-relative offsets below place elements inside its bounds.
-
-            // Coin icon (left side of HUD)
-            if (_coinSprite != null)
+            CanvasGroup cg = hudGo.AddComponent<CanvasGroup>();
+            if (UI.MainMenuUI.Instance != null && !UI.MainMenuUI.HasGameStarted)
             {
-                Image coinImg = CreateGO<Image>("HUDCoin", hudGo.transform);
-                coinImg.sprite = _coinSprite;
-                coinImg.preserveAspect = true;
-                Rect(coinImg, -72f, 0f, 36f, 36f);
+                cg.alpha = 0f;
             }
 
-            // Gold amount text (right of coin)
-            _hudGoldText = CreateGO<Text>("HUDGoldText", hudGo.transform);
-            _hudGoldText.font      = font;
-            _hudGoldText.fontSize  = 20;
+            RectTransform hudRect = (RectTransform)hudGo.transform;
+            hudRect.anchorMin        = new Vector2(0f, 1f);
+            hudRect.anchorMax        = new Vector2(0f, 1f);
+            hudRect.pivot            = new Vector2(0f, 1f);
+            hudRect.anchoredPosition = new Vector2(18f, -14f);
+            hudRect.sizeDelta        = new Vector2(154f, 44f);
+
+            GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
+            shadowGo.transform.SetParent(hudGo.transform, false);
+            RectTransform shadowRt = (RectTransform)shadowGo.transform;
+            shadowRt.anchorMin = Vector2.zero; shadowRt.anchorMax = Vector2.one;
+            shadowRt.offsetMin = new Vector2(-3f, -3f); shadowRt.offsetMax = new Vector2(3f, 2f);
+            Image shadowImg = shadowGo.GetComponent<Image>();
+            shadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            shadowImg.type = Image.Type.Sliced;
+            shadowImg.color = new Color(0f, 0f, 0f, 0.45f);
+
+            GameObject woodGo = new GameObject("WoodFrame", typeof(RectTransform), typeof(Image));
+            woodGo.transform.SetParent(hudGo.transform, false);
+            RectTransform woodRt = (RectTransform)woodGo.transform;
+            woodRt.anchorMin = Vector2.zero; woodRt.anchorMax = Vector2.one;
+            woodRt.offsetMin = Vector2.zero; woodRt.offsetMax = Vector2.zero;
+            Image woodImg = woodGo.GetComponent<Image>();
+            woodImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            woodImg.type = Image.Type.Sliced;
+            woodImg.color = new Color(0.24f, 0.17f, 0.11f, 0.96f);
+
+            GameObject trimGo = new GameObject("GoldTrim", typeof(RectTransform), typeof(Image));
+            trimGo.transform.SetParent(woodGo.transform, false);
+            RectTransform trimRt = (RectTransform)trimGo.transform;
+            trimRt.anchorMin = Vector2.zero; trimRt.anchorMax = Vector2.one;
+            trimRt.offsetMin = new Vector2(2f, 2f); trimRt.offsetMax = new Vector2(-2f, -2f);
+            Image trimImg = trimGo.GetComponent<Image>();
+            trimImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            trimImg.type = Image.Type.Sliced;
+            trimImg.color = new Color(0.78f, 0.62f, 0.32f, 0.75f);
+
+            GameObject innerGo = new GameObject("InnerBacking", typeof(RectTransform), typeof(Image));
+            innerGo.transform.SetParent(trimGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerGo.transform;
+            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(2f, 2f); innerRt.offsetMax = new Vector2(-2f, -2f);
+            Image innerImg = innerGo.GetComponent<Image>();
+            innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerImg.type = Image.Type.Sliced;
+            innerImg.color = new Color(0.09f, 0.08f, 0.07f, 0.96f);
+
+            if (_coinSprite != null)
+            {
+                GameObject coinGlow = new GameObject("CoinGlow", typeof(RectTransform), typeof(Image));
+                coinGlow.transform.SetParent(innerGo.transform, false);
+                RectTransform cgRt = (RectTransform)coinGlow.transform;
+                cgRt.anchorMin = new Vector2(0f, 0.5f);
+                cgRt.anchorMax = new Vector2(0f, 0.5f);
+                cgRt.pivot = new Vector2(0.5f, 0.5f);
+                cgRt.anchoredPosition = new Vector2(20f, 0f);
+                cgRt.sizeDelta = new Vector2(30f, 30f);
+                Image glowImg = coinGlow.GetComponent<Image>();
+                glowImg.sprite = UIResourceHelper.GetCircleSprite();
+                glowImg.color = new Color(1f, 0.85f, 0.2f, 0.25f);
+
+                GameObject coinGo = new GameObject("HUDCoin", typeof(RectTransform), typeof(Image));
+                coinGo.transform.SetParent(innerGo.transform, false);
+                RectTransform coinRt = (RectTransform)coinGo.transform;
+                coinRt.anchorMin = new Vector2(0f, 0.5f);
+                coinRt.anchorMax = new Vector2(0f, 0.5f);
+                coinRt.pivot = new Vector2(0.5f, 0.5f);
+                coinRt.anchoredPosition = new Vector2(20f, 0f);
+                coinRt.sizeDelta = new Vector2(24f, 24f);
+
+                Image coinImg = coinGo.GetComponent<Image>();
+                coinImg.sprite = _coinSprite;
+                coinImg.preserveAspect = true;
+            }
+
+            GameObject txtGo = new GameObject("HUDGoldText", typeof(RectTransform));
+            txtGo.transform.SetParent(innerGo.transform, false);
+            RectTransform txtRt = (RectTransform)txtGo.transform;
+            txtRt.anchorMin = new Vector2(0f, 0f);
+            txtRt.anchorMax = new Vector2(1f, 1f);
+            txtRt.pivot = new Vector2(0f, 0.5f);
+            txtRt.offsetMin = new Vector2(38f, 0f);
+            txtRt.offsetMax = new Vector2(-10f, 0f);
+
+            _hudGoldText = txtGo.AddComponent<Text>();
+            _hudGoldText.font = font;
+            _hudGoldText.fontSize = 18;
             _hudGoldText.fontStyle = FontStyle.Bold;
-            _hudGoldText.color     = new Color(1f, 0.84f, 0f, 1f);
+            _hudGoldText.color = new Color(1f, 0.88f, 0.45f, 1f);
             _hudGoldText.alignment = TextAnchor.MiddleLeft;
-            _hudGoldText.text      = "0";
-            _hudGoldRect = _hudGoldText.GetComponent<RectTransform>();
-            Rect(_hudGoldText, 22f, 0f, 110f, 40f);
+            _hudGoldText.text = "0";
+            _hudGoldRect = hudGo.GetComponent<RectTransform>();
         }
 
-        // ─── UI helpers ───────────────────────────────────────────────────────
 
         /// Creates a child GameObject with component T and returns T.
         private T CreateGO<T>(string name, Transform parent) where T : Component

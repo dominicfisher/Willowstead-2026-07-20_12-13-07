@@ -83,7 +83,6 @@ namespace Willowstead.World
             }
         }
 
-        // ─── Unity lifecycle ────────────────────────────────────────────
 
         private void Awake()
         {
@@ -201,7 +200,6 @@ namespace Willowstead.World
                 Sprite s = _raindropFrames[idx];
                 if (s != null) return s;
             }
-            // Fallback pass: linear scan for the first non-null.
             for (int i = 0; i < _raindropFrames.Length; i++)
             {
                 if (_raindropFrames[i] != null) return _raindropFrames[i];
@@ -214,10 +212,6 @@ namespace Willowstead.World
             float s = _dropSizeMultiplier;
             if (sprite != null && sprite.pixelsPerUnit > 0f)
             {
-                // The sprite sheet was authored at 16 PPU (per the .meta). To make
-                // a sprite authored at native pixel size render at its natural world
-                // size, we apply a per-sprite compensation factor so the swimmy
-                // 43x43 sheet entries and the tiny 6x6 splats don't read at the
                 // same on-screen size.
                 float ppuComp = 16f / sprite.pixelsPerUnit;
                 s *= ppuComp;
@@ -225,7 +219,6 @@ namespace Willowstead.World
             dropTransform.localScale = new Vector3(s, s, 1f);
         }
 
-        // ─── Per-frame logic ───────────────────────────────────────────
 
         private void Update()
         {
@@ -234,10 +227,8 @@ namespace Willowstead.World
             int target = Mathf.RoundToInt(_currentIntensity * _dropPool.Length);
             target = Mathf.Clamp(target, 0, _dropPool.Length);
 
-            // Calculate global rain alpha scale to smoothly fade drops near 0 intensity
             float alphaScale = Mathf.Clamp01(_currentIntensity * 4f);
 
-            // Lower counts deactivate drops from the END of the pool (preserves
             // oldest-active entries, looks less "popping"). Higher counts activate
             // fresh entries from the FIRST inactive slot.
             for (int i = 0; i < _dropPool.Length; i++)
@@ -281,20 +272,16 @@ namespace Willowstead.World
         /// </summary>
         private void InitializeFlight(Drop drop)
         {
-            // 1. Sprite + scale: each drop picks from the variety sheet.
             Sprite picked = PickRaindropSprite();
             if (picked != null) drop.renderer.sprite = picked;
             ApplyDropScale(drop.transform, picked);
 
-            // 2. Rotation: per-drop tilt with random jitter so streaks don't all lean the same direction.
             float tilt = _dropTiltDegrees + Random.Range(-_dropTiltJitterDegrees, _dropTiltJitterDegrees);
             drop.transform.localRotation = Quaternion.Euler(0f, 0f, tilt);
 
-            // 3. Velocity from MOTION angle (independent from sprite tilt, which
             //    is visual only). Splits sprite visual flair from physics — sprite
             //    can lean one way for visual style while motion drives a different
             //    angle (e.g. gentle -10° sprite tilt with strong -45° motion).
-            //    Motion angle is uniform across drops so the rainfield reads as
             //    a coherent diagonal weather pattern rather than random scatter.
             //    `_windDrift` adds an additive horizontal pull on top.
             float fallMult = 1f + _currentIntensity * 0.5f;
@@ -307,7 +294,6 @@ namespace Willowstead.World
                 -Mathf.Cos(motionRad) * speed,
                 0f);
 
-            // 4. Spawn position at top of frustum with random X to scatter horizontally.
             float aspect = _mainCamera.aspect;
             float ortho = _mainCamera.orthographicSize;
             float halfWidth = ortho * aspect + _spawnPaddingX;
@@ -319,9 +305,6 @@ namespace Willowstead.World
                 _mainCamera.nearClipPlane + 0.05f);
             drop.transform.localPosition = drop.position;
 
-            // 5. Pick a per-drop splash target Y so drops rain down to varied points
-            //    across the screen rather than all hitting the bottom edge. Bias
-            //    toward grass cells via ProceduralGridGenerator.IsGrassAt so the
             //    splash visual reads as "hitting terrain" (the player sees splashes
             //    clustered on grass tiles rather than splashing on water/edge tiles).
             float minY = -halfHeight + 0.5f;
@@ -376,9 +359,7 @@ namespace Willowstead.World
                 drop.position += drop.velocity * Time.deltaTime;
                 drop.transform.localPosition = drop.position;
 
-                // Splash fires when the drop crosses its per-flight targetY (set in
                 // InitializeFlight → PickSplashTargetY). Replaces the old fixed-bottom-edge
-                // groundY check so splashes scatter across the entire visible camera
                 // frustum, making rain read as hitting terrain at varied altitudes.
                 bool reachedSplash = drop.position.y <= drop.targetY;
                 bool offHoriz = drop.position.x < -halfWidth || drop.position.x > halfWidth;
@@ -386,7 +367,6 @@ namespace Willowstead.World
 
                 if (reachedSplash)
                 {
-                    // Convert camera-local position back to world space for the event.
                     Vector3 worldHit = _mainCamera.transform.TransformPoint(drop.position);
                     OnDropHitGround?.Invoke(worldHit);
                     RecycleDrop(drop);
@@ -421,7 +401,6 @@ namespace Willowstead.World
         public void Configure(Sprite[] dropFrames)
         {
             _raindropFrames = dropFrames;
-            // Re-skin live drops with a fresh random frame each so the variety
             // is visible immediately rather than waiting for natural recycling.
             if (_dropPool != null && dropFrames != null && dropFrames.Length > 0)
             {

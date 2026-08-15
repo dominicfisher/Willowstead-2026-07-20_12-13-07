@@ -9,14 +9,9 @@ using Willowstead.World;
 namespace Willowstead.UI
 {
     /// <summary>
-    /// Modal "Create New World" panel. Auto-presents on first launch
-    /// (when <see cref="WorldSeedService.LastSeedWasUserProvided"/> is false)
-    /// and any time the player explicitly requests a new seed through the
-    /// dev console or another reroll path.
-    ///
-    /// Subscribes to <see cref="WorldSeedService.OnSeedChanged"/> so external
-    /// seed flips (dev console, etc.) refresh the input field rather than
-    /// leaving stale text on screen.
+    /// Redesigned Modal "Create New World" panel with rich fantasy board styling,
+    /// metallic brass trim, parchment backing, distinct stylized input field,
+    /// and responsive interactive buttons.
     /// </summary>
     public class WorldSetupUI : MonoBehaviour
     {
@@ -27,8 +22,7 @@ namespace Willowstead.UI
         private TextMeshProUGUI _statusLabel;
         private Button _createButton;
         private Button _randomButton;
-
-        private bool _suppressShow;
+        private Button _closeButton;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -60,9 +54,6 @@ namespace Willowstead.UI
 
         private void Start()
         {
-            // First-launch heuristic: only auto-present if no seed has ever been
-            // stored. The PlayerPrefs persistence in WorldSeedService is the
-            // source of truth for "has the player made a choice yet".
             if (WorldSeedService.Instance == null) return;
             ShowIfFirstLaunch();
         }
@@ -78,9 +69,6 @@ namespace Willowstead.UI
 
         private void HandleSeedChanged(int newSeed)
         {
-            // If the panel is open while an external source flips the seed (the
-            // dev console, for instance), keep the input field in sync and hide
-            // the panel — the player has nothing more to decide here.
             if (_seedInput != null && !_seedInput.isFocused)
             {
                 _seedInput.SetTextWithoutNotify(newSeed.ToString());
@@ -91,12 +79,7 @@ namespace Willowstead.UI
             }
         }
 
-        // ─── Public API ─────────────────────────────────────────────────
 
-        /// <summary>
-        /// Shows the panel if and only if no seed has ever been user-provided.
-        /// Called once from <see cref="Start"/>.
-        /// </summary>
         public void ShowIfFirstLaunch()
         {
             if (WorldSeedService.Instance == null) return;
@@ -105,227 +88,296 @@ namespace Willowstead.UI
                 Hide();
                 return;
             }
-            // Random roll for the very first launch so simply running the game
-            // doesn't drop the player into identical worlds on repeat boots.
             int randomSeed = WorldSeedService.Instance.GenerateRandomSeed();
             if (_seedInput != null) _seedInput.text = randomSeed.ToString();
             Show();
         }
 
-        /// <summary>Forcibly show the panel (e.g. from the Main Menu's "New World" button).</summary>
         public void Show()
         {
             if (_panelGo == null) return;
             _panelGo.SetActive(true);
-            // Hard-block gameplay input while open, like DevConsole does — this
-            // prevents hotbar digits / walk keys firing while the player types.
-            Willowstead.Input.InputReader.BlockGameplayInput = true;
-            if (_seedInput != null)
+            Input.InputReader.BlockGameplayInput = true;
+
+            if (WorldSeedService.Instance != null && _seedInput != null)
             {
-                // Pre-fill a fresh random seed only when the field is empty. A
-                // player who typed a specific seed earlier and is returning
-                // keeps their entry; a player who flows in cold sees a new
-                // auto-picked seed rather than the previous world. Combined with
-                // OnCreateClicked's empty-input auto-roll, this means the modal
-                // is never silent: "open → Create (no edits)" always yields a
-                // different world than the one currently on screen.
-                if (string.IsNullOrEmpty(_seedInput.text) && WorldSeedService.Instance != null)
-                    _seedInput.text = WorldSeedService.Instance.GenerateRandomSeed().ToString();
-                _seedInput.ActivateInputField();
+                if (string.IsNullOrEmpty(_seedInput.text))
+                    _seedInput.text = !string.IsNullOrEmpty(WorldSeedService.Instance.CurrentSeedString)
+                        ? WorldSeedService.Instance.CurrentSeedString
+                        : WorldSeedService.Instance.CurrentSeed.ToString();
             }
             EnsureStatusRefresh();
         }
 
-        /// <summary>Hides the panel and releases gameplay input.</summary>
         public void Hide()
         {
             if (_panelGo == null) return;
             _panelGo.SetActive(false);
-            Willowstead.Input.InputReader.BlockGameplayInput = false;
+            Input.InputReader.BlockGameplayInput = false;
         }
 
-        /// <summary>True when the seed-setup modal is on screen. Pause menu bails on ESC while this is true.</summary>
+        /// <summary>True when the Create World panel is active and visible on screen.</summary>
         public bool IsVisible => _panelGo != null && _panelGo.activeSelf;
 
-        // ─── Panel construction ────────────────────────────────────────
+        private void Update()
+        {
+            if (IsVisible)
+            {
+                Input.InputReader.BlockGameplayInput = true;
+            }
+        }
+
 
         private void BuildPanel(Canvas canvas)
         {
-            // Root panel: centred modal frame, sits above any HUD layer.
+            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+
             _panelGo = new GameObject("WorldSetupPanel", typeof(RectTransform), typeof(Image));
             _panelGo.transform.SetParent(canvas.transform, false);
-            RectTransform rt = (RectTransform)_panelGo.transform;
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(620f, 380f);
-            rt.anchoredPosition = Vector2.zero;
+            RectTransform rootRt = (RectTransform)_panelGo.transform;
+            rootRt.anchorMin = Vector2.zero;
+            rootRt.anchorMax = Vector2.one;
+            rootRt.sizeDelta = Vector2.zero;
 
-            Image bgFrame = _panelGo.GetComponent<Image>();
-            bgFrame.sprite = UIResourceHelper.GetBackgroundSprite();
-            bgFrame.type = Image.Type.Sliced;
-            bgFrame.color = new Color(0.18f, 0.13f, 0.09f, 0.98f);
-            bgFrame.raycastTarget = true;
+            Image rootDim = _panelGo.GetComponent<Image>();
+            rootDim.color = new Color(0.04f, 0.04f, 0.05f, 0.85f);
+            rootDim.raycastTarget = true;
 
-            // Inner Card
+            GameObject windowGo = new GameObject("WindowCard", typeof(RectTransform));
+            windowGo.transform.SetParent(_panelGo.transform, false);
+            RectTransform winRt = (RectTransform)windowGo.transform;
+            winRt.anchorMin = new Vector2(0.5f, 0.5f);
+            winRt.anchorMax = new Vector2(0.5f, 0.5f);
+            winRt.pivot = new Vector2(0.5f, 0.5f);
+            winRt.sizeDelta = new Vector2(640f, 420f);
+            winRt.anchoredPosition = Vector2.zero;
+
+            GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
+            shadowGo.transform.SetParent(windowGo.transform, false);
+            RectTransform shadowRt = (RectTransform)shadowGo.transform;
+            shadowRt.anchorMin = Vector2.zero; shadowRt.anchorMax = Vector2.one;
+            shadowRt.offsetMin = new Vector2(-10f, -10f); shadowRt.offsetMax = new Vector2(10f, 10f);
+            Image shadowImg = shadowGo.GetComponent<Image>();
+            shadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            shadowImg.type = Image.Type.Sliced;
+            shadowImg.color = new Color(0f, 0f, 0f, 0.6f);
+
+            GameObject woodGo = new GameObject("WoodBoard", typeof(RectTransform), typeof(Image));
+            woodGo.transform.SetParent(windowGo.transform, false);
+            RectTransform woodRt = (RectTransform)woodGo.transform;
+            woodRt.anchorMin = Vector2.zero; woodRt.anchorMax = Vector2.one;
+            woodRt.offsetMin = Vector2.zero; woodRt.offsetMax = Vector2.zero;
+            Image woodImg = woodGo.GetComponent<Image>();
+            woodImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            woodImg.type = Image.Type.Sliced;
+            woodImg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
+
+            GameObject trimGo = new GameObject("GoldTrim", typeof(RectTransform), typeof(Image));
+            trimGo.transform.SetParent(woodGo.transform, false);
+            RectTransform trimRt = (RectTransform)trimGo.transform;
+            trimRt.anchorMin = Vector2.zero; trimRt.anchorMax = Vector2.one;
+            trimRt.offsetMin = new Vector2(4f, 4f); trimRt.offsetMax = new Vector2(-4f, -4f);
+            Image trimImg = trimGo.GetComponent<Image>();
+            trimImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            trimImg.type = Image.Type.Sliced;
+            trimImg.color = new Color(0.76f, 0.62f, 0.34f, 0.65f);
+
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
-            innerGo.transform.SetParent(_panelGo.transform, false);
+            innerGo.transform.SetParent(trimGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
-            innerRt.anchorMin = Vector2.zero;
-            innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(10f, 10f);
-            innerRt.offsetMax = new Vector2(-10f, -10f);
+            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(3f, 3f); innerRt.offsetMax = new Vector2(-3f, -3f);
             Image innerBg = innerGo.GetComponent<Image>();
             innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerBg.type = Image.Type.Sliced;
-            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+            innerBg.color = new Color(0.11f, 0.09f, 0.07f, 0.98f);
 
-            // Title
-            GameObject titleGo = new GameObject("Title", typeof(RectTransform));
-            titleGo.transform.SetParent(_panelGo.transform, false);
+            GameObject bannerGo = new GameObject("TitleBanner", typeof(RectTransform), typeof(Image));
+            bannerGo.transform.SetParent(innerGo.transform, false);
+            RectTransform bannerRt = (RectTransform)bannerGo.transform;
+            bannerRt.anchorMin = new Vector2(0.5f, 1f);
+            bannerRt.anchorMax = new Vector2(0.5f, 1f);
+            bannerRt.pivot = new Vector2(0.5f, 1f);
+            bannerRt.sizeDelta = new Vector2(360f, 46f);
+            bannerRt.anchoredPosition = new Vector2(0f, -16f);
+            Image bannerImg = bannerGo.GetComponent<Image>();
+            bannerImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            bannerImg.type = Image.Type.Sliced;
+            bannerImg.color = new Color(0.32f, 0.22f, 0.14f, 1f);
+
+            GameObject titleGo = new GameObject("TitleText", typeof(RectTransform));
+            titleGo.transform.SetParent(bannerGo.transform, false);
             RectTransform titleRt = (RectTransform)titleGo.transform;
-            titleRt.anchorMin = new Vector2(0f, 1f);
-            titleRt.anchorMax = new Vector2(1f, 1f);
-            titleRt.pivot = new Vector2(0.5f, 1f);
-            titleRt.offsetMin = new Vector2(24f, -68f);
-            titleRt.offsetMax = new Vector2(-24f, -16f);
+            titleRt.anchorMin = Vector2.zero; titleRt.anchorMax = Vector2.one;
+            titleRt.offsetMin = Vector2.zero; titleRt.offsetMax = Vector2.zero;
+
             TextMeshProUGUI title = titleGo.AddComponent<TextMeshProUGUI>();
-            title.text = "Create a New World";
-            title.fontSize = 30f;
+            if (font != null) title.font = font;
+            title.text = "CREATE NEW WORLD";
+            title.fontSize = 20f;
             title.fontStyle = FontStyles.Bold;
-            title.color = new Color(0.95f, 0.88f, 0.62f, 1f);
+            title.color = new Color(1f, 0.88f, 0.48f, 1f);
             title.alignment = TextAlignmentOptions.Center;
-            title.richText = false;
 
-            // Subtitle
+            GameObject closeGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            closeGo.transform.SetParent(innerGo.transform, false);
+            RectTransform closeRt = (RectTransform)closeGo.transform;
+            closeRt.anchorMin = new Vector2(1f, 1f);
+            closeRt.anchorMax = new Vector2(1f, 1f);
+            closeRt.pivot = new Vector2(1f, 1f);
+            closeRt.anchoredPosition = new Vector2(-12f, -12f);
+            closeRt.sizeDelta = new Vector2(32f, 32f);
+
+            Image closeImg = closeGo.GetComponent<Image>();
+            closeImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            closeImg.type = Image.Type.Sliced;
+            closeImg.color = new Color(0.48f, 0.18f, 0.18f, 0.95f);
+
+            _closeButton = closeGo.GetComponent<Button>();
+            ColorBlock closeCb = _closeButton.colors;
+            closeCb.normalColor = new Color(0.48f, 0.18f, 0.18f, 0.95f);
+            closeCb.highlightedColor = new Color(0.68f, 0.24f, 0.24f, 1f);
+            closeCb.pressedColor = new Color(0.30f, 0.12f, 0.12f, 1f);
+            _closeButton.colors = closeCb;
+            _closeButton.onClick.AddListener(Hide);
+
+            GameObject closeTxtGo = new GameObject("X", typeof(RectTransform));
+            closeTxtGo.transform.SetParent(closeGo.transform, false);
+            RectTransform closeTxtRt = (RectTransform)closeTxtGo.transform;
+            closeTxtRt.anchorMin = Vector2.zero; closeTxtRt.anchorMax = Vector2.one;
+            closeTxtRt.offsetMin = Vector2.zero; closeTxtRt.offsetMax = Vector2.zero;
+            var closeTxt = closeTxtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) closeTxt.font = font;
+            closeTxt.fontSize = 15;
+            closeTxt.fontStyle = FontStyles.Bold;
+            closeTxt.alignment = TextAlignmentOptions.Center;
+            closeTxt.color = Color.white;
+            closeTxt.text = "X";
+
             GameObject subGo = new GameObject("Subtitle", typeof(RectTransform));
-            subGo.transform.SetParent(_panelGo.transform, false);
+            subGo.transform.SetParent(innerGo.transform, false);
             RectTransform subRt = (RectTransform)subGo.transform;
-            subRt.anchorMin = new Vector2(0f, 1f);
-            subRt.anchorMax = new Vector2(1f, 1f);
+            subRt.anchorMin = new Vector2(0.5f, 1f);
+            subRt.anchorMax = new Vector2(0.5f, 1f);
             subRt.pivot = new Vector2(0.5f, 1f);
-            subRt.offsetMin = new Vector2(24f, -120f);
-            subRt.offsetMax = new Vector2(-24f, -72f);
+            subRt.anchoredPosition = new Vector2(0f, -72f);
+            subRt.sizeDelta = new Vector2(540f, 44f);
+
             TextMeshProUGUI sub = subGo.AddComponent<TextMeshProUGUI>();
-            sub.text = "Pick a seed. Worlds with different seeds share nothing — terrain, decor, ponds — but identical seeds reproduce the same world bit-for-bit.";
-            sub.fontSize = 16f;
-            sub.color = new Color(0.86f, 0.82f, 0.74f, 1f);
+            if (font != null) sub.font = font;
+            sub.text = "Enter a custom seed to forge a deterministic world. Identical seeds reproduce the exact same landscape, rivers, and ponds.";
+            sub.fontSize = 14f;
+            sub.color = new Color(0.85f, 0.82f, 0.75f, 0.95f);
             sub.alignment = TextAlignmentOptions.Top;
-            // TMP 4.x renamed enableWordWrapping to textWrappingMode. The older
-            // property still exists for source-compat but emits CS0618 here.
             sub.textWrappingMode = TextWrappingModes.Normal;
-            sub.richText = false;
 
-            // Seed input row
-            _seedInput = BuildSeedInputRow(_panelGo.transform);
+            _seedInput = BuildSeedInputRow(innerGo.transform, font);
 
-            // Status label
             GameObject stGo = new GameObject("Status", typeof(RectTransform));
-            stGo.transform.SetParent(_panelGo.transform, false);
+            stGo.transform.SetParent(innerGo.transform, false);
             RectTransform stRt = (RectTransform)stGo.transform;
-            stRt.anchorMin = new Vector2(0f, 0f);
-            stRt.anchorMax = new Vector2(1f, 0f);
+            stRt.anchorMin = new Vector2(0.5f, 0f);
+            stRt.anchorMax = new Vector2(0.5f, 0f);
             stRt.pivot = new Vector2(0.5f, 0f);
-            stRt.offsetMin = new Vector2(24f, 92f);
-            stRt.offsetMax = new Vector2(-24f, 124f);
+            stRt.anchoredPosition = new Vector2(0f, 92f);
+            stRt.sizeDelta = new Vector2(500f, 26f);
+
             _statusLabel = stGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) _statusLabel.font = font;
             _statusLabel.text = string.Empty;
-            _statusLabel.fontSize = 14f;
-            _statusLabel.color = new Color(0.92f, 0.78f, 0.42f, 1f);
+            _statusLabel.fontSize = 13f;
+            _statusLabel.color = new Color(0.92f, 0.80f, 0.52f, 1f);
             _statusLabel.alignment = TextAlignmentOptions.Center;
-            _statusLabel.richText = false;
 
-            // Button row
-            _randomButton = BuildButton(_panelGo.transform, "Randomize",
-                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(24f, 16f), new Vector2(-12f, 76f), OnRandomizeClicked);
+            _randomButton = BuildButton(innerGo.transform, "Randomize ⚄",
+                new Vector2(-130f, 38f), new Vector2(210f, 48f), font,
+                new Color(0.30f, 0.22f, 0.15f, 1f), OnRandomizeClicked);
 
-            _createButton = BuildButton(_panelGo.transform, "Create World",
-                new Vector2(0.5f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(12f, 16f), new Vector2(-24f, 76f), OnCreateClicked);
-
-            // Enter on the input field = same as Create.
-            // NOTE: We deliberately do NOT also wire _seedInput.onSubmit here.
-            // Pressing Enter while the input is focused would otherwise fire
-            // OnCreateClicked twice (Unity's input routing bubbles Enter to
-            // both the onSubmit listeners AND the active button's onClick).
-            // The Create button above already covers the Enter case exactly once.
+            _createButton = BuildButton(innerGo.transform, "Embark World ✦",
+                new Vector2(130f, 38f), new Vector2(210f, 48f), font,
+                new Color(0.24f, 0.42f, 0.22f, 1f), OnCreateClicked);
 
             _panelGo.SetActive(false);
         }
 
-        private TMP_InputField BuildSeedInputRow(Transform parent)
+        private TMP_InputField BuildSeedInputRow(Transform parent, TMP_FontAsset font)
         {
             GameObject rowGo = new GameObject("SeedRow", typeof(RectTransform), typeof(Image));
             rowGo.transform.SetParent(parent, false);
             RectTransform rowRt = (RectTransform)rowGo.transform;
-            rowRt.anchorMin = new Vector2(0f, 1f);
-            rowRt.anchorMax = new Vector2(1f, 1f);
+            rowRt.anchorMin = new Vector2(0.5f, 1f);
+            rowRt.anchorMax = new Vector2(0.5f, 1f);
             rowRt.pivot = new Vector2(0.5f, 1f);
-            rowRt.offsetMin = new Vector2(40f, -180f);
-            rowRt.offsetMax = new Vector2(-40f, -132f);
+            rowRt.anchoredPosition = new Vector2(0f, -145f);
+            rowRt.sizeDelta = new Vector2(520f, 52f);
 
             Image rowBg = rowGo.GetComponent<Image>();
             rowBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
-            rowBg.color = new Color(0.06f, 0.06f, 0.10f, 0.95f);
-            rowBg.raycastTarget = true;
+            rowBg.type = Image.Type.Sliced;
+            rowBg.color = new Color(0.06f, 0.05f, 0.05f, 0.98f);
 
-            // Inline "Seed:" label on the left side of the row
+            GameObject borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            borderGo.transform.SetParent(rowGo.transform, false);
+            RectTransform borderRt = (RectTransform)borderGo.transform;
+            borderRt.anchorMin = Vector2.zero; borderRt.anchorMax = Vector2.one;
+            borderRt.offsetMin = Vector2.zero; borderRt.offsetMax = Vector2.zero;
+            Image borderImg = borderGo.GetComponent<Image>();
+            borderImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            borderImg.type = Image.Type.Sliced;
+            borderImg.color = new Color(0.72f, 0.58f, 0.32f, 0.55f);
+
             GameObject lblGo = new GameObject("SeedLabel", typeof(RectTransform));
             lblGo.transform.SetParent(rowGo.transform, false);
             RectTransform lblRt = (RectTransform)lblGo.transform;
             lblRt.anchorMin = new Vector2(0f, 0f);
             lblRt.anchorMax = new Vector2(0f, 1f);
             lblRt.pivot = new Vector2(0f, 0.5f);
-            lblRt.offsetMin = new Vector2(12f, 0f);
-            lblRt.offsetMax = new Vector2(78f, 0f);
-            TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
-            lbl.text = "Seed:";
-            lbl.fontSize = 18f;
-            lbl.fontStyle = FontStyles.Bold;
-            lbl.color = new Color(0.95f, 0.88f, 0.62f, 1f);
-            lbl.alignment = TextAlignmentOptions.MidlineLeft;
-            lbl.richText = false;
+            lblRt.offsetMin = new Vector2(16f, 0f);
+            lblRt.offsetMax = new Vector2(110f, 0f);
 
-            // TextArea wrapper for the input field (obligatory for TMP_InputField masking)
+            TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) lbl.font = font;
+            lbl.text = "World Seed:";
+            lbl.fontSize = 15f;
+            lbl.fontStyle = FontStyles.Bold;
+            lbl.color = new Color(1f, 0.88f, 0.52f, 1f);
+            lbl.alignment = TextAlignmentOptions.MidlineLeft;
+
             GameObject textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
             textArea.transform.SetParent(rowGo.transform, false);
             RectTransform textAreaRt = (RectTransform)textArea.transform;
             textAreaRt.anchorMin = new Vector2(0f, 0f);
             textAreaRt.anchorMax = new Vector2(1f, 1f);
             textAreaRt.pivot = new Vector2(0.5f, 0.5f);
-            textAreaRt.offsetMin = new Vector2(90f, 6f);
-            textAreaRt.offsetMax = new Vector2(-12f, -6f);
+            textAreaRt.offsetMin = new Vector2(120f, 6f);
+            textAreaRt.offsetMax = new Vector2(-16f, -6f);
 
-            // Live text
             GameObject inputTextGo = new GameObject("Text", typeof(RectTransform));
             inputTextGo.transform.SetParent(textArea.transform, false);
             RectTransform itRt = (RectTransform)inputTextGo.transform;
-            itRt.anchorMin = Vector2.zero;
-            itRt.anchorMax = Vector2.one;
-            itRt.offsetMin = Vector2.zero;
-            itRt.offsetMax = Vector2.zero;
-            TextMeshProUGUI itText = inputTextGo.AddComponent<TextMeshProUGUI>();
-            itText.fontSize = 20f;
-            itText.color = new Color(0.95f, 0.93f, 0.85f, 1f);
-            itText.alignment = TextAlignmentOptions.MidlineLeft;
-            itText.richText = false;
+            itRt.anchorMin = Vector2.zero; itRt.anchorMax = Vector2.one;
+            itRt.offsetMin = Vector2.zero; itRt.offsetMax = Vector2.zero;
 
-            // Placeholder
+            TextMeshProUGUI itText = inputTextGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) itText.font = font;
+            itText.fontSize = 18f;
+            itText.fontStyle = FontStyles.Bold;
+            itText.color = new Color(0.96f, 0.94f, 0.88f, 1f);
+            itText.alignment = TextAlignmentOptions.MidlineLeft;
+
             GameObject phGo = new GameObject("Placeholder", typeof(RectTransform));
             phGo.transform.SetParent(textArea.transform, false);
             RectTransform phRt = (RectTransform)phGo.transform;
-            phRt.anchorMin = Vector2.zero;
-            phRt.anchorMax = Vector2.one;
-            phRt.offsetMin = Vector2.zero;
-            phRt.offsetMax = Vector2.zero;
+            phRt.anchorMin = Vector2.zero; phRt.anchorMax = Vector2.one;
+            phRt.offsetMin = Vector2.zero; phRt.offsetMax = Vector2.zero;
+
             TextMeshProUGUI phText = phGo.AddComponent<TextMeshProUGUI>();
-            phText.text = "type a number, or click Randomize";
-            phText.fontSize = 16f;
+            if (font != null) phText.font = font;
+            phText.text = "Type any seed (e.g. Willowstead or 1234)...";
+            phText.fontSize = 15f;
             phText.fontStyle = FontStyles.Italic;
-            phText.color = new Color(1f, 1f, 1f, 0.32f);
+            phText.color = new Color(1f, 1f, 1f, 0.35f);
             phText.alignment = TextAlignmentOptions.MidlineLeft;
-            phText.richText = false;
 
             TMP_InputField field = rowGo.AddComponent<TMP_InputField>();
             field.targetGraphic = rowBg;
@@ -333,61 +385,53 @@ namespace Willowstead.UI
             field.textComponent = itText;
             field.placeholder = phText;
             field.lineType = TMP_InputField.LineType.SingleLine;
-            field.characterLimit = 24;
+            field.characterLimit = 32;
             field.restoreOriginalTextOnEscape = false;
-            // Null navigation so Tab is consumed by the dev console's Tab completion
-            // when both panels are open at the same time (rare but possible from the
-            // sandbox menu); keeps focus from walking off mid-typing.
             field.navigation = new Navigation { mode = Navigation.Mode.None };
-            field.contentType = TMP_InputField.ContentType.IntegerNumber;
+            field.contentType = TMP_InputField.ContentType.Standard;
 
             return field;
         }
 
-        private Button BuildButton(Transform parent, string label,
-                                   Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-                                   Vector2 offsetMin, Vector2 offsetMax,
-                                   UnityEngine.Events.UnityAction onClick)
+        private Button BuildButton(Transform parent, string label, Vector2 centerPos, Vector2 size, TMP_FontAsset font, Color btnColor, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image));
+            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.offsetMin = offsetMin;
-            rt.offsetMax = offsetMax;
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = centerPos;
+            rt.sizeDelta = size;
+
             Image img = go.GetComponent<Image>();
             img.sprite = UIResourceHelper.GetBackgroundSprite();
-            img.color = new Color(0.20f, 0.18f, 0.14f, 1f);
+            img.type = Image.Type.Sliced;
+            img.color = btnColor;
             img.raycastTarget = true;
 
-            Button btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            // Hover / press tints so the button feels responsive.
+            Button btn = go.GetComponent<Button>();
             ColorBlock cb = btn.colors;
-            cb.normalColor = new Color(0.20f, 0.18f, 0.14f, 1f);
-            cb.highlightedColor = new Color(0.34f, 0.30f, 0.22f, 1f);
-            cb.pressedColor = new Color(0.10f, 0.09f, 0.07f, 1f);
+            cb.normalColor = btnColor;
+            cb.highlightedColor = btnColor * 1.35f;
+            cb.pressedColor = btnColor * 0.75f;
             cb.selectedColor = cb.highlightedColor;
-            cb.disabledColor = new Color(0.18f, 0.16f, 0.12f, 0.6f);
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
             GameObject lblGo = new GameObject("Label", typeof(RectTransform));
             lblGo.transform.SetParent(go.transform, false);
             RectTransform lblRt = (RectTransform)lblGo.transform;
-            lblRt.anchorMin = Vector2.zero;
-            lblRt.anchorMax = Vector2.one;
-            lblRt.offsetMin = Vector2.zero;
-            lblRt.offsetMax = Vector2.zero;
+            lblRt.anchorMin = Vector2.zero; lblRt.anchorMax = Vector2.one;
+            lblRt.offsetMin = Vector2.zero; lblRt.offsetMax = Vector2.zero;
+
             TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) lbl.font = font;
             lbl.text = label;
-            lbl.fontSize = 20f;
+            lbl.fontSize = 17f;
             lbl.fontStyle = FontStyles.Bold;
-            lbl.color = new Color(0.96f, 0.92f, 0.78f, 1f);
+            lbl.color = new Color(1f, 0.94f, 0.82f, 1f);
             lbl.alignment = TextAlignmentOptions.Center;
-            lbl.richText = false;
 
             return btn;
         }
@@ -395,7 +439,10 @@ namespace Willowstead.UI
         private void EnsureStatusRefresh()
         {
             if (_statusLabel == null || WorldSeedService.Instance == null) return;
-            _statusLabel.text = $"Current seed: {WorldSeedService.Instance.CurrentSeed}";
+            string display = !string.IsNullOrEmpty(WorldSeedService.Instance.CurrentSeedString)
+                ? $"{WorldSeedService.Instance.CurrentSeedString} ({WorldSeedService.Instance.CurrentSeed})"
+                : $"{WorldSeedService.Instance.CurrentSeed}";
+            _statusLabel.text = $"Current Seed: <color=#FFD670>{display}</color>";
         }
 
         private void OnRandomizeClicked()
@@ -412,32 +459,20 @@ namespace Willowstead.UI
             if (_seedInput == null || WorldSeedService.Instance == null) return;
 
             string raw = _seedInput.text == null ? string.Empty : _seedInput.text.Trim();
-            int parsed;
             if (string.IsNullOrEmpty(raw))
             {
-                // Empty input → re-roll automatically so the player can't get stuck.
-                parsed = WorldSeedService.Instance.GenerateRandomSeed();
+                int randomSeed = WorldSeedService.Instance.GenerateRandomSeed();
+                WorldSeedService.Instance.SetSeed(randomSeed, userProvided: true);
             }
-            else if (!int.TryParse(raw, System.Globalization.NumberStyles.Integer,
-                                    System.Globalization.CultureInfo.InvariantCulture, out parsed))
+            else
             {
-                // Bad input. Refuse and ping the status label rather than silently
-                // dropping the player into an unintended world.
-                if (_statusLabel != null)
-                {
-                    _statusLabel.text = $"'{raw}' is not a valid 32-bit integer.";
-                    _statusLabel.color = new Color(0.95f, 0.55f, 0.45f, 1f);
-                }
-                return;
+                WorldSeedService.Instance.SetSeed(raw, userProvided: true);
             }
 
-            // Apply + regenerate. SetSeed fires the OnSeedChanged event which
-            // ProceduralGridGenerator listens to and uses as the reroll trigger.
-            WorldSeedService.Instance.SetSeed(parsed, userProvided: true);
-
-            if (_statusLabel != null) _statusLabel.color = new Color(0.92f, 0.78f, 0.42f, 1f);
+            if (_statusLabel != null) _statusLabel.color = new Color(0.92f, 0.80f, 0.52f, 1f);
             Hide();
             if (MainMenuUI.Instance != null) MainMenuUI.Instance.Hide();
+            MainMenuUI.StartGameSession();
         }
     }
 }

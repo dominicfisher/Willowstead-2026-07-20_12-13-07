@@ -125,11 +125,9 @@ namespace Willowstead.Player
 
             if (_canvasGo == null) return;
 
-            // Destroy old hotbar panel if rebuilding
             Transform existing = _canvasGo.transform.Find("HotbarPanel");
             if (existing != null) DestroyImmediate(existing.gameObject);
 
-            // Hotbar Root Panel
             _hotbarGo = new GameObject("HotbarPanel");
             _hotbarGo.transform.SetParent(_canvasGo.transform, false);
 
@@ -151,6 +149,12 @@ namespace Willowstead.Player
             panelBg.type = Image.Type.Sliced;
             panelBg.color = new Color(0.12f, 0.10f, 0.08f, 0.92f);
 
+            CanvasGroup cg = _hotbarGo.AddComponent<CanvasGroup>();
+            if (UI.MainMenuUI.Instance != null && !UI.MainMenuUI.HasGameStarted)
+            {
+                cg.alpha = 0f;
+            }
+
             _slotTransforms = new RectTransform[8];
             _slotHighlights = new Image[8];
             _slotIconImages = new Image[8];
@@ -171,13 +175,11 @@ namespace Willowstead.Player
                 slotRect.anchoredPosition = new Vector2(posX, 0f);
                 _slotTransforms[i] = slotRect;
 
-                // Slot background frame
                 Image slotBg = slotGo.AddComponent<Image>();
                 slotBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 slotBg.type = Image.Type.Sliced;
                 slotBg.color = new Color(0.20f, 0.17f, 0.14f, 1.0f);
 
-                // Highlight border
                 GameObject highlightGo = new GameObject("SlotHighlight");
                 highlightGo.transform.SetParent(slotGo.transform, false);
                 RectTransform hlRect = highlightGo.AddComponent<RectTransform>();
@@ -191,7 +193,6 @@ namespace Willowstead.Player
                 hlImage.raycastTarget = false;
                 _slotHighlights[i] = hlImage;
 
-                // Slot Icon Image
                 GameObject iconGo = new GameObject("SlotIconImage");
                 iconGo.transform.SetParent(slotGo.transform, false);
                 RectTransform iconRect = iconGo.AddComponent<RectTransform>();
@@ -204,7 +205,6 @@ namespace Willowstead.Player
                 iconImg.raycastTarget = false;
                 _slotIconImages[i] = iconImg;
 
-                // Slot Count Text
                 GameObject countGo = new GameObject("SlotCountText");
                 countGo.transform.SetParent(slotGo.transform, false);
                 RectTransform countRect = countGo.AddComponent<RectTransform>();
@@ -224,7 +224,6 @@ namespace Willowstead.Player
                 countGo.AddComponent<Outline>().effectColor = Color.black;
                 _slotCountTexts[i] = countText;
 
-                // Attach UIDragSlot for slot 0..7
                 UIDragSlot dragSlot = slotGo.AddComponent<UIDragSlot>();
                 dragSlot.slotIndex = i;
             }
@@ -281,6 +280,9 @@ namespace Willowstead.Player
 
         private Sprite GetIconForItem(string itemName)
         {
+            Sprite dbSprite = UIResourceHelper.GetItemIconSprite(itemName);
+            if (dbSprite != null) return dbSprite;
+
             if (itemName == "Hoe" && _hoeIcon != null) return _hoeIcon;
             if (itemName == "Watering Can" && _wateringCanIcon != null) return _wateringCanIcon;
             if (itemName == "Axe" && _axeIcon != null) return _axeIcon;
@@ -288,7 +290,7 @@ namespace Willowstead.Player
             if (itemName == "Carrot" && _carrotIcon != null) return _carrotIcon;
             if ((itemName == "Wood" || itemName == "Log") && _logIcon != null) return _logIcon;
 
-            return UIResourceHelper.GetItemIconSprite(itemName);
+            return null;
         }
     }
 }

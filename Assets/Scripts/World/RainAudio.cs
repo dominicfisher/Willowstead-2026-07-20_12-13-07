@@ -25,21 +25,21 @@ namespace Willowstead.World
         [Tooltip("Looping storm ambience clips with baked-in thunder rumble — fades in proportional to rain intensity so a Light rain has no rumble but a Storm has continuous rumbling thunder. Drag files like 'Rain & Thunder.mp3' and 'Rain & Thunder (Variation).mp3' here. Storm loops are muted when SetIndoors(true).")]
         [SerializeField] private AudioClip[] _stormAmbienceLoops;
 
+        [Tooltip("Looping light wind ambience clips for Windy weather and background breeze.")]
+        [SerializeField] private AudioClip[] _windAmbienceLoops;
+
+        [Tooltip("Looping heavy wind whistle clips for strong wind and stormy weather.")]
+        [SerializeField] private AudioClip[] _heavyWindAmbienceLoops;
+
         [Header("Volume")]
 
         /// <summary>
         /// Volume of EVERY ambience loop (outdoor + indoor) at intensity = 1.0.
-        /// <b>Not</b> a SerializeField — the canonical slider lives on
-        /// <c>WeatherCycle._maxAmbienceVolume</c>, which pushes the value down
-        /// via <see cref="SetAmbienceVolume"/> at Start and on every Inspector
-        /// edit during play (via WeatherCycle.OnValidate). Keeping this private
-        /// prevents a second Inspector knob that would be silently overwritten
-        /// by WeatherCycle at runtime. Default 0.30 is the fallback when
-        /// RainAudio is instantiated without a parent WeatherCycle.
+        /// Lowish atmospheric volume by default (~0.18 - 0.25).
         /// </summary>
-        private float _maxAmbienceVolume = 0.30f;
-        [Tooltip("Volume of the loudest thunder one-shot.")]
-        [Range(0f, 1f)] [SerializeField] private float _maxThunderVolume = 1f;
+        private float _maxAmbienceVolume = 0.22f;
+        [Tooltip("Volume of the thunder one-shots (kept atmospheric and low-mix).")]
+        [Range(0f, 1f)] [SerializeField] private float _maxThunderVolume = 0.40f;
         [Tooltip("Smoothing speed for the ambience volume lerp (per second). Higher = faster response to intensity changes.")]
         [SerializeField] private float _ambienceLerpSpeed = 2.5f;
 
@@ -57,16 +57,18 @@ namespace Willowstead.World
 
         private AudioSource[] _ambiences;
         private AudioSource[] _stormSources;
+        private AudioSource[] _windSources;
+        private AudioSource[] _heavyWindSources;
         private AudioSource _indoor;
         private AudioSource _thunder;
         private Camera _mainCamera;
         private float _currentIntensity;
+        private float _currentWindIntensity01;
         private bool _hasStarted;
 
         public float CurrentIntensity => _currentIntensity;
         public bool IsIndoors => _isIndoors;
 
-        // ─── Unity lifecycle ────────────────────────────────────────────
 
         private void Awake()
         {
@@ -78,33 +80,87 @@ namespace Willowstead.World
         {
             _mainCamera = Camera.main;
 
+            EnsureElementsAudioClips();
+
             Transform parent = _attachToCamera && _mainCamera != null
                 ? (Transform)_mainCamera.transform
                 : (Transform)transform;
 
-            // Each outdoor ambience clip gets its own AudioSource so volumes
-            // can be summed/balanced individually. The sources are kept alive
-            // at all times (volume = 0 when not active) so crossfade transitions
-            // never restart playback on either side.
             BuildOutdoorAmbienceSources(parent);
             BuildStormAmbienceSources(parent);
             BuildIndoorAmbienceSource(parent);
+            BuildWindAmbienceSources(parent);
 
             _hasStarted = true;
 
             _thunder = CreateAudioSource("ThunderOneShot", loop: false, parent: parent);
-            // Thunder is a one-shot — keep loop off (CreateAudioSource already
-            // sets loop = false here, but make intent explicit).
 
-            if ((_rainAmbienceLoops == null || _rainAmbienceLoops.Length == 0) && _indoorAmbienceClip == null)
+            SubscribeToWeather();
+        }
+
+        private void EnsureElementsAudioClips()
+        {
+#if UNITY_EDITOR
+            if (_rainAmbienceLoops == null || _rainAmbienceLoops.Length == 0)
             {
-                Debug.LogWarning("[RainAudio] No ambience clips assigned — rain will be silent. Drag looping AudioClips into Rain Ambience Loops and/or Indoor Ambience Clip in the Inspector.", this);
+                var list = new System.Collections.Generic.List<AudioClip>();
+                for (int i = 1; i <= 10; i++)
+                {
+                    var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Elements/WE Light Outside Rain {i}.wav");
+                    if (clip != null) list.Add(clip);
+                }
+                if (list.Count > 0) _rainAmbienceLoops = list.ToArray();
             }
 
-            // Subscribe to the weather cycle. Subscription is forgiving: if
-            // WeatherCycle hasn't booted yet, we'll catch it when it does
-            // because WeatherCycle.Instance is set inside its own Start.
-            SubscribeToWeather();
+            if (_indoorAmbienceClip == null)
+            {
+                _indoorAmbienceClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Elements/WE Light Inside Rain 1.wav");
+            }
+
+            if (_stormAmbienceLoops == null || _stormAmbienceLoops.Length == 0)
+            {
+                var list = new System.Collections.Generic.List<AudioClip>();
+                for (int i = 1; i <= 10; i++)
+                {
+                    var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Elements/WE Heavy Outside Rain {i}.wav");
+                    if (clip != null) list.Add(clip);
+                }
+                if (list.Count > 0) _stormAmbienceLoops = list.ToArray();
+            }
+
+            if (_windAmbienceLoops == null || _windAmbienceLoops.Length == 0)
+            {
+                var list = new System.Collections.Generic.List<AudioClip>();
+                for (int i = 1; i <= 10; i++)
+                {
+                    var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Elements/WE Light Wind Whistle {i}.wav");
+                    if (clip != null) list.Add(clip);
+                }
+                if (list.Count > 0) _windAmbienceLoops = list.ToArray();
+            }
+
+            if (_heavyWindAmbienceLoops == null || _heavyWindAmbienceLoops.Length == 0)
+            {
+                var list = new System.Collections.Generic.List<AudioClip>();
+                for (int i = 1; i <= 10; i++)
+                {
+                    var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Elements/WE Heavy Wind Whistle {i}.wav");
+                    if (clip != null) list.Add(clip);
+                }
+                if (list.Count > 0) _heavyWindAmbienceLoops = list.ToArray();
+            }
+
+            if (_thunderClips == null || _thunderClips.Length == 0)
+            {
+                var list = new System.Collections.Generic.List<AudioClip>();
+                for (int i = 1; i <= 31; i++)
+                {
+                    var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Elements/WE Thunder {i}.wav");
+                    if (clip != null) list.Add(clip);
+                }
+                if (list.Count > 0) _thunderClips = list.ToArray();
+            }
+#endif
         }
 
         private void BuildOutdoorAmbienceSources(Transform parent)
@@ -142,11 +198,6 @@ namespace Willowstead.World
             }
         }
 
-        /// <summary>
-        /// Mirror of <see cref="BuildOutdoorAmbienceSources"/> for the storm
-        /// pool. Same parent / spatial-blend / volume-0-at-start conventions so
-        /// fades in <see cref="Update"/> are smooth lerps, not start/stop clicks.
-        /// </summary>
         private void BuildStormAmbienceSources(Transform parent)
         {
             if (_stormAmbienceLoops == null || _stormAmbienceLoops.Length == 0)
@@ -170,9 +221,55 @@ namespace Willowstead.World
             }
         }
 
+        private void BuildWindAmbienceSources(Transform parent)
+        {
+            if (_windAmbienceLoops != null && _windAmbienceLoops.Length > 0)
+            {
+                _windSources = new AudioSource[_windAmbienceLoops.Length];
+                for (int i = 0; i < _windAmbienceLoops.Length; i++)
+                {
+                    AudioSource src = CreateAudioSource($"WindAmbience_{i}", loop: true, parent: parent);
+                    src.spatialBlend = _ambienceSpatialBlend;
+                    AudioClip clip = _windAmbienceLoops[i];
+                    if (clip != null)
+                    {
+                        src.clip = clip;
+                        src.volume = 0f;
+                        src.Play();
+                    }
+                    _windSources[i] = src;
+                }
+            }
+            else
+            {
+                _windSources = System.Array.Empty<AudioSource>();
+            }
+
+            if (_heavyWindAmbienceLoops != null && _heavyWindAmbienceLoops.Length > 0)
+            {
+                _heavyWindSources = new AudioSource[_heavyWindAmbienceLoops.Length];
+                for (int i = 0; i < _heavyWindAmbienceLoops.Length; i++)
+                {
+                    AudioSource src = CreateAudioSource($"HeavyWindAmbience_{i}", loop: true, parent: parent);
+                    src.spatialBlend = _ambienceSpatialBlend;
+                    AudioClip clip = _heavyWindAmbienceLoops[i];
+                    if (clip != null)
+                    {
+                        src.clip = clip;
+                        src.volume = 0f;
+                        src.Play();
+                    }
+                    _heavyWindSources[i] = src;
+                }
+            }
+            else
+            {
+                _heavyWindSources = System.Array.Empty<AudioSource>();
+            }
+        }
+
         private void OnEnable()
         {
-            // If we were disabled mid-game, the Subscription dedupes itself
             // on re-enable so we don't double-register.
             SubscribeToWeather();
         }
@@ -212,52 +309,69 @@ namespace Willowstead.World
             AudioSource src = go.AddComponent<AudioSource>();
             src.playOnAwake = false;
             src.loop = loop;
-            src.spatialBlend = 0f; // 2D world — full volume regardless of camera distance
+            src.spatialBlend = 0f;
             return src;
         }
 
-        // ─── Per-frame logic ───────────────────────────────────────────
-
         private void Update()
         {
-            // Outdoor volume scales with intensity; indoor volume is independent
-            // and only fades in when SetIndoors(true) is called. Both groups are
-            // always alive so the crossfade is a smooth lerp, not a start/stop.
-            // Single ceiling = _maxAmbienceVolume (Inspector slider); no runtime
-            // multiplier so a developer tweak in the Inspector is the only knob.
             float ceiling = _maxAmbienceVolume;
-            float outdoorTarget = _isIndoors ? 0f : _currentIntensity * ceiling;
-            float indoorTarget = _isIndoors ? _currentIntensity * ceiling : 0f;
+            float outdoorRainTarget = _isIndoors ? 0f : _currentIntensity * ceiling;
+            float indoorRainTarget = _isIndoors ? _currentIntensity * ceiling : 0f;
 
+            // Calculate wind volume target from WeatherCycle
+            float windTarget = 0f;
+            float heavyWindTarget = 0f;
+            if (WeatherCycle.Instance != null && !_isIndoors)
+            {
+                if (WeatherCycle.Instance.CurrentWeather == WeatherType.Windy)
+                {
+                    switch (WeatherCycle.Instance.CurrentIntensity)
+                    {
+                        case WindIntensity.Light:
+                            windTarget = ceiling * 0.6f;
+                            break;
+                        case WindIntensity.Moderate:
+                            windTarget = ceiling * 0.9f;
+                            heavyWindTarget = ceiling * 0.35f;
+                            break;
+                        case WindIntensity.Strong:
+                            windTarget = ceiling * 0.7f;
+                            heavyWindTarget = ceiling * 0.95f;
+                            break;
+                    }
+                }
+                else if (WeatherCycle.Instance.CurrentWeather == WeatherType.Rainy)
+                {
+                    // Rainy storms also carry wind whistle
+                    float stormWeight = Mathf.Clamp01((_currentIntensity - 0.5f) / 0.5f);
+                    windTarget = stormWeight * ceiling * 0.5f;
+                    heavyWindTarget = stormWeight * ceiling * 0.75f;
+                }
+            }
+
+            // 1. Rain ambience loops
             if (_ambiences != null)
             {
                 for (int i = 0; i < _ambiences.Length; i++)
                 {
                     AudioSource src = _ambiences[i];
                     if (src == null || src.clip == null) continue;
-                    src.volume = Mathf.MoveTowards(src.volume, outdoorTarget, _ambienceLerpSpeed * Time.deltaTime);
+                    src.volume = Mathf.MoveTowards(src.volume, outdoorRainTarget, _ambienceLerpSpeed * Time.deltaTime);
                     if (src.volume < 0.005f) src.volume = 0f;
                 }
             }
 
+            // 2. Indoor rain
             if (_indoor != null && _indoor.clip != null)
             {
-                _indoor.volume = Mathf.MoveTowards(_indoor.volume, indoorTarget, _ambienceLerpSpeed * Time.deltaTime);
+                _indoor.volume = Mathf.MoveTowards(_indoor.volume, indoorRainTarget, _ambienceLerpSpeed * Time.deltaTime);
                 if (_indoor.volume < 0.005f) _indoor.volume = 0f;
             }
 
-            // Storm loops crossfade in only as rain intensity climbs from
-            // Moderate (0.66) toward Storm (1.0). Smooth ramp instead of a
-            // sharp threshold so the rumble grows gradually as a storm rolls
-            // in. Below Moderate the rumble is silent; muted indoors because
-            // outdoor thunder doesn't bleed inside buildings.
-            //
-            // Magic numbers 0.66 and 0.34 mirror the literal bin values
-            // WeatherCycle.RainIntensity emits for WindIntensity.Moderate (0.66)
-            // and the Storm end (1.00). If the bins in WeatherCycle change,
-            // update these too — or refactor to expose them as public constants.
-            float stormWeight = Mathf.Clamp01((_currentIntensity - 0.66f) / 0.34f);
-            float stormTarget = _isIndoors ? 0f : stormWeight * ceiling;
+            // 3. Storm thunder rumble loops
+            float stormWeightRumble = Mathf.Clamp01((_currentIntensity - 0.66f) / 0.34f);
+            float stormTarget = _isIndoors ? 0f : stormWeightRumble * ceiling;
             if (_stormSources != null)
             {
                 for (int i = 0; i < _stormSources.Length; i++)
@@ -268,9 +382,31 @@ namespace Willowstead.World
                     if (src.volume < 0.005f) src.volume = 0f;
                 }
             }
-        }
 
-        // ─── Weather hooks ─────────────────────────────────────────────
+            // 4. Wind ambience loops
+            if (_windSources != null)
+            {
+                for (int i = 0; i < _windSources.Length; i++)
+                {
+                    AudioSource src = _windSources[i];
+                    if (src == null || src.clip == null) continue;
+                    src.volume = Mathf.MoveTowards(src.volume, windTarget, _ambienceLerpSpeed * Time.deltaTime);
+                    if (src.volume < 0.005f) src.volume = 0f;
+                }
+            }
+
+            // 5. Heavy wind whistle loops
+            if (_heavyWindSources != null)
+            {
+                for (int i = 0; i < _heavyWindSources.Length; i++)
+                {
+                    AudioSource src = _heavyWindSources[i];
+                    if (src == null || src.clip == null) continue;
+                    src.volume = Mathf.MoveTowards(src.volume, heavyWindTarget, _ambienceLerpSpeed * Time.deltaTime);
+                    if (src.volume < 0.005f) src.volume = 0f;
+                }
+            }
+        }
 
         private void HandleIntensity(float intensity)
         {
@@ -312,8 +448,6 @@ namespace Willowstead.World
 
         private IEnumerator PlayThunderAfter(float delay)
         {
-            // WaitForSeconds is fine here — timescale=0 normally doesn't apply
-            // because the pause menu pauses separately, but if it does this
             // becomes a real-time wait which is the desired behaviour.
             yield return new WaitForSeconds(delay);
             if (_thunder == null) yield break;
@@ -335,17 +469,15 @@ namespace Willowstead.World
         /// The 4-argument form is required; no default value on <paramref name="stormLoops"/>
         /// so a 3-arg call can't silently null out an Inspector-assigned field.
         /// </summary>
-        public void Configure(AudioClip[] outdoorLoops, AudioClip indoorLoop, AudioClip[] thunderClips, AudioClip[] stormLoops)
+        public void Configure(AudioClip[] outdoorLoops, AudioClip indoorLoop, AudioClip[] thunderClips, AudioClip[] stormLoops, AudioClip[] windLoops = null, AudioClip[] heavyWindLoops = null)
         {
             _rainAmbienceLoops = outdoorLoops;
             _indoorAmbienceClip = indoorLoop;
             _thunderClips = thunderClips;
             _stormAmbienceLoops = stormLoops ?? System.Array.Empty<AudioClip>();
+            if (windLoops != null) _windAmbienceLoops = windLoops;
+            if (heavyWindLoops != null) _heavyWindAmbienceLoops = heavyWindLoops;
 
-            // If Start hasn't run yet OR the camera isn't ready, just store the
-            // arrays and let Start() build the sources with them. Tearing down
-            // AudioSources at this point would leave the playback layer silent
-            // if the camera becomes available later.
             if (_mainCamera == null) return;
             if (!_hasStarted) return;
 
@@ -371,6 +503,28 @@ namespace Willowstead.World
                 }
                 _stormSources = null;
             }
+            if (_windSources != null)
+            {
+                for (int i = 0; i < _windSources.Length; i++)
+                {
+                    if (_windSources[i] != null && _windSources[i].gameObject != null)
+                    {
+                        Destroy(_windSources[i].gameObject);
+                    }
+                }
+                _windSources = null;
+            }
+            if (_heavyWindSources != null)
+            {
+                for (int i = 0; i < _heavyWindSources.Length; i++)
+                {
+                    if (_heavyWindSources[i] != null && _heavyWindSources[i].gameObject != null)
+                    {
+                        Destroy(_heavyWindSources[i].gameObject);
+                    }
+                }
+                _heavyWindSources = null;
+            }
             if (_indoor != null && _indoor.gameObject != null)
             {
                 Destroy(_indoor.gameObject);
@@ -383,6 +537,7 @@ namespace Willowstead.World
             BuildOutdoorAmbienceSources(parent);
             BuildStormAmbienceSources(parent);
             BuildIndoorAmbienceSource(parent);
+            BuildWindAmbienceSources(parent);
         }
     }
 }

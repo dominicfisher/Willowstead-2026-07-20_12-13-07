@@ -32,20 +32,15 @@ namespace Willowstead.World
         [Tooltip("The overlay image is parented to the shared HUD canvas and pushed to the last sibling so it renders on top of other HUD panels (DebugOverlay, dev hints, etc.). Image has no per-instance sortingOrder in Unity UI; sibling index is the in-canvas sort. If you need finer control, swap UIResourceHelper for a dedicated Canvas here.")] 
         [SerializeField] private bool _renderOnTop = true;
 
-        // Cached / state
         private Image _image;
         private float _currentAlpha;
         private float _targetAlpha;
         private bool _subscribed;
 
-        // ─── Lifecycle ────────────────────────────────────────────────
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrap()
         {
-            // Catches both active AND disabled scene instances. Without
-            // FindObjectsInactive.Include, a user-disabled RainScreenTint
-            // (Awake never fires, so Instance stays null) would still trip the
             // bootstrap and spawn a duplicate on top.
             if (Object.FindAnyObjectByType<RainScreenTint>(FindObjectsInactive.Include) != null) return;
             GameObject go = new GameObject("RainScreenTint");
@@ -75,10 +70,6 @@ namespace Willowstead.World
         private void Update()
         {
             if (!_subscribed) TrySubscribe();
-            // Smoothly approach target alpha. Unscaled time so the tint doesn't
-            // stop responding if the player pauses time (e.g. inspects menu).
-            // Skip the color write at rest — MoveTowards returns the same value
-            // when already at target, so we don't repaint the canvas every
             // frame post-fade.
             float dt = Time.unscaledDeltaTime;
             float nextAlpha = Mathf.MoveTowards(_currentAlpha, _targetAlpha, _fadeSpeed * dt);
@@ -87,7 +78,6 @@ namespace Willowstead.World
             ApplyAlpha(_currentAlpha);
         }
 
-        // ─── Bootstrap ────────────────────────────────────────────────
 
         private void BuildOverlay()
         {
@@ -108,12 +98,10 @@ namespace Willowstead.World
             _image.raycastTarget = false;          // never eat clicks meant for the world / HUD
             _image.sprite = null;
             // Image has no sortingOrder property. Sibling index within the canvas
-            // is the in-canvas render order; SetAsLastSibling pushes us above
             // every existing HUD panel for the duration of the rain.
             if (_renderOnTop) rt.SetAsLastSibling();
         }
 
-        // ─── Subscription ────────────────────────────────────────────
 
         private void TrySubscribe()
         {
@@ -139,7 +127,6 @@ namespace Willowstead.World
             _targetAlpha = Mathf.Clamp01(intensity) * _maxAlpha;
         }
 
-        // ─── Apply ───────────────────────────────────────────────────
 
         private void ApplyAlpha(float a)
         {

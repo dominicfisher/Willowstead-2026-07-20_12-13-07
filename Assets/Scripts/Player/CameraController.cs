@@ -47,7 +47,6 @@ namespace Willowstead.Player
             _camera = GetComponent<Camera>();
             if (_camera != null)
             {
-                // Seed the zoom target with whatever the camera currently has, so
                 // dragging a custom orthographic size in the scene stays as-is.
                 _targetOrthographicSize = _camera.orthographicSize;
             }
@@ -58,23 +57,44 @@ namespace Willowstead.Player
             HandleZoomInput();
         }
 
+        private Vector3 _menuPanPosition;
+        private bool _isMenuPanning;
+
         private void LateUpdate()
         {
             if (_camera == null) return;
 
-            if (_target == null && PlayerController.Instance != null)
+            bool inMainMenu = UI.MainMenuUI.Instance != null && UI.MainMenuUI.Instance.IsVisible;
+
+            if (inMainMenu)
             {
-                _target = PlayerController.Instance.transform;
+                if (!_isMenuPanning)
+                {
+                    _menuPanPosition = transform.position;
+                    _isMenuPanning = true;
+                }
+
+                // Slowly drift the camera horizontally and gently vertically to showcase terrain
+                _menuPanPosition += new Vector3(1.2f * Time.unscaledDeltaTime, Mathf.Sin(Time.unscaledTime * 0.35f) * 0.4f * Time.unscaledDeltaTime, 0f);
+                _menuPanPosition.z = _offset.z;
+                transform.position = _menuPanPosition;
+            }
+            else
+            {
+                _isMenuPanning = false;
+
+                if (_target == null && PlayerController.Instance != null)
+                {
+                    _target = PlayerController.Instance.transform;
+                }
+
+                if (_target != null)
+                {
+                    Vector3 targetPosition = _target.position + _offset;
+                    transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref _currentVelocity, _smoothTime);
+                }
             }
 
-            // 1) Position follow
-            if (_target != null)
-            {
-                Vector3 targetPosition = _target.position + _offset;
-                transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref _currentVelocity, _smoothTime);
-            }
-
-            // 2) Smoothly approach the desired zoom
             _camera.orthographicSize = Mathf.Lerp(
                 _camera.orthographicSize,
                 _targetOrthographicSize,
@@ -97,7 +117,6 @@ namespace Willowstead.Player
                 scrollDelta += mouse.scroll.ReadValue().y;
             }
 
-            // Optional keyboard fallback when Alt is held
             if (_allowKeyboardZoom && isAltHeld && Mathf.Approximately(scrollDelta, 0f))
             {
                 if (keyboard != null)

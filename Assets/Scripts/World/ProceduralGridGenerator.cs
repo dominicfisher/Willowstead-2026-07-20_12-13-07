@@ -29,8 +29,13 @@ namespace Willowstead.World
         [SerializeField] private Tilemap _grassTilemap;
         [SerializeField] private Tilemap _dirtTilemap;
         // Separate tilemap above grass so water tiles don't replace/remove grass tiles.
-        // Set its Sorting Order above the grass tilemap in the Inspector (e.g. grass=1, water=2).
         [SerializeField] private Tilemap _waterTilemap;
+
+        public Tilemap GrassTilemap => _grassTilemap;
+        public Tilemap DirtTilemap => _dirtTilemap;
+        public Tilemap WaterTilemap => _waterTilemap;
+
+        public event System.Action<Vector2Int> OnChunkGenerated;
 
         [Header("Tilemap Assets")]
         [SerializeField] private TileBase _baseDirtTile;
@@ -133,16 +138,12 @@ namespace Willowstead.World
         [Header("Editor Preview")]
         [SerializeField] private bool _generateInEditMode = false;
 
-        // ─── Singleton ────────────────────────────────────────────────────────────
         public static ProceduralGridGenerator Instance { get; private set; }
 
-        // ─── Seed offset (driven by WorldSeedService) ─────────────────────────────
         // Mixed into every Perlin sample and integer hash function in this file.
-        // Defaults to 0 so a world with no user-supplied seed reproduces the
         // exact pre-seed-generation terrain.
         private int _seedOffset;
 
-        // ─── Persistent world data ────────────────────────────────────────────────
         // World-tile position → is grass? Never cleared; grows as player explores.
         private readonly Dictionary<Vector2Int, bool> _grassData = new Dictionary<Vector2Int, bool>();
 
@@ -162,13 +163,10 @@ namespace Willowstead.World
         // Parent GameObjects per chunk for a clean hierarchy.
         private readonly Dictionary<Vector2Int, GameObject> _chunkContainers = new Dictionary<Vector2Int, GameObject>();
 
-        // Track the chunk the player was in last frame to avoid redundant checks.
         private Vector2Int _lastPlayerChunk = new Vector2Int(int.MinValue, int.MinValue);
 
         private bool _farmPlotGenerated = false;
 
-
-        // ─── Unity lifecycle ──────────────────────────────────────────────────────
 
 #if UNITY_EDITOR
         /// <summary>
@@ -211,10 +209,7 @@ namespace Willowstead.World
             else
             {
                 // NOTE: must be Destroy, NOT DestroyImmediate. Unity's runtime safety
-                // check throws if you call DestroyImmediate inside OnValidate. In Edit
                 // mode (the only mode this branch runs in, due to the isPlaying guard
-                // above) Destroy tears the GameObject down synchronously anyway, so
-                // behaviour matches DestroyImmediate. A future reader: please don't
                 // "modernise" this back to DestroyImmediate — Unity will throw.
                 foreach (var kvp in _chunkContainers)
                 {
@@ -251,26 +246,20 @@ namespace Willowstead.World
             // guard is paranoia for hot-reload after domain reloads.
             if (WorldSeedService.Instance != null) _seedOffset = WorldSeedService.Instance.SeedOffset;
 
-            // Pre-build the biome weight lookup so the first chunk generation is ready.
             RebuildBiomeWeights();
 
-            // Default to grass_tile_19 if user enabled restriction but left list empty
             if (_restrictSpawnsToSpecificGrass && (_spawnOnlyOnGrassSpriteNames == null || _spawnOnlyOnGrassSpriteNames.Length == 0))
             {
                 _spawnOnlyOnGrassSpriteNames = new[] { "grass_tile_19" };
             }
 	
-	            // Auto-locate the player if not assigned in the Inspector.
 	            if (_playerTransform == null)
 	            {
-                // 1. Try by tag
                 GameObject player = GameObject.FindWithTag("Player");
 
-                // 2. Fall back to finding by name
                 if (player == null)
                     player = GameObject.Find("Player");
 
-                // 3. Fall back to finding the PlayerController component anywhere in the scene
                 if (player == null)
                 {
                     var controller = FindAnyObjectByType<Player.PlayerController>();
@@ -287,7 +276,6 @@ namespace Willowstead.World
 
         private void OnEnable()
         {
-            // Subscribe AFTER any FirstInstanceInstance checks so a duplicate
             // generator that gets destroyed in Awake never adds a zombie listener.
             if (Instance == this && WorldSeedService.Instance != null)
             {
@@ -351,12 +339,10 @@ namespace Willowstead.World
             _lastPlayerChunk = new Vector2Int(int.MinValue, int.MinValue);
             _farmPlotGenerated = false;
 
-            // Wipe the cross-chunk felled-tile memory so the new seed doesn't see
             // tiles the player cut under the previous seed.
             Willowstead.World.TreeChoppable.ResetFelledTiles();
 
             // Note: GridManager crops/tiled cells are intentionally NOT cleared on
-            // regenerate — losing crops mid-play is hostile UX. The dev-console
             // `seed` command accepts this for testing; the World Setup panel only
             // appears on first launch (when no value is stored in PlayerPrefs), so
             // a regular player never sees their crops vanish.
@@ -400,7 +386,6 @@ namespace Willowstead.World
             }
 
             // Pre-till the starting farm plot (once) — Play-mode only. GridManager
-            // isn't initialised in Edit mode and writing hoed cells there would
             // persist into the saved scene file (which would be hostile UX).
             if (Application.isPlaying
                 && _preGenerateFarmPlot
@@ -417,8 +402,6 @@ namespace Willowstead.World
                 }
             }
 
-            // Setup warnings only during Play mode — at edit time the user is
-            // already looking at the Inspector and these lines are noise. They
             // also survive across recompiles via Application.isPlaying guard.
             if (Application.isPlaying)
             {
@@ -440,7 +423,6 @@ namespace Willowstead.World
         {
             if (_playerTransform == null) return;
 
-            // Edit-mode gate: never fan out new chunks unless the user opted in
             // AND a Scene view is present, so [ExecuteAlways] doesn't continuously
             // expand the preview just because someone re-imported the sprite atlas.
             if (!ShouldGenerateNow()) return;
@@ -452,7 +434,6 @@ namespace Willowstead.World
             GenerateChunksAround(currentChunk);
         }
 
-        // ─── Chunk management ─────────────────────────────────────────────────────
 
         /// <summary>Converts a world-space position to a chunk coordinate.</summary>
         private Vector2Int WorldToChunk(Vector3 worldPos)
@@ -479,6 +460,15 @@ namespace Willowstead.World
             }
         }
 
+        /// <summary>Ensures the chunk at the given coordinates has been generated into tilemaps.</summary>
+        public void EnsureChunkGenerated(Vector2Int chunkCoord)
+        {
+            if (!_generatedChunks.Contains(chunkCoord))
+            {
+                GenerateChunk(chunkCoord);
+            }
+        }
+
         /// <summary>
         /// Generates a single chunk: samples noise, spawns dirt + grass tiles, and
         /// computes grass edge-transition sprites for every grass tile in the chunk.
@@ -487,14 +477,11 @@ namespace Willowstead.World
         {
             _generatedChunks.Add(chunkCoord);
 
-            // Create a parent container for the chunk's tile objects.
             GameObject container = new GameObject($"Chunk_{chunkCoord.x}_{chunkCoord.y}");
             container.transform.parent = transform;
             _chunkContainers[chunkCoord] = container;
 
             // Edit-mode preview: mark the container non-persistent so all spawned
-            // tiles (dirt, grass, puddles, trees, objects) are excluded from the
-            // saved scene file. The chunks stay visible in the Hierarchy while
             // previewing, and an OnValidate toggle-off cleans them up.
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -516,7 +503,6 @@ namespace Willowstead.World
                 }
             }
 
-            // ── Pass 2: draw tiles to Tilemap (or fallback GameObjects) ───────
             bool useTilemaps = _grassTilemap != null || _dirtTilemap != null;
 
             for (int x = startX; x < startX + _chunkSize; x++)
@@ -528,7 +514,6 @@ namespace Willowstead.World
 
                     if (useTilemaps)
                     {
-                        // Dirt base layer
                         if (_dirtTilemap != null && _baseDirtTile != null)
                         {
                             _dirtTilemap.SetTile(cellPos, _baseDirtTile);
@@ -540,7 +525,6 @@ namespace Willowstead.World
                         {
                             if (IsDirtPatchAt(x, y))
                             {
-                                // Leave this tile as bare dirt — update grassData so
                                 // adjacency checks (IsGrassAt, decor guards) stay consistent.
                                 _grassData[tilePos] = false;
                             }
@@ -556,7 +540,6 @@ namespace Willowstead.World
                     }
                     else
                     {
-                        // Legacy GameObject fallback
                         GameObject dirtTile = new GameObject($"DirtTile_{x}_{y}");
                         dirtTile.transform.parent = container.transform;
                         dirtTile.transform.position = new Vector3(x + 0.5f, y + 0.5f, 0f);
@@ -596,9 +579,11 @@ namespace Willowstead.World
 
 	            // ── Pass 6: decor/trees ────────────────────────────────────────────
 	            SpawnDecorForChunk(chunkCoord, container.transform);
+
+	            _generatedChunks.Add(chunkCoord);
+	            OnChunkGenerated?.Invoke(chunkCoord);
 	        }
 
-        // ─── Tile visual helpers ──────────────────────────────────────────────────
 
         private void SpawnGrassTile(Vector2Int tilePos, Transform parent)
         {
@@ -660,9 +645,6 @@ namespace Willowstead.World
         }
 
 
-
-	        // ─── Puddles / Ponds ────────────────────────────────────────────────────
-
 	        private void SpawnPuddlesForChunk(Vector2Int chunkCoord, Transform parent)
 	        {
 	            // Determine active target tilemap (prefer dedicated water tilemap, fall back to grass tilemap if unassigned)
@@ -684,7 +666,6 @@ namespace Willowstead.World
 	                    Vector2Int pos = new Vector2Int(x, y);
 	                    if (_puddleCells.Contains(pos)) continue; // Already water
 	
-	                    // Respect clear radius and tilled cells
 	                    if (Mathf.Abs(x) <= _clearRadiusAroundOrigin && Mathf.Abs(y) <= _clearRadiusAroundOrigin) continue;
 	                    if (GridManager.Instance != null && GridManager.Instance.IsCellTilled(new Vector3Int(x, y, 0))) continue;
 
@@ -711,7 +692,6 @@ namespace Willowstead.World
 	            }
 	        }
 
-	        // ─── Rivers ─────────────────────────────────────────────────────────────
 
 	        /// <summary>
 	        /// Attempts to start a river originating in this chunk using a Perlin-steered
@@ -856,11 +836,9 @@ namespace Willowstead.World
 	                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
 	                    if (dist < 0.001f)
 	                    {
-	                        // Always include center cell
 	                    }
 	                    else
 	                    {
-	                        // Sample Perlin noise in the direction of (dx, dy) to distort radius
 	                        float angle = Mathf.Atan2(dy, dx);
 	                        float noiseX = noiseOffsetX + Mathf.Cos(angle) * _pondBlobNoiseScale * radius;
 	                        float noiseY = noiseOffsetY + Mathf.Sin(angle) * _pondBlobNoiseScale * radius;
@@ -872,7 +850,6 @@ namespace Willowstead.World
 	                    Vector2Int p = new Vector2Int(center.x + dx, center.y + dy);
 	                    if (_puddleCells.Contains(p)) continue;
 
-	                    // Skip tilled cells and keep within grass if required
 	                    if (GridManager.Instance != null && GridManager.Instance.IsCellTilled(new Vector3Int(p.x, p.y, 0))) continue;
 	                    bool isGrass = _grassData.TryGetValue(p, out bool g) && g;
 	                    if (_puddlesOnlyOnGrass && !isGrass) continue;
@@ -890,7 +867,6 @@ namespace Willowstead.World
 	                bool e = pondSet.Contains(new Vector2Int(p.x + 1, p.y));
 	                bool w = pondSet.Contains(new Vector2Int(p.x - 1, p.y));
 	                int count = (n?1:0) + (s?1:0) + (e?1:0) + (w?1:0);
-	                // Remove tips (<=1 neighbour) and single-tile corridors (NS only or EW only)
 	                if (count <= 1 || (n && s && !e && !w) || (e && w && !n && !s))
 	                {
 	                    toRemove.Add(p);
@@ -899,11 +875,9 @@ namespace Willowstead.World
 	            for (int i = 0; i < toRemove.Count; i++) pondSet.Remove(toRemove[i]);
 	            pondCells = new System.Collections.Generic.List<Vector2Int>(pondSet);
 
-	            // Build a lookup that includes existing water plus this (smoothed) pond
 	            System.Collections.Generic.HashSet<Vector2Int> combined = new System.Collections.Generic.HashSet<Vector2Int>(_puddleCells);
 	            for (int i = 0; i < pondCells.Count; i++) combined.Add(pondCells[i]);
 
-	            // Now spawn visuals for each new cell
 	            Tilemap targetTilemap = _waterTilemap != null ? _waterTilemap : _grassTilemap;
 	            bool useRuleTileInner = targetTilemap != null && _waterRuleTile != null;
 	            for (int i = 0; i < pondCells.Count; i++)
@@ -918,7 +892,6 @@ namespace Willowstead.World
 
 	                    if (_puddlesBlockMovement)
 	                    {
-	                        // Spawn a minimal collider-only GO — no SpriteRenderer needed.
 	                        GameObject go = new GameObject($"Puddle_{p.x}_{p.y}");
 	                        go.transform.parent = parent;
 	                        go.transform.position = new Vector3(p.x + 0.5f, p.y + 0.5f, 0f);
@@ -998,14 +971,12 @@ namespace Willowstead.World
 	            return true;
 	        }
 
-	        // ─── Decor / Trees spawning ──────────────────────────────────────────────
 
 	        private void SpawnDecorForChunk(Vector2Int chunkCoord, Transform parent)
 	        {
 	            int startX = chunkCoord.x * _chunkSize;
 	            int startY = chunkCoord.y * _chunkSize;
 
-	            // Keep a neat hierarchy
 	            GameObject decorContainer = new GameObject($"Decor_{chunkCoord.x}_{chunkCoord.y}");
 	            decorContainer.transform.parent = parent;
 
@@ -1022,14 +993,11 @@ namespace Willowstead.World
 	                    Vector2Int tilePos = new Vector2Int(x, y);
 	                    Vector3Int cellPos = new Vector3Int(x, y, 0);
 
-	                    // Reserve the starter farm zone
 	                    if (Mathf.Abs(x) <= _clearRadiusAroundOrigin && Mathf.Abs(y) <= _clearRadiusAroundOrigin)
 	                        continue;
 
-	                    // Skip if something already occupies this cell or is a puddle
 	                    if (_decorObjects.ContainsKey(tilePos) || IsPuddleAt(tilePos)) continue;
 
-                    // Skip tilled soil (or about-to-be tilled) areas
                     if (GridManager.Instance != null && GridManager.Instance.IsCellTilled(cellPos))
                         continue;
 
@@ -1047,7 +1015,6 @@ namespace Willowstead.World
                         float tChance = Deterministic01(x, y, 8617);
 	                        if (tChance < _treeDensity)
 	                        {
-	                            // Note: do not spawn yet; collect position first
 	                            Vector2 jitter = DeterministicJitter(x, y, 7331, _jitterRange);
 	                            Vector2 pos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
 	                            treePositions.Add(pos);
@@ -1082,7 +1049,6 @@ namespace Willowstead.World
 	                }
 	            }
 
-	            // Second pass: objects with separation from trees
 	            for (int x = startX; x < startX + _chunkSize; x++)
 	            {
 	                for (int y = startY; y < startY + _chunkSize; y++)
@@ -1093,7 +1059,6 @@ namespace Willowstead.World
                     if (Mathf.Abs(x) <= _clearRadiusAroundOrigin && Mathf.Abs(y) <= _clearRadiusAroundOrigin)
                         continue;
 
-                    // Belt-and-braces: objects can NEVER be placed on water (puddle)
                     // — loop 1 and loop 2 already guard this, but loop 3 was missing it.
                     if (_decorObjects.ContainsKey(tilePos) || IsPuddleAt(tilePos)) continue;
 
@@ -1105,8 +1070,6 @@ namespace Willowstead.World
 
                     bool isGrass = _grassData.TryGetValue(tilePos, out bool g) && g;
                     bool allowedGrassSprite = !_restrictSpawnsToSpecificGrass || IsAllowedGrassSpriteAt(tilePos);
-                    // _objectsOnlyOnGrass toggles the grass requirement: when OFF, small
-                    // object props may also appear on bare-dirt tiles. The grass-sprite-
                     // name whitelist still gates grass spawns; dirt has no sprite to compare
                     // against so it bypasses the whitelist (intentional).
                     bool objectsPassTile = !_objectsOnlyOnGrass || isGrass;
@@ -1120,7 +1083,6 @@ namespace Willowstead.World
 	                        float oChance = Deterministic01(x, y, 19211);
 	                        if (oChance < _objectDensity)
 	                        {
-	                            // Check separation from any tree in this chunk
 	                            Vector2 jitter = DeterministicJitter(x, y, 1129, _jitterRange * 0.7f);
 	                            Vector2 objPos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
 	                            Vector2Int objCell = new Vector2Int(Mathf.FloorToInt(objPos.x), Mathf.FloorToInt(objPos.y));
@@ -1155,11 +1117,9 @@ namespace Willowstead.World
 
 	            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
 	            sr.sprite = sprite;
-	            // Sort by the base of the sprite (bounds.min.y) to keep layering correct even if pivot isn't set
 	            float baseY = (sr != null && sr.sprite != null) ? sr.bounds.min.y : position.y;
 	            sr.sortingOrder = Mathf.RoundToInt(-baseY * 100) - 1; // Slightly behind player at same Y
 
-	            // Add a small base collider so the player collides with trunk, not canopy
 	            var bc = go.AddComponent<BoxCollider2D>();
 	            if (sr != null && sr.sprite != null)
 	            {
@@ -1169,12 +1129,10 @@ namespace Willowstead.World
 	                float h = Mathf.Max(0.06f, b.size.y * _treeColliderHeightPct);
 	                float centerWorldY = b.min.y + h * 0.5f + _treeColliderUpOffset;
 	                bc.size = new Vector2(w, h);
-	                // Convert world Y to local offset
 	                bc.offset = new Vector2(0f, centerWorldY - go.transform.position.y);
 	            }
 	            bc.isTrigger = false;
 
-            // Occlusion fade when player walks "behind"
             var occluder = go.AddComponent<TreeOccluder>();
             occluder.InitializeAuto();
 
@@ -1200,7 +1158,6 @@ namespace Willowstead.World
 	            float baseY = (sr != null && sr.sprite != null) ? sr.bounds.min.y : position.y;
 	            sr.sortingOrder = Mathf.RoundToInt(-baseY * 100) - 2; // A touch further back than trees
 
-	            // Add collider for physical collision
             var bc = go.AddComponent<BoxCollider2D>();
             if (sr != null && sr.sprite != null)
             {
@@ -1267,7 +1224,6 @@ namespace Willowstead.World
 
 	        private float Deterministic01(int x, int y, int salt)
 	        {
-	            // Fast 2D int hash -> [0,1). Add the seed offset into BOTH position
 	            // components so flipping the seed has equal effect on every tile.
 	            uint h = (uint)((x + _seedOffset) * 374761393
 	                          + (y + _seedOffset) * 668265263
@@ -1336,7 +1292,6 @@ namespace Willowstead.World
                 running += Mathf.Max(0f, _grassBiomes[i].weight);
                 _biomeCumulativeWeights[i] = running / total;
             }
-            // Clamp last entry to exactly 1 to avoid float drift.
             _biomeCumulativeWeights[_grassBiomes.Length - 1] = 1f;
         }
 
@@ -1353,7 +1308,6 @@ namespace Willowstead.World
                 return _grassBiomes[0].tile;
             }
 
-            // Ensure the weight table is ready (may be null after domain reload).
             if (_biomeCumulativeWeights == null || _biomeCumulativeWeights.Length != _grassBiomes.Length)
                 RebuildBiomeWeights();
 
@@ -1386,7 +1340,6 @@ namespace Willowstead.World
             return val < _dirtPatchThreshold;
         }
 
-        // ─── Public API ───────────────────────────────────────────────────────────
 
         /// <summary>
         /// Clears the grass at <paramref name="cellPos"/>, converting it to bare dirt
@@ -1402,16 +1355,13 @@ namespace Willowstead.World
 
             _grassData[pos] = false;
 
-            // Remove any decor on this tile now that it's dirt/tilled
             RemoveDecorAt(pos);
 
-            // Clear modern Tilemap tile
             if (_grassTilemap != null)
             {
                 _grassTilemap.SetTile(cellPos, null);
             }
 
-            // Clear legacy GameObject tile if present
             if (_grassTileObjects.TryGetValue(pos, out GameObject grassTile))
             {
                 if (grassTile != null) Destroy(grassTile);
@@ -1436,7 +1386,6 @@ namespace Willowstead.World
             return true;
         }
 
-        // ─── Sprite selection (legacy GameObject fallback — unused when Tilemaps are assigned) ──
 
         /// <summary>
         /// Legacy fallback: selects a grass sprite for the old GameObject-based renderer.

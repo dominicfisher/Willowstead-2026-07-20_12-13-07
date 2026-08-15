@@ -37,11 +37,9 @@ namespace Willowstead.Debugging
             _instance = go.AddComponent<DebugOverlay>();
         }
 
-        // UI
         private GameObject _panelGo;
         private TextMeshProUGUI _text;
 
-        // Update pacing
         private float _updateTimer;
         private const float UPDATE_INTERVAL = 0.5f;
 
@@ -52,7 +50,6 @@ namespace Willowstead.Debugging
         private Transform _cachedPlayer;
         private Camera _cachedCamera;
 
-        // ─── Lifecycle ──────────────────────────────────────────────────
         private void Awake()
         {
             _instance = this;
@@ -72,10 +69,8 @@ namespace Willowstead.Debugging
             _panelGo = new GameObject("DebugOverlayPanel", typeof(RectTransform), typeof(Image));
             RectTransform rt = _panelGo.GetComponent<RectTransform>();
             rt.SetParent(canvas.transform, false);
-            // Single-point anchor at left-middle so sizeDelta defines the rect's
             // *exact* extent (no anchor-stretch). Without anchorMin.y == anchorMax.y
             // the rect would inherit `(anchorMax - anchorMin) * parent.height` and
-            // grow taller than sizeDelta.y, which is what clipped the top half
             // (Day/Night + Weather) above the visible canvas.
             rt.anchorMin = new Vector2(0f, 0.5f);
             rt.anchorMax = new Vector2(0f, 0.5f);
@@ -102,7 +97,6 @@ namespace Willowstead.Debugging
 
             _text = textGo.AddComponent<TextMeshProUGUI>();
             // Larger + bold + pure white so the text reads over the live world with
-            // no backing. fontSize bumped from 14 -> 22 so it's actually legible
             // without a dark backdrop; FontStyles.Bold and pure white give enough
             // contrast on grass/dirt/trees to remain scannable.
             _text.fontSize = 22f;
@@ -113,7 +107,6 @@ namespace Willowstead.Debugging
             _text.text = string.Empty;
         }
 
-        // ─── Input + refresh loop ───────────────────────────────────────
         private void Update()
         {
             Keyboard kb = Keyboard.current;
@@ -146,7 +139,6 @@ namespace Willowstead.Debugging
             }
         }
 
-        // ─── Compose the rich-text snapshot of world state ───────────────
         private void RefreshText()
         {
             // Lazy cache refreshes (cheap because cached objects avoid the second call).
@@ -156,7 +148,6 @@ namespace Willowstead.Debugging
 
             string s = string.Empty;
 
-            // ── Day / Night ────────────────────────────────────────────
             if (_cachedDayNight != null)
             {
                 float t01 = _cachedDayNight.Time01;
@@ -171,7 +162,6 @@ namespace Willowstead.Debugging
                 s += $"  Day progress: {t01 * 24f:F1}h\n\n";
             }
 
-            // ── Weather ────────────────────────────────────────────────
             if (_cachedWeather != null)
             {
                 s += "<b>Weather</b>\n";
@@ -179,7 +169,6 @@ namespace Willowstead.Debugging
                 s += $"  Intensity: {_cachedWeather.CurrentIntensity}\n\n";
             }
 
-            // ── Player ─────────────────────────────────────────────────
             if (_cachedPlayer == null)
             {
                 GameObject p = GameObject.FindWithTag("Player");
@@ -192,7 +181,6 @@ namespace Willowstead.Debugging
                 s += $"  Pos: ({pos.x:F1}, {pos.y:F1})\n\n";
             }
 
-            // ── Camera ─────────────────────────────────────────────────
             if (_cachedCamera != null)
             {
                 Vector3 camPos = _cachedCamera.transform.position;
@@ -201,7 +189,6 @@ namespace Willowstead.Debugging
                 s += $"  Pos: ({camPos.x:F1}, {camPos.y:F1})\n\n";
             }
 
-            // ── Runtime ────────────────────────────────────────────────
             float fps = 1f / Mathf.Max(Time.unscaledDeltaTime, 0.0001f);
             s += "<b>Runtime</b>\n";
             s += $"  FPS: {fps:F0}\n";
@@ -210,7 +197,6 @@ namespace Willowstead.Debugging
             _text.text = s;
         }
 
-        // ─── Tiny formatters ────────────────────────────────────────────
         private static string DescribeDayPhase(float t01)
         {
             // Mirrors the brightness curve in DayNightCycle.cs so the labels stay in sync

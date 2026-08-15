@@ -3,9 +3,6 @@ using Willowstead.Player;
 
 namespace Willowstead.World
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Enums
-    // ─────────────────────────────────────────────────────────────────────────
 
     public enum WeatherType
     {
@@ -27,9 +24,6 @@ namespace Willowstead.World
         Right,
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // WeatherCycle
-    // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Lightweight weather cycle that runs alongside DayNightCycle. Weather state
@@ -41,15 +35,12 @@ namespace Willowstead.World
     [DisallowMultipleComponent]
     public class WeatherCycle : MonoBehaviour
     {
-        // ─── Singleton ────────────────────────────────────────────────────
         public static WeatherCycle Instance { get; private set; }
 
-        // ─── Inspector — references ──────────────────────────────────────
         [Header("References")]
         [Tooltip("The day/night cycle to sync weather changes with. If unassigned, WeatherCycle still works but rolls on its own timer.")]
         [SerializeField] private DayNightCycle _dayNightCycle;
 
-        // ─── Inspector — timing & rolling ─────────────────────────────────
         [Header("Weather Timing")]
         [Tooltip("Chance (0-1) to roll for a new weather state each half-day (noon/midnight).")]
         [Range(0f, 1f)] [SerializeField] private float _weatherChangeChance = 0.35f;
@@ -60,7 +51,6 @@ namespace Willowstead.World
         [Tooltip("Fallback duration (in real seconds) between weather checks if DayNightCycle is not assigned.")]
         [SerializeField] private float _fallbackChangeInterval = 120f;
 
-        // ─── Inspector — wind intensity ───────────────────────────────────
         [Header("Wind Intensity")]
         [Tooltip("Maximum concurrent gusts for each intensity level.")]
         [SerializeField] private int _lightGustCount = 3;
@@ -80,7 +70,6 @@ namespace Willowstead.World
         [Tooltip("How much to multiply gust count and speed while boosted via ToggleWindBoost().")]
         [SerializeField] private float _boostMultiplier = 2f;
 
-        // ─── Inspector — wind visuals ─────────────────────────────────────
         [Header("Wind Visuals")]
         [Tooltip("If true, gust sprites also appear during a Storm (Rainy + Strong intensity) so storms look as dramatic as a windy day. Disable if you want storms to feel clean and wind-free (rain only).")]
         [SerializeField] private bool _showWindDuringStorm = true;
@@ -108,7 +97,6 @@ namespace Willowstead.World
         [Tooltip("Horizontal padding beyond the screen edge where gusts spawn/despawn.")]
         [SerializeField] private float _gustSpawnPadding = 1f;
 
-        // ─── Inspector — lightning ────────────────────────────────────────
         [Header("Lightning")]
         [Tooltip("If true, lightning strikes can fire while a storm is active (Rainy + Strong wind). Disable for calmer worlds where rain and thunder never coincide.")]
         [SerializeField] private bool _canLightning = true;
@@ -122,7 +110,6 @@ namespace Willowstead.World
         [Tooltip("Time, in seconds, until the first lightning can strike after rain starts. Slightly higher than the loop interval so players see the storm escalate.")]
         [SerializeField] private float _lightningFirstStrikeDelay = 6f;
 
-        // ─── Inspector — rain auto-spawn config ───────────────────────────
         [Header("Rain Visuals (Auto-Spawn)")]
         [Tooltip("Variety sheet for falling raindrops. Each drop picks one at random on activate so the rainfield isn't uniform. The RainRenderer component is auto-created at Start, then Configure() is called with this array.")]
         [SerializeField] private Sprite[] _rainDropFrames;
@@ -130,11 +117,11 @@ namespace Willowstead.World
         [Tooltip("Sprite for the small splash burst when a raindrop crosses the ground row.")]
         [SerializeField] private Sprite _rainSplashSprite;
 
-        [Header("Rain Audio")]
-        [Tooltip("Master volume of the rain ambience loop set (outdoor + indoor) when rain intensity = 1.0. Default 0.30 (30%) so the layered bed sits low and atmospheric. WeatherCycle pushes this value into RainAudio at Start via SetAmbienceVolume AND on every Inspector drag during play (via OnValidate), so this slider is the single source of truth for ambient loudness.")]
-        [Range(0f, 1f)] [SerializeField] private float _maxAmbienceVolume = 0.30f;
+        [Header("Weather Audio")]
+        [Tooltip("Master volume of the weather ambience loops (rain + wind) at peak intensity. Default 0.22 (22%) so ambient sound sits gently in the background. WeatherCycle pushes this value into RainAudio.")]
+        [Range(0f, 1f)] [SerializeField] private float _maxAmbienceVolume = 0.22f;
 
-        [Tooltip("Looping outdoor rain ambience clips. Layer a base bed with finer droplet variation for a richer soundscape. Each plays simultaneously and is volume-equalised by RainAudio at intensity = 1.0.")]
+        [Tooltip("Looping outdoor rain ambience clips. (Auto-discovered from Elements/WE Light Outside Rain).")]
         [SerializeField] private AudioClip[] _rainAmbienceLoops;
 
         [Tooltip("Single looping indoor rain ambience clip. Cross-faded in when SetIndoors(true) is called.")]
@@ -143,14 +130,19 @@ namespace Willowstead.World
         [Tooltip("One or more thunder SFX clips. Randomly picked per strike so consecutive strikes don't sound identical.")]
         [SerializeField] private AudioClip[] _thunderClips;
 
-        [Tooltip("Looping storm ambience clips with baked-in thunder rumble — fades in proportional to rain intensity so Light rain has no rumble but a Storm gets continuous rumbling thunder. Drag files like 'Rain & Thunder.mp3' and 'Rain & Thunder (Variation).mp3' here. Storm is muted when SetIndoors(true).")]
+        [Tooltip("Looping heavy storm ambience clips with thunder rumble. (Auto-discovered from Elements/WE Heavy Outside Rain).")]
         [SerializeField] private AudioClip[] _stormAmbienceLoops;
+
+        [Tooltip("Looping light wind whistle clips for windy weather.")]
+        [SerializeField] private AudioClip[] _windAmbienceLoops;
+
+        [Tooltip("Looping heavy wind whistle clips for strong wind and storms.")]
+        [SerializeField] private AudioClip[] _heavyWindAmbienceLoops;
 
         [Header("Weather Transitions")]
         [Tooltip("Time in seconds for rain and wind intensity to smoothly fade between weather states.")]
         [SerializeField] private float _weatherTransitionDuration = 5f;
 
-        // ─── Runtime state ────────────────────────────────────────────────
         private WeatherType _currentWeather = WeatherType.Clear;
         private WindIntensity _currentIntensity = WindIntensity.Light;
         private float _currentRainIntensityLerped = 0f;
@@ -160,12 +152,10 @@ namespace Willowstead.World
         private float _lightningTimer;
         private bool _isWindBoosted;
 
-        // Visuals
         private Camera _mainCamera;
         private GameObject _gustContainer;
         private WindGust[] _gustPool;
 
-        // ─── Public surface ───────────────────────────────────────────────
         public WeatherType CurrentWeather => _currentWeather;
 
         public WindIntensity CurrentIntensity => _currentIntensity;
@@ -212,7 +202,6 @@ namespace Willowstead.World
         /// </summary>
         public event System.Action OnLightningStrike;
 
-        // ─── Unity lifecycle ──────────────────────────────────────────────
         private void Start()
         {
             if (Instance == null) Instance = this;
@@ -223,7 +212,6 @@ namespace Willowstead.World
                 _lastTime01 = _dayNightCycle.Time01;
             }
 
-            // Lightning timer gets a soft first-strike delay so a freshly-rolled
             // storm doesn't immediately hammer the player with thunder.
             _lightningTimer = _lightningFirstStrikeDelay;
 
@@ -259,12 +247,8 @@ namespace Willowstead.World
             CleanupGusts();
         }
 
-        // ─── Inspector push (Play-time edits) ───────────────────────────────
-        // Unity calls OnValidate whenever a SerializeField changes in the
         // Inspector OR when the script reloads. Without this hook, dragging the
-        // _maxAmbienceVolume slider while Play is running would change the
         // SerializeField but RainAudio would never hear about it, so the user
-        // would see "I moved the slider and nothing happened". Push on every
         // Play-time validation so the slider feels live.
         private void OnValidate()
         {
@@ -274,7 +258,6 @@ namespace Willowstead.World
             RainAudio.Instance.SetAmbienceVolume(_maxAmbienceVolume);
         }
 
-        // ─── Save / load hooks ────────────────────────────────────────────
         /// <summary>
         /// Restore weather + wind intensity + wind direction from a save.
         /// Resetting intensity for non-windy weather is intentional —
@@ -289,7 +272,6 @@ namespace Willowstead.World
             EmitIntensityChanged();
         }
 
-        // ─── Public weather mutators ──────────────────────────────────────
         /// <summary>
         /// Public helper to force a specific weather state immediately.
         /// If no intensity is provided, it randomizes one for Windy.
@@ -364,15 +346,12 @@ namespace Willowstead.World
 #endif
         }
 
-        // ─── Internal — state mutation helpers ────────────────────────────
-        // Helper: invoke OnIntensityChanged with the latest value. Used by
         // every mutation site so listeners always get a fresh sample.
         private void EmitIntensityChanged()
         {
             OnIntensityChanged?.Invoke(RainIntensity);
         }
 
-        // ─── Internal — weather rolling ───────────────────────────────────
         /// <summary>
         /// Checks whether enough time has passed to roll for a new weather state.
         /// When DayNightCycle is present, changes happen at noon and midnight.
@@ -422,8 +401,6 @@ namespace Willowstead.World
             }
             else if (_currentWeather == WeatherType.Rainy)
             {
-                // Rain rolls to Strong intensity so lightning can fire on the
-                // first tick — a "ramp up" Light → Moderate → Strong chain would
                 // never get there within the player's session.
                 _currentIntensity = WindIntensity.Strong;
             }
@@ -451,7 +428,6 @@ namespace Willowstead.World
             return WindIntensity.Light;
         }
 
-        // ─── Internal — lightning ─────────────────────────────────────────
         /// <summary>
         /// Counts down until the next lightning strike while a storm is active.
         /// Only runs when RainIntensity == 1 (rain + Strong wind). When the
@@ -467,14 +443,11 @@ namespace Willowstead.World
             _lightningTimer -= Time.deltaTime;
             if (_lightningTimer > 0f) return;
 
-            // Reset BEFORE invoking so a subscriber that re-enters state during
-            // the callback (e.g. dev console forcing a weather change) doesn't
             // immediately re-fire.
             _lightningTimer = Random.Range(_lightningMinInterval, _lightningMaxInterval);
             OnLightningStrike?.Invoke();
         }
 
-        // ─── Internal — wind visuals ──────────────────────────────────────
         /// <summary>
         /// Runtime state of a single wind gust sprite.
         /// </summary>
@@ -525,7 +498,6 @@ namespace Willowstead.World
                 return;
             }
 
-            // Spawn new gusts over time up to the target count.
             _spawnTimer += Time.deltaTime;
             if (activeCount < targetCount && _spawnTimer >= _spawnInterval)
             {
@@ -537,20 +509,17 @@ namespace Willowstead.World
                 }
             }
 
-            // Update each active gust (drift + animation).
             float frameDuration = 1f / Mathf.Max(_windFramerate, 0.01f);
             for (int i = 0; i < _gustPool.Length; i++)
             {
                 WindGust gust = _gustPool[i];
                 if (!gust.isActive) continue;
 
-                // Drift
                 Vector3 pos = gust.transform.localPosition;
                 float driftDir = (_windDirection == WindDirection.Left) ? 1f : -1f;
                 pos.x += gust.speed * Time.deltaTime * driftDir;
                 gust.transform.localPosition = pos;
 
-                // Animate
                 gust.animTimer += Time.deltaTime;
                 if (gust.animTimer >= frameDuration)
                 {
@@ -563,7 +532,6 @@ namespace Willowstead.World
                     gust.renderer.sprite = _windFrames[gust.currentFrame];
                 }
 
-                // Despawn if off-screen
                 float halfWidth = GetCameraHalfWidth() + _gustSpawnPadding;
                 bool offScreen = (_windDirection == WindDirection.Left)
                     ? pos.x > halfWidth
@@ -578,7 +546,6 @@ namespace Willowstead.World
         private int GetTargetGustCount()
         {
             // Wind visuals only spawn when IsWindActive() is true; during a clear
-            // day or non-storm rain there's no reason to count drifts we'd then
             // immediately deactivate.
             if (!IsWindActive()) return 0;
 
@@ -658,7 +625,6 @@ namespace Willowstead.World
             return (_windDirection == WindDirection.Left) ? _windScale : -_windScale;
         }
 
-        // ─── Internal — overlay + cleanup ─────────────────────────────────
         /// <summary>
         /// Creates the gust pool parented to the main camera.
         /// </summary>
@@ -760,7 +726,6 @@ namespace Willowstead.World
             return null;
         }
 
-        // ─── Internal — rain sub-system auto-bootstrap ─────────────────────
         /// <summary>
         /// Ensures RainRenderer, RainSplash and RainAudio MonoBehaviours exist in
         /// the scene at startup. If any are missing, they are created on a child
@@ -772,14 +737,11 @@ namespace Willowstead.World
         /// </summary>
         private void EnsureRainSystem()
         {
-            // Single-instance check before AddComponent is critical: each Rain*
-            // class uses a Destroy-on-existing-Instance pattern in Awake, so
             // adding a duplicate would nuke the host and any co-existing sibling.
             var existingRenderer = Object.FindAnyObjectByType<RainRenderer>();
             var existingSplash = Object.FindAnyObjectByType<RainSplash>();
             var existingAudio = Object.FindAnyObjectByType<RainAudio>();
 
-            // Reuse any pre-existing component's GameObject as the host. If all
             // three rain components are already in the scene under different GOs,
             // pick the renderer as host and parent it under WeatherCycle.
             GameObject host = (existingRenderer != null) ? existingRenderer.gameObject
@@ -797,24 +759,18 @@ namespace Willowstead.World
                 host.transform.SetParent(transform, false);
             }
 
-            // Spawn only if no manual instance won Awake.
             if (existingRenderer == null) host.AddComponent<RainRenderer>();
             if (existingSplash == null) host.AddComponent<RainSplash>();
             if (existingAudio == null) host.AddComponent<RainAudio>();
 
-            // Configure on whatever ended up on the host — auto-spawned or
-            // pre-existing. Always-overwrite semantics so the SerializeField
             // references on WeatherCycle win over empty per-component slots.
             var renderer = host.GetComponent<RainRenderer>();
             var splash = host.GetComponent<RainSplash>();
             var audio = host.GetComponent<RainAudio>();
             if (renderer != null) renderer.Configure(_rainDropFrames);
             if (splash != null) splash.Configure(_rainSplashSprite);
-            if (audio != null) audio.Configure(_rainAmbienceLoops, _indoorAmbienceClip, _thunderClips, _stormAmbienceLoops);
+            if (audio != null) audio.Configure(_rainAmbienceLoops, _indoorAmbienceClip, _thunderClips, _stormAmbienceLoops, _windAmbienceLoops, _heavyWindAmbienceLoops);
 
-            // Push the inspector-set ambience ceiling down to RainAudio so this
-            // slider (the user's source of truth for ambient loudness) actually
-            // drives playback volume. Done unconditionally so it overwrites any
             // stale default RainAudio might still be holding from Awake.
             if (audio != null) audio.SetAmbienceVolume(_maxAmbienceVolume);
 

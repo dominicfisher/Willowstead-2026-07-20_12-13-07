@@ -16,7 +16,6 @@ namespace Willowstead.Player
     /// </summary>
     public static class UIResourceHelper
     {
-        // ─── Sprite helpers ───────────────────────────────────────────────
 
         public static Sprite GetBackgroundSprite()
         {
@@ -47,7 +46,6 @@ namespace Willowstead.Player
             }
             catch (System.Exception)
             {
-                // Catch any exception to prevent console spam
             }
 
             if (sprite == null)
@@ -135,6 +133,16 @@ namespace Willowstead.Player
         public static Sprite GetItemIconSprite(string itemName)
         {
             if (string.IsNullOrEmpty(itemName)) return null;
+
+            // 1. Check Inspector-configured ItemDatabase ScriptableObject first
+            if (Willowstead.Inventory.ItemDatabase.Instance != null)
+            {
+                if (Willowstead.Inventory.ItemDatabase.Instance.TryGetIcon(itemName, out Sprite dbSprite) && dbSprite != null)
+                {
+                    return dbSprite;
+                }
+            }
+
             if (_iconCache.TryGetValue(itemName, out Sprite cached) && cached != null) return cached;
 
 #if UNITY_EDITOR
@@ -147,7 +155,6 @@ namespace Willowstead.Player
             else if (itemName == "Wood" || itemName == "Log") path = "Assets/Sprites/log.png";
             else if (itemName == "Gold Coin" || itemName == "Coin") path = "Assets/Sprites/gold coin.png";
             
-            // Crops.png slices according to the Crops Sprite Sheet Guide
             else if (itemName == "Carrot Seeds" || itemName == "Carrot Seed" || itemName == "Seed")
             {
                 path = "Assets/Sprites/Crops.png";
@@ -252,7 +259,6 @@ namespace Willowstead.Player
 
         private static Sprite CreateFallbackSprite()
         {
-            // Create a small 2x2 white texture and return it as a sprite
             Texture2D tex = new Texture2D(2, 2);
             for (int y = 0; y < tex.height; y++)
             {
@@ -265,7 +271,6 @@ namespace Willowstead.Player
             return Sprite.Create(tex, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f));
         }
 
-        // ─── Canvas & EventSystem helpers ─────────────────────────────────
 
         /// <summary>
         /// Default name used when looking for an existing HUD canvas.
@@ -320,7 +325,6 @@ namespace Willowstead.Player
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
 
-            // Draw HUD above any world-tint canvas (sortingOrder = -1) so the day/night
             // overlay can never darken inventory sprites or other panels.
             Canvas hudCanvas = canvasGo.GetComponent<Canvas>();
             hudCanvas.sortingOrder = 1;
@@ -343,7 +347,6 @@ namespace Willowstead.Player
             return es;
         }
 
-        // ─── Pointer / hit-test helpers ───────────────────────────────────
 
         /// <summary>
         /// Returns true if the mouse pointer is currently blocked by any UI:
@@ -353,6 +356,8 @@ namespace Willowstead.Player
         /// </summary>
         public static bool IsPointerOverAnyUI()
         {
+            if (UIDragSlot.IsDragging) return true;
+
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return true;
 
@@ -379,7 +384,6 @@ namespace Willowstead.Player
             return false;
         }
 
-        // ─── Component lookup helper ──────────────────────────────────────
 
         /// <summary>
         /// Searches all child components of <paramref name="root"/> of type T,

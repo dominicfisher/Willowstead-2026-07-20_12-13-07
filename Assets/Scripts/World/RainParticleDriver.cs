@@ -2,13 +2,6 @@
 // live rain intensity onto the Shuriken emitter and syncing wind direction.
 // Use this if you prefer Shuriken particles over the sprite-pool RainRenderer.
 //
-// Setup:
-//   1. Right-click your WeatherCycle GameObject > Create Empty Child. Name it RainParticles.
-//   2. Add Component > Effects > Particle System (Unity adds it + Renderer).
-//   3. Author the particle system in the Inspector (sprite, shape, lifetime, etc.).
-//   4. Add Component > RainParticleDriver on the same GameObject.
-//   5. (Optional) live-edit the Emission Curve and Wind Strength on the driver.
-//   6. Press Play, type `weather rain` in the dev console (`) to test.
 
 using UnityEngine;
 
@@ -48,7 +41,6 @@ namespace Willowstead.World
         // would falsely match and skip the first ApplyWind call.
         private WindDirection _lastWind = (WindDirection)(-1);
 
-        // ─── Lifecycle ────────────────────────────────────────────────
 
         private void Awake()
         {
@@ -61,7 +53,6 @@ namespace Willowstead.World
             _main = _ps.main;
 
             // World-space so velocityOverLifetime.x is in world horizontal terms,
-            // not "downstream from emitter local-X", which would skew with the
             // camera-relative emitter position.
             _main.simulationSpace = ParticleSystemSimulationSpace.World;
             _emission.enabled = false;
@@ -91,7 +82,6 @@ namespace Willowstead.World
             if (Instance == this) Instance = null;
         }
 
-        // ─── Subscription ─────────────────────────────────────────────
 
         private void TrySubscribe()
         {
@@ -112,7 +102,6 @@ namespace Willowstead.World
             _subscribed = false;
         }
 
-        // ─── Live update ──────────────────────────────────────────────
 
         private void HandleIntensityChanged(float intensity)
         {

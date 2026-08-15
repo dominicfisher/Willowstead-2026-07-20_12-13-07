@@ -16,15 +16,11 @@ namespace Willowstead.World
     /// </summary>
     public class WorldSeedService : MonoBehaviour
     {
-        // ─── Persistence ────────────────────────────────────────────────
         private const string PlayerPrefsKey = "Willowstead.WorldSeed";
+        private const string PlayerPrefsStringKey = "Willowstead.WorldSeedString";
 
-        // Default value used when the game has never had a seed stored. 0 keeps
-        // the ProceduralGridGenerator on its legacy behaviour (offset = 0, so
-        // the maths stays bit-identical to the pre-seed codebase).
         public const int DefaultSeed = 0;
 
-        // ─── Singleton ──────────────────────────────────────────────────
         public static WorldSeedService Instance { get; private set; }
 
         /// <summary>
@@ -32,6 +28,11 @@ namespace Willowstead.World
         /// <see cref="SetSeed"/>; assigned back from PlayerPrefs automatically.
         /// </summary>
         public int CurrentSeed { get; private set; }
+
+        /// <summary>
+        /// The raw string representation of the current seed (e.g. "Willowstead", "12345").
+        /// </summary>
+        public string CurrentSeedString { get; private set; } = string.Empty;
 
         /// <summary>
         /// Mixable offset derived from <see cref="CurrentSeed"/>. Add this to any
@@ -44,9 +45,6 @@ namespace Willowstead.World
             {
                 unchecked
                 {
-                    // Knuth multiplicative hash on the user seed → stable, large,
-                    // signed offset that hides any "seed = small int" pattern from
-                    // the integer-hash functions in ProceduralGridGenerator.
                     return (int)(CurrentSeed * unchecked((int)0x9E3779B1));
                 }
             }
@@ -62,7 +60,6 @@ namespace Willowstead.World
         /// <summary>Fires whenever the seed flips. Subscribers should regenerate.</summary>
         public event Action<int> OnSeedChanged;
 
-        // ─── Bootstrap ──────────────────────────────────────────────────
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoBootstrap()
         {
@@ -72,7 +69,6 @@ namespace Willowstead.World
             go.AddComponent<WorldSeedService>();
         }
 
-        // ─── Lifecycle ──────────────────────────────────────────────────
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -82,20 +78,14 @@ namespace Willowstead.World
             }
             Instance = this;
 
-            // Pull the previous-session seed if one was saved. Treat any stored
-            // value as user-provided so the World Setup UI doesn't re-prompt on
-            // the next launch — the player already made a choice before.
             if (PlayerPrefs.HasKey(PlayerPrefsKey))
             {
                 CurrentSeed = PlayerPrefs.GetInt(PlayerPrefsKey, DefaultSeed);
+                CurrentSeedString = PlayerPrefs.GetString(PlayerPrefsStringKey, CurrentSeed.ToString());
                 LastSeedWasUserProvided = true;
             }
             else
             {
-                // On a fresh install (no PlayerPrefs key yet) auto-roll a real seed
-                // so ProceduralGridGenerator's first Start-time generation isn't
-                // offset=0. Without this, the world renders once with DefaultSeed
-                // terrain and then snaps to the player's later pick on Create.
                 SetSeed(GenerateRandomSeed(), userProvided: false);
                 LastSeedWasUserProvided = false;
             }
@@ -106,10 +96,54 @@ namespace Willowstead.World
             if (Instance == this) Instance = null;
         }
 
-        // ─── Public API ─────────────────────────────────────────────────
+        /// <summary>
+        /// Converts any input string (numeric, alphanumeric, words) into a deterministic 32-bit integer seed.
+        /// If the string is a valid integer, it parses it directly; otherwise it computes a deterministic FNV-1a hash.
+        /// </summary>
+        public static int ParseSeedString(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return 0;
+            string trimmed = raw.Trim();
+            if (int.TryParse(trimmed, System.Globalization.NumberStyles.Integer,
+                             System.Globalization.CultureInfo.InvariantCulture, out int parsedInt))
+            {
+                return parsedInt;
+            }
+
+            // FNV-1a 32-bit hash for deterministic alphanumeric seed support across platforms/sessions
+            unchecked
+            {
+                uint hash = 2166136261u;
+                for (int i = 0; i < trimmed.Length; i++)
+                {
+                    hash ^= trimmed[i];
+                    hash *= 16777619u;
+                }
+                return (int)hash;
+            }
+        }
 
         /// <summary>
-        /// Applies a new seed and fires <see cref="OnSeedChanged"/>. Pass
+        /// Sets a string seed (accepting numbers or words/letters).
+        /// </summary>
+        public void SetSeed(string seedString, bool userProvided)
+        {
+            string cleanStr = string.IsNullOrWhiteSpace(seedString) ? string.Empty : seedString.Trim();
+            int seedInt = ParseSeedString(cleanStr);
+            CurrentSeed = seedInt;
+            CurrentSeedString = string.IsNullOrEmpty(cleanStr) ? seedInt.ToString() : cleanStr;
+            LastSeedWasUserProvided = userProvided;
+
+            PlayerPrefs.SetInt(PlayerPrefsKey, CurrentSeed);
+            PlayerPrefs.SetString(PlayerPrefsStringKey, CurrentSeedString);
+            PlayerPrefs.Save();
+
+            try { OnSeedChanged?.Invoke(CurrentSeed); }
+            catch (Exception ex) { Debug.LogException(ex, this); }
+        }
+
+        /// <summary>
+        /// Applies a new seed integer and fires <see cref="OnSeedChanged"/>. Pass
         /// <paramref name="userProvided"/> = true when the value was typed
         /// by the player (or set via dev console); false when auto-generated.
         /// Persists through PlayerPrefs across restarts.
@@ -117,8 +151,10 @@ namespace Willowstead.World
         public void SetSeed(int seed, bool userProvided)
         {
             CurrentSeed = seed;
+            CurrentSeedString = seed.ToString();
             LastSeedWasUserProvided = userProvided;
             PlayerPrefs.SetInt(PlayerPrefsKey, seed);
+            PlayerPrefs.SetString(PlayerPrefsStringKey, CurrentSeedString);
             PlayerPrefs.Save();
             try { OnSeedChanged?.Invoke(seed); }
             catch (Exception ex) { Debug.LogException(ex, this); }

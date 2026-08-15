@@ -29,7 +29,6 @@ namespace Willowstead.World
 
             if (_sprites == null || _sprites.Count == 0) return;
 
-            // Pick a deterministic weighted sprite based on cell position hash
             Sprite chosenSprite = PickWeightedSprite(position);
             if (chosenSprite != null)
             {
@@ -48,7 +47,6 @@ namespace Willowstead.World
 
             if (totalWeight <= 0f)
             {
-                // Fallback to first valid sprite if all weights are zero
                 for (int i = 0; i < _sprites.Count; i++)
                 {
                     if (_sprites[i].sprite != null) return _sprites[i].sprite;
@@ -56,7 +54,6 @@ namespace Willowstead.World
                 return null;
             }
 
-            // Deterministic hash based on grid coordinate (x, y)
             uint hash = (uint)(position.x * 1103515245 + position.y * 12345 + position.z * 1234567);
             hash ^= (hash >> 13);
             hash *= 1274126177u;

@@ -57,6 +57,11 @@ namespace Willowstead.UI
             Show();
         }
 
+        public static bool HasGameStarted { get; private set; } = false;
+        public static event System.Action OnGameStarted;
+
+        private Coroutine _fadeCoroutine;
+
         public void Show()
         {
             if (_panelGo == null) return;
@@ -64,6 +69,7 @@ namespace Willowstead.UI
             InputReader.BlockGameplayInput = true;
             RefreshContinue();
             _panelGo.SetActive(true);
+            SetGameplayVisualsVisible(false);
         }
 
         public void Hide()
@@ -73,10 +79,130 @@ namespace Willowstead.UI
             InputReader.BlockGameplayInput = false;
         }
 
+        private void Update()
+        {
+            if (!HasGameStarted)
+            {
+                SetGameplayVisualsVisible(false);
+            }
+        }
+
+        /// <summary>
+        /// Toggles player sprite rendering and HUD visibility while in the main menu.
+        /// </summary>
+        public static void SetGameplayVisualsVisible(bool visible)
+        {
+            if (PlayerController.Instance != null)
+            {
+                var sr = PlayerController.Instance.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.enabled = visible;
+            }
+
+            Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
+            if (canvas != null)
+            {
+                Transform hotbar = canvas.transform.Find("HotbarPanel");
+                if (hotbar != null)
+                {
+                    var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                    if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                }
+
+                Transform compass = canvas.transform.Find("CompassPanel");
+                if (compass != null)
+                {
+                    var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                    if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                }
+
+                Transform gold = canvas.transform.Find("GoldHUD");
+                if (gold != null)
+                {
+                    var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                    if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Commits to starting the game session, unhides gameplay HUDs, and plays a smooth fade-in animation.
+        /// </summary>
+        public static void StartGameSession()
+        {
+            if (HasGameStarted) return;
+            HasGameStarted = true;
+            OnGameStarted?.Invoke();
+
+            if (PlayerController.Instance != null)
+            {
+                var sr = PlayerController.Instance.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.enabled = true;
+            }
+
+            if (Instance != null)
+            {
+                if (Instance._fadeCoroutine != null) Instance.StopCoroutine(Instance._fadeCoroutine);
+                Instance._fadeCoroutine = Instance.StartCoroutine(Instance.PlayHudFadeInAnimation());
+            }
+        }
+
+        private System.Collections.IEnumerator PlayHudFadeInAnimation()
+        {
+            // Collect all gameplay HUD elements (Hotbar, Compass, GoldHUD)
+            var groups = new System.Collections.Generic.List<CanvasGroup>();
+
+            Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
+            if (canvas != null)
+            {
+                Transform hotbar = canvas.transform.Find("HotbarPanel");
+                if (hotbar != null)
+                {
+                    var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                    cg.alpha = 0f;
+                    groups.Add(cg);
+                }
+
+                Transform compass = canvas.transform.Find("CompassPanel");
+                if (compass != null)
+                {
+                    var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                    cg.alpha = 0f;
+                    groups.Add(cg);
+                }
+
+                Transform gold = canvas.transform.Find("GoldHUD");
+                if (gold != null)
+                {
+                    var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                    cg.alpha = 0f;
+                    groups.Add(cg);
+                }
+            }
+
+            float duration = 0.85f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float alpha = Mathf.Clamp01(elapsed / duration);
+                float curvedAlpha = 1f - (1f - alpha) * (1f - alpha);
+
+                for (int i = 0; i < groups.Count; i++)
+                {
+                    if (groups[i] != null) groups[i].alpha = curvedAlpha;
+                }
+                yield return null;
+            }
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (groups[i] != null) groups[i].alpha = 1f;
+            }
+            _fadeCoroutine = null;
+        }
+
         /// <summary>True when the Play menu panel is on screen. Pause menu bails on ESC while this is true.</summary>
         public bool IsVisible => _panelGo != null && _panelGo.activeSelf;
-
-        // ─── Panel construction ────────────────────────────────────────
 
         private void BuildPanel(Canvas canvas)
         {
@@ -90,7 +216,6 @@ namespace Willowstead.UI
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
 
-            // Centered Wooden Board Card
             GameObject cardGo = new GameObject("MenuCard", typeof(RectTransform), typeof(Image));
             cardGo.transform.SetParent(_panelGo.transform, false);
             RectTransform cardRt = (RectTransform)cardGo.transform;
@@ -105,7 +230,6 @@ namespace Willowstead.UI
             cardBg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
             cardBg.raycastTarget = true;
 
-            // Inner Board Panel
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
             innerGo.transform.SetParent(cardGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
@@ -118,7 +242,6 @@ namespace Willowstead.UI
             innerBg.type = Image.Type.Sliced;
             innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
 
-            // Title Banner
             GameObject bannerGo = new GameObject("TitleBanner", typeof(RectTransform), typeof(Image));
             bannerGo.transform.SetParent(cardGo.transform, false);
             RectTransform bannerRt = (RectTransform)bannerGo.transform;
@@ -151,7 +274,6 @@ namespace Willowstead.UI
             BuildText(subGo, "a cozy farm in a deterministic world",
                 new Color(0.92f, 0.86f, 0.74f, 1f), fontSize: 16, style: FontStyles.Italic);
 
-            // Buttons stacked inside card
             _continueButton = BuildMenuButton(cardGo.transform, "Continue (Most Recent)",
                 new Vector2(0f, -145f), OnContinueClicked);
             BuildMenuButton(cardGo.transform, "New World",
@@ -162,7 +284,6 @@ namespace Willowstead.UI
                 new Vector2(0f, -385f), OnQuitClicked);
             _continueLabel = _continueButton.GetComponentInChildren<Text>();
 
-            // Tip footer
             GameObject hintGo = new GameObject("Hint", typeof(RectTransform));
             hintGo.transform.SetParent(cardGo.transform, false);
             RectTransform hintRt = (RectTransform)hintGo.transform;
@@ -185,7 +306,6 @@ namespace Willowstead.UI
             t.alignment = TextAlignmentOptions.Center;
             t.richText = false;
 
-            // Ensure font asset is valid for TMP runtime creation
             if (t.font == null || t.font.material == null)
             {
                 var defaultFont = TMP_Settings.defaultFontAsset;
@@ -238,8 +358,6 @@ namespace Willowstead.UI
             return btn;
         }
 
-        // ─── Button handlers ───────────────────────────────────────────
-
         private void RefreshContinue()
         {
             if (_continueButton == null) return;
@@ -272,6 +390,7 @@ namespace Willowstead.UI
             if (best == null || !best.exists) return;
             SaveGameManager.Instance.LoadFromPath(best.fullPath);
             Hide();
+            StartGameSession();
         }
 
         private void OnLoadSavesClicked()

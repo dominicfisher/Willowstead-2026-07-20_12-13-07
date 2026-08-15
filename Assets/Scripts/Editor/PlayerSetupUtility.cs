@@ -25,31 +25,26 @@ namespace Willowstead.Player.Editor
 
             try { playerGo.tag = "Player"; } catch {}
 
-            // SpriteRenderer
             SpriteRenderer sr = playerGo.GetComponent<SpriteRenderer>();
             if (sr == null) sr = Undo.AddComponent<SpriteRenderer>(playerGo);
             if (sr.sprite == null) sr.sprite = UIResourceHelper.GetCircleSprite();
             sr.color = new Color(0.95f, 0.85f, 0.55f, 1f);
             sr.sortingOrder = 50;
 
-            // CircleCollider2D
             CircleCollider2D col = playerGo.GetComponent<CircleCollider2D>();
             if (col == null) col = Undo.AddComponent<CircleCollider2D>(playerGo);
             col.radius = 0.4f;
 
-            // Rigidbody2D
             Rigidbody2D rb = playerGo.GetComponent<Rigidbody2D>();
             if (rb == null) rb = Undo.AddComponent<Rigidbody2D>(playerGo);
             rb.gravityScale = 0f;
             rb.freezeRotation = true;
             rb.interpolation = RigidbodyInterpolation2D.Interpolate;
 
-            // AudioSource
             AudioSource audio = playerGo.GetComponent<AudioSource>();
             if (audio == null) audio = Undo.AddComponent<AudioSource>(playerGo);
             audio.playOnAwake = false;
 
-            // Core Player Scripts
             if (playerGo.GetComponent<InventoryManager>() == null) Undo.AddComponent<InventoryManager>(playerGo);
             if (playerGo.GetComponent<Farming.FarmingController>() == null) Undo.AddComponent<Farming.FarmingController>(playerGo);
             if (playerGo.GetComponent<HotbarUI>() == null) Undo.AddComponent<HotbarUI>(playerGo);

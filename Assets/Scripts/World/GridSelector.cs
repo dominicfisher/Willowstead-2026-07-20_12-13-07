@@ -46,7 +46,6 @@ namespace Willowstead.World
                 _maxInteractionDistance = 7.5f;
             }
             
-            // Try to find the player if not manually assigned in inspector
             if (_playerTransform == null)
             {
                 var playerObj = GameObject.FindWithTag("Player");
@@ -63,12 +62,11 @@ namespace Willowstead.World
         {
             _lineRenderer = GetComponent<LineRenderer>();
             _lineRenderer.positionCount = 5;
-            _lineRenderer.useWorldSpace = false; // Draw relative to this GameObject's position
+            _lineRenderer.useWorldSpace = false;
             _lineRenderer.loop = true;
             _lineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _lineRenderer.receiveShadows = false;
 
-            // Use the standard Sprites shader for clean coloring
             _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
 
             UpdateLineRendererPoints();
@@ -87,12 +85,10 @@ namespace Willowstead.World
             float halfX = cellSize.x * 0.5f;
             float halfY = cellSize.y * 0.5f;
 
-            // Scale outline width relative to the cell size
             float width = 0.05f * cellSize.x;
             _lineRenderer.startWidth = width;
             _lineRenderer.endWidth = width;
 
-            // Draw a square border centered on the cell
             _lineRenderer.SetPosition(0, new Vector3(-halfX, -halfY, 0f));
             _lineRenderer.SetPosition(1, new Vector3(halfX, -halfY, 0f));
             _lineRenderer.SetPosition(2, new Vector3(halfX, halfY, 0f));
@@ -111,7 +107,6 @@ namespace Willowstead.World
                 return;
             }
 
-            // Restore line renderer if it was disabled by UI hover
             if (_lineRenderer != null && !_lineRenderer.enabled)
             {
                 _lineRenderer.enabled = true;
@@ -121,7 +116,6 @@ namespace Willowstead.World
 
             UpdateLineRendererPoints();
 
-            // 1. Get mouse position in world coordinates
             Vector3 mouseWorldPos = Vector3.zero;
             if (UnityEngine.InputSystem.Mouse.current != null)
             {
@@ -130,11 +124,9 @@ namespace Willowstead.World
             }
             mouseWorldPos.z = 0f; // Lock to 2D plane
 
-            // 2. Convert to cell coordinates and update selector position
             _currentCell = GridManager.Instance.WorldToCell(mouseWorldPos);
             transform.position = GridManager.Instance.CellToWorldCenter(_currentCell);
 
-            // 3. Perform range check against player
             if (_playerTransform != null)
             {
                 float distance = Vector2.Distance(_playerTransform.position, transform.position);
@@ -142,11 +134,9 @@ namespace Willowstead.World
             }
             else
             {
-                // Fallback if player doesn't exist yet
                 _isCellInRange = true;
             }
 
-            // 4. Update the color of the outline
             Color targetColor = _isCellInRange ? _inRangeColor : _outOfRangeColor;
             _lineRenderer.startColor = targetColor;
             _lineRenderer.endColor = targetColor;

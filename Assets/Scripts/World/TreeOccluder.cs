@@ -35,11 +35,8 @@ namespace Willowstead.World
 
         private void TryFindPlayerImmediate()
         {
-            // 1. Try by tag
             GameObject player = GameObject.FindWithTag("Player");
-            // 2. Fall back to name
             if (player == null) player = GameObject.Find("Player");
-            // 3. Fall back to PlayerController
             if (player == null)
             {
                 var controller = FindAnyObjectByType<Player.PlayerController>();
@@ -54,7 +51,6 @@ namespace Willowstead.World
 
             if (_player == null)
             {
-                // Reattempt find at a low cadence
                 _findCooldown -= Time.deltaTime;
                 if (_findCooldown <= 0f)
                 {
@@ -78,12 +74,8 @@ namespace Willowstead.World
 
         private bool ShouldOcclude()
         {
-            // The tree fades only when the player is roughly "under" its canopy:
             // horizontally within a band of the trunk AND vertically within a band
             // of the trunk. Comparing against transform.position (the recommended
-            // bottom-center pivot location) keeps the check stable regardless of
-            // the sprite's pivot — bounds.min.y was unreliable because for
-            // center-pivoted sprites it sits far below the trunk and the fade
             // would trigger for trees that were nowhere near the player.
             float px = _player.position.x;
             float py = _player.position.y;

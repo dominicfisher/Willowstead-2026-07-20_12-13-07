@@ -22,7 +22,7 @@ namespace Willowstead.World
             SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             sr.color = tintColor ?? Color.white;
-            sr.sortingOrder = 1000; // Draw on top of all normal world elements
+            sr.sortingOrder = 1000;
 
             FlyingItemAnimation anim = go.AddComponent<FlyingItemAnimation>();
             anim.StartCoroutine(anim.AnimateFly(startWorldPos, uiTarget, onArrival));
@@ -30,11 +30,9 @@ namespace Willowstead.World
 
         private System.Collections.IEnumerator AnimateFly(Vector3 startPos, RectTransform uiTarget, Action onArrival)
         {
-            // Phase 1: Jump up out of the ground bouncily
             float jumpDuration = 0.25f;
             float elapsed = 0f;
             
-            // Roll a slight random peak offset
             Vector3 peakPos = startPos + new Vector3(
                 UnityEngine.Random.Range(-0.35f, 0.35f),
                 UnityEngine.Random.Range(0.45f, 0.75f),
@@ -46,18 +44,15 @@ namespace Willowstead.World
                 elapsed += Time.deltaTime;
                 float t = elapsed / jumpDuration;
 
-                // Scale up from 0 to 1.0 bouncily
                 float scale = Mathf.Lerp(0f, 1.0f, t);
                 transform.localScale = new Vector3(scale, scale, 1f);
 
-                // Quadratic parabolic arc
                 float height = Mathf.Sin(t * Mathf.PI) * 0.45f;
                 transform.position = Vector3.Lerp(startPos, peakPos, t) + new Vector3(0f, height, 0f);
 
                 yield return null;
             }
 
-            // Phase 2: Track and fly directly towards the UI Hotbar slot on the screen
             float flyDuration = 0.45f;
             elapsed = 0f;
             Vector3 flightStartPos = transform.position;
@@ -67,7 +62,6 @@ namespace Willowstead.World
                 elapsed += Time.deltaTime;
                 float t = elapsed / flyDuration;
 
-                // Ease In / Accelerate towards slot
                 float tSmooth = t * t * (3f - 2f * t);
 
                 // Dynamically fetch slot's world coordinate (re-evaluating in case camera moves)
@@ -75,17 +69,14 @@ namespace Willowstead.World
 
                 transform.position = Vector3.Lerp(flightStartPos, targetWorldPos, tSmooth);
 
-                // Spin the item in mid-air
                 transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, 360f, t));
 
-                // Scale down slightly to match slot overlay sizing as it hits the HUD
                 float scale = Mathf.Lerp(1.0f, 0.55f, t);
                 transform.localScale = new Vector3(scale, scale, 1f);
 
                 yield return null;
             }
 
-            // Phase 3: Arrived
             onArrival?.Invoke();
             Destroy(gameObject);
         }
@@ -94,7 +85,6 @@ namespace Willowstead.World
         {
             if (rect == null)
             {
-                // Fallback: bottom-center region of screen
                 Vector3 fallbackScreenPos = new Vector3(Screen.width / 2f, 50f, 10f);
                 Vector3 fallbackWorldPos = Camera.main.ScreenToWorldPoint(fallbackScreenPos);
                 fallbackWorldPos.z = 0f;

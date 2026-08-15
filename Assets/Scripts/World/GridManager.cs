@@ -19,6 +19,8 @@ namespace Willowstead.World
         [Tooltip("The Tilemap representing the farming/soil layer.")]
         [SerializeField] private Tilemap _farmingTilemap;
 
+        public Tilemap FarmingTilemap => _farmingTilemap;
+
         [Header("Farming Tiles")]
         [Tooltip("Tile asset used for hoed/tilled soil.")]
         [SerializeField] private TileBase _tilledTile;
@@ -58,7 +60,6 @@ namespace Willowstead.World
         // Tracks the spawned edge fringe GameObjects, keyed by the cell position that owns them.
         private Dictionary<Vector3Int, System.Collections.Generic.List<GameObject>> _edgeFringes = new Dictionary<Vector3Int, System.Collections.Generic.List<GameObject>>();
 
-        // ─── Save / load hooks ───────────────────────────────────────────
         public List<Willowstead.Persistence.Vector3IntRecord> CaptureTilledCells()
         {
             var list = new List<Willowstead.Persistence.Vector3IntRecord>(_tilledCells.Count);
@@ -282,7 +283,6 @@ namespace Willowstead.World
         {
             if (_tilledCells.Contains(cellPosition)) return;
 
-            // Disallow hoeing on water/puddle tiles
             if (ProceduralGridGenerator.Instance != null && ProceduralGridGenerator.Instance.HasPuddleAt(cellPosition))
             {
 #if UNITY_EDITOR
@@ -291,7 +291,6 @@ namespace Willowstead.World
                 return;
             }
 
-            // Convert grass tile to bare dirt underneath
             if (ProceduralGridGenerator.Instance != null)
             {
                 ProceduralGridGenerator.Instance.ClearGrassAt(cellPosition);
@@ -300,7 +299,6 @@ namespace Willowstead.World
             _tilledCells.Add(cellPosition);
             _moistureLevels[cellPosition] = 0; // 0 = Dry (Blue block)
 
-            // Extract a preview sprite for the pop animation
             Sprite soilSprite = null;
             if (_tilledTile is PlowedDirtAutoTile autoTile)
             {
@@ -313,14 +311,12 @@ namespace Willowstead.World
 
             if (soilSprite != null)
             {
-                // Instantiate the visual pop animator at the cell's world position
                 GameObject animGo = new GameObject("SoilPopAnimation");
                 animGo.transform.position = CellToWorldCenter(cellPosition);
 
                 SoilPopAnimator animator = animGo.AddComponent<SoilPopAnimator>();
                 animator.Initialize(soilSprite, _dirtParticleSprite, _dirtColor, () =>
                 {
-                    // Place permanent tile once the pop-up finishes
                     if (_farmingTilemap != null && _tilledTile != null)
                     {
                         _farmingTilemap.SetTile(cellPosition, _tilledTile);
@@ -330,7 +326,6 @@ namespace Willowstead.World
             }
             else
             {
-                // Fallback instant placement
                 if (_farmingTilemap != null && _tilledTile != null)
                 {
                     _farmingTilemap.SetTile(cellPosition, _tilledTile);
@@ -338,7 +333,6 @@ namespace Willowstead.World
                 }
             }
 
-            // Update edge fringes for this tile and its 4 neighbors
             UpdateEdgeFringesAround(cellPosition);
             UpdateEdgeFringesAround(cellPosition + new Vector3Int(1, 0, 0));
             UpdateEdgeFringesAround(cellPosition + new Vector3Int(-1, 0, 0));
@@ -352,10 +346,8 @@ namespace Willowstead.World
 
         private void UpdateEdgeFringesAround(Vector3Int cell)
         {
-            // Clear existing fringes first
             ClearFringesForCell(cell);
 
-            // Fringes are only owned by tilled cells
             if (!_tilledCells.Contains(cell)) return;
 
             bool tilledN = _tilledCells.Contains(cell + new Vector3Int(0, 1, 0));
@@ -366,12 +358,10 @@ namespace Willowstead.World
             System.Collections.Generic.List<GameObject> cellFringes = new System.Collections.Generic.List<GameObject>();
             Vector3 cellWorldPos = CellToWorldCenter(cell);
 
-            // Get dynamic cell size to scale placement and graphics
             Vector3 cellSize = CellSize;
             float scaleX = cellSize.x;
             float scaleY = cellSize.y;
 
-            // Helper to spawn a single grass fringe tuft
             System.Action<Vector3, float> spawnTuft = (pos, sizeMult) =>
             {
                 if (_grassFringeSprites == null || _grassFringeSprites.Length == 0) return;
@@ -380,7 +370,6 @@ namespace Willowstead.World
                 tuftGo.transform.parent = transform;
                 tuftGo.transform.position = pos;
 
-                // Scale the sprite physically to match the grid cell size
                 float scale = Random.Range(_fringeScaleMin, _fringeScaleMax) * sizeMult * scaleX;
                 tuftGo.transform.localScale = new Vector3(scale, scale, 1f);
 
@@ -395,18 +384,15 @@ namespace Willowstead.World
                 cellFringes.Add(tuftGo);
             };
 
-            // Detect if isolated 1x1 tile
             bool isIsolated = !tilledN && !tilledS && !tilledE && !tilledW;
 
             if (isIsolated)
             {
-                // Circular ring of 8 tufts around the cell, pulled in slightly
                 for (int angleDeg = 0; angleDeg < 360; angleDeg += 45)
                 {
                     float angleRad = angleDeg * Mathf.Deg2Rad;
                     float currentOffset = 0.44f;
 
-                    // Push South-facing angles down to preserve bottom overhang
                     if (angleDeg == 225 || angleDeg == 270 || angleDeg == 315)
                     {
                         currentOffset = 0.68f;
@@ -418,8 +404,6 @@ namespace Willowstead.World
             }
             else
             {
-                // 1. STRAIGHT EDGES
-                // North edge
                 if (!tilledN && tilledE && tilledW)
                 {
                     for (int i = 0; i < 3; i++)
@@ -429,7 +413,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // South edge (keep tile overhang!)
                 if (!tilledS && tilledE && tilledW)
                 {
                     for (int i = 0; i < 3; i++)
@@ -439,7 +422,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // East edge (pulled inward to overlap the seam)
                 if (!tilledE && tilledN && tilledS)
                 {
                     for (int i = 0; i < 3; i++)
@@ -449,7 +431,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // West edge (pulled inward to overlap the seam)
                 if (!tilledW && tilledN && tilledS)
                 {
                     for (int i = 0; i < 3; i++)
@@ -460,8 +441,6 @@ namespace Willowstead.World
                     }
                 }
 
-                // 2. CORNERS (ROUNDED CLUSTERS)
-                // Northwest Corner (NW)
                 if (!tilledN && !tilledW)
                 {
                     for (int angleDeg = 90; angleDeg <= 180; angleDeg += 45)
@@ -472,7 +451,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // Northeast Corner (NE)
                 if (!tilledN && !tilledE)
                 {
                     for (int angleDeg = 0; angleDeg <= 90; angleDeg += 45)
@@ -483,7 +461,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // Southwest Corner (SW) - South-facing parts pushed down!
                 if (!tilledS && !tilledW)
                 {
                     for (int angleDeg = 180; angleDeg <= 270; angleDeg += 45)
@@ -494,7 +471,6 @@ namespace Willowstead.World
                         spawnTuft(pos, 1.0f);
                     }
                 }
-                // Southeast Corner (SE) - South-facing parts pushed down!
                 if (!tilledS && !tilledE)
                 {
                     for (int angleDeg = 270; angleDeg <= 360; angleDeg += 45)
@@ -588,7 +564,6 @@ namespace Willowstead.World
             }
             else if (_farmingTilemap != null && _tilledTile is PlowedDirtAutoTile)
             {
-                // Moist-but-not-Wet cells still benefit from a refresh so the
                 // PlowedDirtAutoTile can re-pick its Moist variant. Cheap enough.
                 RefreshFarmingNeighbours(cellPosition);
             }
@@ -615,7 +590,6 @@ namespace Willowstead.World
                 return false;
             }
 
-            // Spawn the crop prefab at the center of the cell
             Vector3 worldPos = CellToWorldCenter(cellPosition);
             GameObject cropGo = Instantiate(cropPrefab, worldPos, Quaternion.identity, transform);
 
@@ -660,7 +634,6 @@ namespace Willowstead.World
             Debug.Log("[GridManager] A new day begins!");
 #endif
 
-            // Grow crops (midnight tick)
             foreach (var kvp in _activeCrops)
             {
                 Vector3Int cell = kvp.Key;
@@ -670,7 +643,6 @@ namespace Willowstead.World
                 crop.Grow(isWatered);
             }
 
-            // Decay soil moisture levels: Wet (2) -> Moist (1) -> Dry (0)
             _wateredCells.Clear();
 
             List<Vector3Int> keys = new List<Vector3Int>(_moistureLevels.Keys);

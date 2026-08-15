@@ -11,6 +11,8 @@ namespace Willowstead.Player
     /// </summary>
     public class UIDragSlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
+        public static bool IsDragging { get; private set; }
+
         [Tooltip("The slot index inside InventoryManager slots array that this UI slot represents.")]
         public int slotIndex;
 
@@ -21,7 +23,6 @@ namespace Willowstead.Player
 
         private void Start()
         {
-            // Find the child icon image
             _originalIcon = transform.Find("Icon")?.GetComponent<Image>();
             if (_originalIcon == null)
             {
@@ -36,13 +37,11 @@ namespace Willowstead.Player
 
         private void Update()
         {
-            // Smoothly animate hover scale transitions
             transform.localScale = Vector3.Lerp(transform.localScale, _targetScale, Time.deltaTime * 14f);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            // Hover scale bounce
             _targetScale = new Vector3(1.08f, 1.08f, 1.08f);
         }
 
@@ -53,16 +52,15 @@ namespace Willowstead.Player
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            IsDragging = true;
             if (InventoryManager.Instance == null) return;
 
             InventorySlot slot = InventoryManager.Instance.GetSlotItem(slotIndex);
             if (slot == null || slot.IsEmpty) return;
 
-            // Find main canvas to parent the drag ghost
             Canvas rootCanvas = GetComponentInParent<Canvas>();
             if (rootCanvas == null) return;
 
-            // Spawn the Drag Ghost GameObject
             _ghostGo = new GameObject("DragGhostIcon");
             _ghostGo.transform.SetParent(rootCanvas.transform, false);
             _ghostGo.transform.SetAsLastSibling(); // Render on top of everything
@@ -78,7 +76,6 @@ namespace Willowstead.Player
             RectTransform ghostRect = _ghostGo.GetComponent<RectTransform>();
             ghostRect.sizeDelta = new Vector2(35f, 35f); // Match slot size
 
-            // Make original icon translucent during drag
             if (_originalIcon != null)
             {
                 _originalIcon.color = new Color(_originalIconColor.r, _originalIconColor.g, _originalIconColor.b, 0.4f);
@@ -89,7 +86,6 @@ namespace Willowstead.Player
         {
             if (_ghostGo != null && UnityEngine.InputSystem.Mouse.current != null)
             {
-                // Update ghost position to mouse cursor
                 Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
                 _ghostGo.transform.position = mousePos;
             }
@@ -97,14 +93,13 @@ namespace Willowstead.Player
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            // Destroy drag ghost icon
+            IsDragging = false;
             if (_ghostGo != null)
             {
                 Destroy(_ghostGo);
                 _ghostGo = null;
             }
 
-            // Restore original icon opacity
             if (_originalIcon != null)
             {
                 _originalIcon.color = _originalIconColor;
@@ -112,7 +107,6 @@ namespace Willowstead.Player
 
             if (EventSystem.current == null || UnityEngine.InputSystem.Mouse.current == null) return;
 
-            // Raycast UI under cursor to find the drop target slot
             PointerEventData pointerData = new PointerEventData(EventSystem.current)
             {
                 position = UnityEngine.InputSystem.Mouse.current.position.ReadValue()
@@ -127,15 +121,23 @@ namespace Willowstead.Player
                 {
                     if (targetSlot != this)
                     {
-                        // Swap slots
                         InventoryManager.Instance.SwapSlots(slotIndex, targetSlot.slotIndex);
 
-                        // Refresh both UI displays
                         FindAnyObjectByType<InventoryUI>()?.RefreshUI();
                         FindAnyObjectByType<HotbarUI>()?.RefreshUI();
                     }
                     break;
                 }
+            }
+        }
+
+        private void OnDisable()
+        {
+            IsDragging = false;
+            if (_ghostGo != null)
+            {
+                Destroy(_ghostGo);
+                _ghostGo = null;
             }
         }
     }

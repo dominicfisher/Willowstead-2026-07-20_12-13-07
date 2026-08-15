@@ -30,7 +30,6 @@ namespace Willowstead.UI
     {
         public static PauseMenuUI Instance { get; private set; }
 
-        // ─── Hierarchy ─────────────────────────────────────────────────
         private GameObject _rootGo;            // dimmer + click-blocker
         private GameObject _mainPanel;
         private GameObject _optionsPanel;
@@ -38,7 +37,6 @@ namespace Willowstead.UI
 
         private readonly Stack<GameObject> _panelBackstack = new Stack<GameObject>();
 
-        // Snapshot of Time.timeScale at the moment we paused, so a future
         // slow-mo effect (cinematics, weather reveal) can restore to 0.5 not 1.
         private float _priorTimeScale = 1f;
 
@@ -47,7 +45,6 @@ namespace Willowstead.UI
         private readonly List<Button> _presetButtons = new List<Button>();
         private readonly List<float>  _presetSeconds = new List<float>();
 
-        // ─── Bootstrap ─────────────────────────────────────────────────
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
@@ -70,14 +67,12 @@ namespace Willowstead.UI
 
             if (_rootGo != null)
             {
-                // Ensure PauseMenu panel renders on top of all HUD panels (Shop, Inventory, Hotbar)
                 Canvas pauseCanvas = _rootGo.AddComponent<Canvas>();
                 pauseCanvas.overrideSorting = true;
                 pauseCanvas.sortingOrder = 1000;
                 _rootGo.AddComponent<GraphicRaycaster>();
             }
 
-            // Bind UI Toolkit UIDocument if present
             var uiDoc = GetComponent<UnityEngine.UIElements.UIDocument>();
             if (uiDoc == null) uiDoc = FindAnyObjectByType<UnityEngine.UIElements.UIDocument>();
             if (uiDoc != null && uiDoc.rootVisualElement != null)
@@ -110,7 +105,6 @@ namespace Willowstead.UI
             }
         }
 
-        // ─── Public API ────────────────────────────────────────────────
 
         public bool IsOpen => (_rootGo != null && _rootGo.activeSelf) || (_toolkitPauseRoot != null && _toolkitPauseRoot.style.display == UnityEngine.UIElements.DisplayStyle.Flex);
 
@@ -173,7 +167,6 @@ namespace Willowstead.UI
             if (_gameplayPanel != null) _gameplayPanel.SetActive(panel == _gameplayPanel);
         }
 
-        // ─── Update / input ────────────────────────────────────────────
         private void Update()
         {
             // Don't even run when in-world state isn't established.
@@ -204,14 +197,12 @@ namespace Willowstead.UI
             }
             else if (IsOpen && kb.f5Key.wasPressedThisFrame)
             {
-                // Quick-save convenience: snap a silent save and close the menu
                 // so the player returns to the world immediately.
                 SaveCurrentWorld();
                 Hide();
             }
         }
 
-        // ─── Actions ───────────────────────────────────────────────────
 
         private void SaveCurrentWorld()
         {
@@ -242,7 +233,6 @@ namespace Willowstead.UI
 #endif
         }
 
-        // ─── Hierarchy construction ────────────────────────────────────
 
         private void BuildHierarchy(Canvas canvas)
         {
@@ -289,7 +279,6 @@ namespace Willowstead.UI
             cardBg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f); // Warm timber frame
             cardBg.raycastTarget = true;
 
-            // Inner Board
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
             innerGo.transform.SetParent(cardGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
@@ -416,7 +405,6 @@ namespace Willowstead.UI
         {
             BuildHeader(parent, "Options");
 
-            // ── Master Volume slider ──
             GameObject header = NewChild(parent, "VolumeHeader");
             RectTransform hr = SetAnchoredTopBand(header.transform, 60f, 100f);
             TextMeshProUGUI hTxt = header.AddComponent<TextMeshProUGUI>();
@@ -563,7 +551,6 @@ namespace Willowstead.UI
             BuildMenuButton(parent, "Back", new Vector2(0f, -420f), new Vector2(220f, 50f), Back);
         }
 
-        // ─── Helpers ───────────────────────────────────────────────────
 
         private static GameObject NewChild(Transform parent, string name)
         {
@@ -578,9 +565,6 @@ namespace Willowstead.UI
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(1f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
-            // offsetMin.y is the distance up from the lower edge; offsetMax.y is
-            // the distance up from the lower edge of the top. "Top band of
-            // pixels fromTop..toTop measured downward from the panel's top."
             rt.offsetMin = new Vector2(36f, -toTop);
             rt.offsetMax = new Vector2(-36f, -fromTop);
             return rt;
@@ -588,7 +572,6 @@ namespace Willowstead.UI
 
         private static void BuildSliderVisuals(Slider slider)
         {
-            // Background
             GameObject bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
             bg.transform.SetParent(slider.transform, false);
             RectTransform bgRt = (RectTransform)bg.transform;
@@ -599,7 +582,6 @@ namespace Willowstead.UI
             bgRt.offsetMax = Vector2.zero;
             bg.GetComponent<Image>().color = new Color(0.10f, 0.09f, 0.07f, 1f);
 
-            // Fill area
             GameObject fa = new GameObject("Fill Area", typeof(RectTransform));
             fa.transform.SetParent(slider.transform, false);
             RectTransform faRt = (RectTransform)fa.transform;
@@ -619,7 +601,6 @@ namespace Willowstead.UI
             fill.GetComponent<Image>().color = new Color(0.74f, 0.62f, 0.40f, 1f);
             slider.fillRect = fRt;
 
-            // Handle slide area
             GameObject ha = new GameObject("Handle Slide Area", typeof(RectTransform));
             ha.transform.SetParent(slider.transform, false);
             RectTransform haRt = (RectTransform)ha.transform;
@@ -679,7 +660,6 @@ namespace Willowstead.UI
             return best;
         }
 
-        // Persisted PlayerPref keys — kept in one nested class so we don't
         // accidentally drift between read and write sites.
         private static class PlayerPrefKeys
         {

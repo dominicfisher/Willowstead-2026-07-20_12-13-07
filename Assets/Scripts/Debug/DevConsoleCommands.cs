@@ -6,7 +6,6 @@ using Willowstead.Player;
 namespace Willowstead.Debugging.Commands
 {
 
-    // ─── help ───────────────────────────────────────────────────────────
     public sealed class HelpCommand : DevConsoleCommand
     {
         public override string Id   => "help";
@@ -21,7 +20,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── give <item> [count=1] ──────────────────────────────────────────
     public sealed class GiveCommand : DevConsoleCommand
     {
         public override string Id   => "give";
@@ -47,7 +45,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── gold [amount] ──────────────────────────────────────────────────
     public sealed class GoldCommand : DevConsoleCommand
     {
         public override string Id   => "gold";
@@ -75,7 +72,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── time <0..1> ────────────────────────────────────────────────────
     public sealed class TimeCommand : DevConsoleCommand
     {
         public override string Id   => "time";
@@ -102,7 +98,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── day ────────────────────────────────────────────────────────────
     public sealed class DayCommand : DevConsoleCommand
     {
         public override string Id   => "day";
@@ -117,7 +112,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── grow ───────────────────────────────────────────────────────────
     public sealed class GrowCommand : DevConsoleCommand
     {
         public override string Id   => "grow";
@@ -132,7 +126,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── clear ──────────────────────────────────────────────────────────
     public sealed class ClearCommand : DevConsoleCommand
     {
         public override string Id   => "clear";
@@ -146,7 +139,6 @@ namespace Willowstead.Debugging.Commands
             for (int i = 0; i < inv.slots.Length; i++)
             {
                 // InventorySlot is a sibling class in Willowstead.Player (not nested in
-                // InventoryManager). The bare identifier compiles via the file-scope
                 // `using Willowstead.Player;`.
                 InventorySlot slot = inv.slots[i];
                 if (slot == null || slot.IsEmpty) continue;
@@ -157,7 +149,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── tp <x> <y> ─────────────────────────────────────────────────────
     public sealed class TpCommand : DevConsoleCommand
     {
         public override string Id   => "tp";
@@ -271,7 +262,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── save [slot | autosave] ─────────────────────────────────────—
     /// <summary>
     /// Save the current world into a manual slot (1..3) or the autosave.
     /// </summary>
@@ -302,7 +292,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── load [slot | autosave] ──────────────────────────────────────
     public sealed class LoadCommand : DevConsoleCommand
     {
         public override string Id   => "load";
@@ -323,7 +312,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── saves ───────────────────────────────────────────────────────
     public sealed class SavesCommand : DevConsoleCommand
     {
         public override string Id   => "saves";
@@ -351,7 +339,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── delete [slot | autosave] ────────────────────────────────────
     public sealed class DeleteSaveCommand : DevConsoleCommand
     {
         public override string Id   => "delsave";
@@ -376,7 +363,6 @@ namespace Willowstead.Debugging.Commands
         }
     }
 
-    // ─── fps ────────────────────────────────────────────────────────────
     public sealed class FpsCommand : DevConsoleCommand
     {
         public override string Id   => "fps";
@@ -384,7 +370,6 @@ namespace Willowstead.Debugging.Commands
         public override void Run(DevConsole ctx, string[] args) => DevConsole.ToggleFps();
     }
 
-    // ─── seed [int | random | show] ────────────────────────────────────
     /// <summary>
     /// Show, set, or randomise the active world seed. Setting flips
     /// <c>WorldSeedService.CurrentSeed</c> and triggers
@@ -395,7 +380,7 @@ namespace Willowstead.Debugging.Commands
     {
         public override string Id   => "seed";
         public override string Help =>
-            "seed [int | random | show] - Show current seed; with int/random sets and regenerates the world.";
+            "seed [seed_string | int | random | show] - Show current seed; with value/random sets and regenerates the world.";
         public override void Run(DevConsole ctx, string[] args)
         {
             Willowstead.World.WorldSeedService seedSvc =
@@ -406,48 +391,39 @@ namespace Willowstead.Debugging.Commands
                 return;
             }
 
-            // No args: just print the current seed.
             if (args.Length == 0)
             {
-                ctx.Print($"Current seed: {seedSvc.CurrentSeed} " +
-                          $"(user-provided: {seedSvc.LastSeedWasUserProvided})");
+                string disp = !string.IsNullOrEmpty(seedSvc.CurrentSeedString) ? seedSvc.CurrentSeedString : seedSvc.CurrentSeed.ToString();
+                ctx.Print($"Current seed: {disp} (int: {seedSvc.CurrentSeed}, user-provided: {seedSvc.LastSeedWasUserProvided})");
                 return;
             }
 
-            int newSeed;
-            string target = args[0].ToLowerInvariant();
-            switch (target)
+            string target = args[0];
+            string lower = target.ToLowerInvariant();
+            if (lower == "show")
             {
-                case "show":
-                    ctx.Print($"Current seed: {seedSvc.CurrentSeed} " +
-                              $"(user-provided: {seedSvc.LastSeedWasUserProvided})");
-                    return;
-                case "random":
-                case "rand":
-                    newSeed = seedSvc.GenerateRandomSeed();
-                    break;
-                default:
-                    if (!int.TryParse(args[0],
-                                      System.Globalization.NumberStyles.Integer,
-                                      System.Globalization.CultureInfo.InvariantCulture,
-                                      out newSeed))
-                    {
-                        ctx.PrintError($"'{args[0]}' is not a valid 32-bit integer. " +
-                                       "Use a number, 'random', or call with no args to show.");
-                        return;
-                    }
-                    break;
+                string disp = !string.IsNullOrEmpty(seedSvc.CurrentSeedString) ? seedSvc.CurrentSeedString : seedSvc.CurrentSeed.ToString();
+                ctx.Print($"Current seed: {disp} (int: {seedSvc.CurrentSeed}, user-provided: {seedSvc.LastSeedWasUserProvided})");
+                return;
             }
 
             int previous = seedSvc.CurrentSeed;
-            seedSvc.SetSeed(newSeed, userProvided: true);
+            if (lower == "random" || lower == "rand")
+            {
+                int newSeed = seedSvc.GenerateRandomSeed();
+                seedSvc.SetSeed(newSeed, userProvided: true);
+            }
+            else
+            {
+                seedSvc.SetSeed(target, userProvided: true);
+            }
 
-            // Explicit regenerate in case the event-subscriber race went wrong.
             Willowstead.World.ProceduralGridGenerator gen =
                 Willowstead.World.ProceduralGridGenerator.Instance;
             if (gen != null) gen.Regenerate();
 
-            ctx.PrintOk($"Seed changed: {previous} -> {newSeed}. World regenerated.");
+            string currentDisp = !string.IsNullOrEmpty(seedSvc.CurrentSeedString) ? seedSvc.CurrentSeedString : seedSvc.CurrentSeed.ToString();
+            ctx.PrintOk($"Seed changed: {previous} -> {currentDisp} (int: {seedSvc.CurrentSeed}). World regenerated.");
         }
     }
 }

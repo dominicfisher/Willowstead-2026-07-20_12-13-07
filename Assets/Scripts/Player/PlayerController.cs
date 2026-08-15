@@ -44,7 +44,6 @@ namespace Willowstead.Player
         {
             if (_instance != null) return _instance;
 
-            // 1. PlayerController component directly on any GameObject
             PlayerController existing = FindAnyObjectByType<PlayerController>();
             if (existing != null)
             {
@@ -53,11 +52,9 @@ namespace Willowstead.Player
                 return _instance;
             }
 
-            // 2. Search by tag "Player"
             GameObject playerGo = null;
             try { playerGo = GameObject.FindWithTag("Player"); } catch {}
 
-            // 3. Search by name containing "player" (case-insensitive)
             if (playerGo == null)
             {
                 GameObject[] allGos = FindObjectsByType<GameObject>(FindObjectsInactive.Include);
@@ -72,7 +69,6 @@ namespace Willowstead.Player
                 }
             }
 
-            // 4. Last resort: nothing in the scene matches — dump all scene objects for debugging
             if (playerGo == null)
             {
                 var allGos = FindObjectsByType<GameObject>(FindObjectsInactive.Include);
@@ -159,7 +155,6 @@ namespace Willowstead.Player
         }
 
 
-
         [Header("References")]
         [Tooltip("The ScriptableObject input reader channels input events to this controller.")]
         [SerializeField] private Input.InputReader _inputReader;
@@ -190,7 +185,7 @@ namespace Willowstead.Player
         private Vector2 _moveInput;
         private Vector2 _currentVelocity;
         private bool _isSprinting;
-        private Vector2 _lastMoveDirection = Vector2.down; // Default to facing down
+        private Vector2 _lastMoveDirection = Vector2.down;
         private float _footstepTimer;
 
         /// <summary>Vector of player's current input direction or last movement direction.</summary>
@@ -205,7 +200,7 @@ namespace Willowstead.Player
             get
             {
                 Vector2 dir = _moveInput.sqrMagnitude > 0.01f ? _moveInput : _lastMoveDirection;
-                if (dir.sqrMagnitude < 0.001f) return 270f; // Default South
+                if (dir.sqrMagnitude < 0.001f) return 270f;
                 float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
                 if (angle < 0) angle += 360f;
                 return angle;
@@ -229,11 +224,22 @@ namespace Willowstead.Player
             }
 
 
-
             _rb = GetComponent<Rigidbody2D>();
             if (_rb == null) _rb = gameObject.AddComponent<Rigidbody2D>();
 
             _animator = GetComponent<Animator>();
+            if (_animator == null)
+            {
+                _animator = gameObject.AddComponent<Animator>();
+            }
+
+            if (_animator.runtimeAnimatorController == null)
+            {
+#if UNITY_EDITOR
+                var ctrl = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Scripts/Player/PlayerAnimatorController.controller");
+                if (ctrl != null) _animator.runtimeAnimatorController = ctrl;
+#endif
+            }
 
             _spriteRenderer = GetComponent<SpriteRenderer>();
             if (_spriteRenderer == null)
@@ -246,7 +252,14 @@ namespace Willowstead.Player
                 _spriteRenderer.sprite = UIResourceHelper.GetCircleSprite();
             }
 
-            _spriteRenderer.enabled = true;
+            if (UI.MainMenuUI.Instance != null && !UI.MainMenuUI.HasGameStarted)
+            {
+                _spriteRenderer.enabled = false;
+            }
+            else
+            {
+                _spriteRenderer.enabled = true;
+            }
             Color sc = _spriteRenderer.color;
             if (sc.a < 0.1f) sc.a = 1f;
             _spriteRenderer.color = sc;
@@ -257,7 +270,6 @@ namespace Willowstead.Player
                 transform.localScale = Vector3.one;
             }
 
-            // Ensure an AudioSource exists for footstep sounds.
             _audioSource = GetComponent<AudioSource>();
             if (_audioSource == null)
             {
@@ -265,7 +277,6 @@ namespace Willowstead.Player
                 _audioSource.playOnAwake = false;
             }
 
-            // Basic Rigidbody2D configurations for top-down games:
             // - No gravity because it's top-down.
             // - Freeze rotation so the player doesn't spin when colliding with walls.
             // - Enable interpolation to smooth out physics updates at high framerates
@@ -311,7 +322,6 @@ namespace Willowstead.Player
             }
         }
 
-        // ─── Save / load hooks ─────────────────────────────────────────
         /// <summary>Snaps the player to the given world position via the
         /// Rigidbody2D so physics picks it up the same frame.</summary>
         public void RestorePosition(Vector3 worldPos)
@@ -356,28 +366,22 @@ namespace Willowstead.Player
 
         private void MovePlayer()
         {
-            // Calculate target velocity based on input and settings
             float targetSpeed = _moveSpeed * (_isSprinting ? _sprintSpeedMultiplier : 1f);
             Vector2 targetVelocity = _moveInput * targetSpeed;
 
-            // Apply smooth acceleration and deceleration
             float lerpRate = _moveInput.magnitude > 0.01f ? _acceleration : _deceleration;
             _currentVelocity = Vector2.MoveTowards(_currentVelocity, targetVelocity, lerpRate * Time.fixedDeltaTime);
 
-            // Set the rigidbody velocity
             _rb.linearVelocity = _currentVelocity;
 
-            // Update Animator parameters
             UpdateAnimator();
 
-            // Play footstep sounds while moving
             UpdateFootstepAudio();
         }
 
         private void OnMoveInput(Vector2 direction)
         {
             if (Input.InputReader.BlockGameplayInput) return;
-            // Normalize direction to prevent moving faster diagonally
             _moveInput = direction.magnitude > 0.01f ? direction.normalized : Vector2.zero;
         }
 
@@ -396,7 +400,6 @@ namespace Willowstead.Player
             bool isMoving = _moveInput.magnitude > 0.01f;
             if (!isMoving)
             {
-                // Reset so the next movement triggers a step quickly.
                 _footstepTimer = _footstepInterval * 0.5f;
                 return;
             }

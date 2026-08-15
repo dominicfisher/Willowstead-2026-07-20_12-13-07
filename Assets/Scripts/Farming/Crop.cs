@@ -140,7 +140,6 @@ namespace Willowstead.Farming
 
         private void SetupRenderers()
         {
-            // Clear any existing children just in case
             foreach (var r in _childRenderers)
             {
                 if (r != null && r.gameObject != gameObject)
@@ -175,16 +174,13 @@ namespace Willowstead.Farming
                     GameObject child = new GameObject($"CropVisual_{i}");
                     child.transform.SetParent(transform);
 
-                    // Distribute positions
                     Vector3 offset = Vector3.zero;
                     if (_cropData.LayoutMode == CropLayoutMode.RowAligned)
                     {
-                        // 3 vertical rows: left, center, right
                         int numCols = 3;
                         int colIndex = i % numCols;
                         float xPos = -0.2f + (colIndex * 0.2f); // -0.2f, 0.0f, 0.2f
                         
-                        // Distribute Y based on the row index in the column
                         int rowIndexInCol = i / numCols;
                         int maxRowsInCol = (count - 1) / numCols + 1;
                         
@@ -232,14 +228,12 @@ namespace Willowstead.Farming
                         }
                     }
 
-                    // Add random jitter
                     float jitter = _cropData.RandomJitter;
                     offset += new Vector3(Random.Range(-jitter, jitter), Random.Range(-jitter, jitter), 0f);
 
                     child.transform.localPosition = offset;
                     _originalChildPositions[i] = offset;
 
-                    // Random scale
                     float scale = Random.Range(_cropData.MinScale, _cropData.MaxScale);
                     child.transform.localScale = new Vector3(scale, scale, 1f);
 
@@ -252,13 +246,11 @@ namespace Willowstead.Farming
                         childSr.color = _spriteRenderer.color;
                     }
 
-                    // Random flip
                     if (_cropData.AllowHorizontalFlip)
                     {
                         childSr.flipX = Random.value > 0.5f;
                     }
 
-                    // Set individual sorting order based on child position
                     childSr.sortingOrder = Mathf.RoundToInt(-child.transform.position.y * 100);
 
                     _childRenderers.Add(childSr);
@@ -317,7 +309,6 @@ namespace Willowstead.Farming
             // Tell GridManager we are gone immediately so the cell space is cleared
             World.GridManager.Instance.RemoveCrop(_gridPosition);
 
-            // Play the wiggle & shrink animation before destroying the GameObject
             StartCoroutine(PlayHarvestAnimationAndDestroy());
 
             return count;
@@ -330,7 +321,6 @@ namespace Willowstead.Farming
 
             int count = _childRenderers.Count;
 
-            // Trigger each crop visual pop sequentially
             for (int i = 0; i < count; i++)
             {
                 SpriteRenderer childSr = _childRenderers[i];
@@ -354,7 +344,6 @@ namespace Willowstead.Farming
             Vector3 originalLocalPos = childTransform.localPosition;
             Quaternion originalRotation = childTransform.localRotation;
 
-            // Random slight horizontal jump direction
             float jumpDirectionX = Random.Range(-0.06f, 0.06f);
 
             while (elapsed < duration)
@@ -362,16 +351,13 @@ namespace Willowstead.Farming
                 elapsed += Time.deltaTime;
                 float percent = elapsed / duration;
 
-                // Shake back and forth
                 float angle = Mathf.Sin(percent * Mathf.PI * 3f) * 12f;
                 childTransform.localRotation = originalRotation * Quaternion.Euler(0f, 0f, angle);
 
-                // Pop upward (slide position up from furrow)
                 float yOffset = Mathf.Lerp(0f, 0.25f, percent);
                 float xOffset = Mathf.Lerp(0f, jumpDirectionX, percent);
                 childTransform.localPosition = new Vector3(originalLocalPos.x + xOffset, originalLocalPos.y + yOffset, originalLocalPos.z);
 
-                // Squash up slightly (plucking effort)
                 float scaleMultiplier = 1f;
                 if (percent < 0.4f)
                 {
@@ -386,7 +372,6 @@ namespace Willowstead.Farming
                 yield return null;
             }
 
-            // Spawn the flying crop animation from the plucked position
             Player.HotbarUI hotbar = FindAnyObjectByType<Player.HotbarUI>();
             string yieldItemName = _cropData.YieldItemName;
             RectTransform targetSlot = (hotbar != null) ? hotbar.GetSlotRectForItem(yieldItemName) : null;
@@ -405,7 +390,6 @@ namespace Willowstead.Farming
                 }
             });
 
-            // Destroy the visual child GameObject immediately since it has been replaced by the flying item
             Destroy(childSr.gameObject);
         }
 
@@ -422,7 +406,6 @@ namespace Willowstead.Farming
             Vector3[] targetLocalPositions = new Vector3[count];
             Vector3[] targetScales = new Vector3[count];
 
-            // Store final local positions and scales of children
             for (int i = 0; i < count; i++)
             {
                 if (_childRenderers[i] != null)
@@ -437,12 +420,10 @@ namespace Willowstead.Farming
                 elapsed += Time.deltaTime;
                 float percent = elapsed / duration;
 
-                // overshoot bounce curve: starts at 0, goes up to 1.15, settles at 1
                 float scaleMultiplier = Mathf.Sin(percent * Mathf.PI * 0.5f); // ease out
                 float bounce = Mathf.Sin(percent * Mathf.PI) * 0.15f * (1f - percent); // bounce factor
                 float currentMultiplier = scaleMultiplier + bounce;
 
-                // Y translation factor (starts offset below, rises up to center)
                 float yOffset = Mathf.Lerp(-0.1f, 0f, percent);
 
                 for (int i = 0; i < count; i++)
@@ -452,10 +433,8 @@ namespace Willowstead.Farming
 
                     Transform childTransform = childSr.transform;
                     
-                    // Scale from 0 up to target with bounce
                     childTransform.localScale = targetScales[i] * currentMultiplier;
 
-                    // Position slides up organically
                     Vector3 targetPos = targetLocalPositions[i];
                     childTransform.localPosition = new Vector3(targetPos.x, targetPos.y + yOffset * currentMultiplier, targetPos.z);
                 }
@@ -463,7 +442,6 @@ namespace Willowstead.Farming
                 yield return null;
             }
 
-            // Ensure exact target positioning and scaling at completion
             for (int i = 0; i < count; i++)
             {
                 SpriteRenderer childSr = _childRenderers[i];

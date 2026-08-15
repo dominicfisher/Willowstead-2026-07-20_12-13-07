@@ -36,17 +36,11 @@ namespace Willowstead.World
                  "or let OnValidate fill them automatically.")]
         [SerializeField] private Sprite[] _sprites = new Sprite[48];
 
-        // ─────────────────────────────────────────────────────────
-        //  PUBLIC ACCESSORS
-        // ─────────────────────────────────────────────────────────
 
         /// <summary>Returns the isolated dry sprite (index 36) for use in hoe-pop animations.</summary>
         public Sprite DryIsolatedSprite =>
             (_sprites != null && _sprites.Length > 36) ? _sprites[36] : null;
 
-        // ─────────────────────────────────────────────────────────
-        //  EDITOR AUTO-POPULATION
-        // ─────────────────────────────────────────────────────────
 
 #if UNITY_EDITOR
         private void OnValidate()
@@ -96,9 +90,6 @@ namespace Willowstead.World
         }
 #endif
 
-        // ─────────────────────────────────────────────────────────
-        //  TILE DATA — called by Unity Tilemap on every refresh
-        // ─────────────────────────────────────────────────────────
 
         public override void GetTileData(Vector3Int position, ITilemap tilemap, ref TileData tileData)
         {
@@ -118,27 +109,20 @@ namespace Willowstead.World
                 return;
             }
 
-            // ── Moisture level → which 4×4 block to use ──────────
-            // 0 = Dry   → Blue block   (baseCol = 0)
-            // 1 = Moist → Green block  (baseCol = 4)
-            // 2 = Wet   → Yellow block (baseCol = 8)
             int moisture = gm.GetMoistureLevel(position);
             int baseCol  = moisture * 4; // 0, 4, or 8
 
-            // ── Neighbour detection ───────────────────────────────
             bool n = gm.IsCellTilled(position + Vector3Int.up);
             bool s = gm.IsCellTilled(position + Vector3Int.down);
             bool e = gm.IsCellTilled(position + Vector3Int.right);
             bool w = gm.IsCellTilled(position + Vector3Int.left);
 
-            // ── Row = vertical connection state ───────────────────
             int row;
             if      (!n &&  s) row = 0; // top cap
             else if ( n &&  s) row = 1; // middle
             else if ( n && !s) row = 2; // bottom cap
             else               row = 3; // isolated
 
-            // ── Column offset = horizontal connection state ───────
             int col;
             if      (!w && !e) col = 0; // isolated
             else if (!w &&  e) col = 1; // left edge

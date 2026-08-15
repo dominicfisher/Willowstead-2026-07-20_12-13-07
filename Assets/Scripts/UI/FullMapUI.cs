@@ -1,5 +1,8 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 using Willowstead.Player;
 using Willowstead.World;
@@ -7,15 +10,9 @@ using Willowstead.World;
 namespace Willowstead.UI
 {
     /// <summary>
-    /// Programmatically constructs and manages the Full World Map modal overlay.
-    /// Features:
-    ///   • Real-time sampling of world biomes, dirt patches, ponds/rivers, and farm plot into a map texture.
-    ///   • Dynamic player pin with directional facing arrow and pulsing indicator.
-    ///   • Landmark POI pins (Farm, Water, Shop).
-    ///   • Interactive mouse-drag panning, scroll-wheel zooming, and "Center on Player" snap.
-    ///   • Cursor world coordinates display and landmark legend.
-    ///   • Clean Esc / M hotkey handling with InputReader input blocking.
-    /// Pure code-built UI: 100% self-contained, requires zero inspector prefabs.
+    /// Redesigned World Map Modal with rich cartographic aesthetics,
+    /// smooth zoom/pan controls, real-time procedural biome & water rendering,
+    /// dynamic animated player pin with heading arrow, and POI markers.
     /// </summary>
     public class FullMapUI : MonoBehaviour, IDragHandler, IScrollHandler, IPointerDownHandler
     {
@@ -23,7 +20,6 @@ namespace Willowstead.UI
 
         public bool IsMapOpen => _rootGo != null && _rootGo.activeSelf;
 
-        // UI GameObjects
         private GameObject _rootGo;
         private GameObject _windowPanel;
         private RectTransform _viewportRect;
@@ -32,22 +28,28 @@ namespace Willowstead.UI
 
         private RectTransform _playerPinRect;
         private RectTransform _playerArrowRect;
+        private Image _playerPulseImg;
 
-        private Text _playerCoordsText;
-        private Text _cursorCoordsText;
-        private Text _zoomLevelText;
+        private TextMeshProUGUI _playerCoordsText;
+        private TextMeshProUGUI _cursorCoordsText;
+        private TextMeshProUGUI _zoomLevelText;
 
-        // Texture generation params
         private Texture2D _mapTexture;
-        private const int MapWorldRadius = 64; // Bounds -64 to +64 world tiles (128x128 grid)
-        private const int MapTexSize = 256;    // Texture resolution
+        public const int MapWorldRadius = 500; // Bounds -500 to +500 world tiles (1000x1000 world bounds = 62x62 chunks!)
+        private const int TileRes = 4; // Compact 4x4 micro-texture per tile for lightweight 4000x4000 full world caching
+        private const int TotalTiles = MapWorldRadius * 2;
+        private const int MapTexSize = TotalTiles * TileRes;
 
-        // Zoom & Pan state
-        private float _currentZoom = 1.2f;
-        private const float MinZoom = 0.6f;
-        private const float MaxZoom = 3.5f;
+        private readonly HashSet<Vector2Int> _renderedChunks = new HashSet<Vector2Int>();
+        private readonly Dictionary<Sprite, Color[]> _spritePixelCache = new Dictionary<Sprite, Color[]>();
+
+        private float _currentZoom = 1.0f;
+        private const float MinZoom = 0.5f;
+        private const float MaxZoom = 12.0f;
         private Vector2 _targetPanPos = Vector2.zero;
         private Vector2 _currentPanPos = Vector2.zero;
+
+        private readonly List<GameObject> _spawnedPoiPins = new List<GameObject>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -69,24 +71,68 @@ namespace Willowstead.UI
                 Destroy(gameObject);
                 return;
             }
+
+            InitMapTexture();
         }
 
         private void Start()
         {
             CreateFullMapUI();
             if (_rootGo != null) _rootGo.SetActive(false);
+
+            if (ProceduralGridGenerator.Instance != null)
+            {
+                ProceduralGridGenerator.Instance.OnChunkGenerated += HandleChunkGenerated;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (ProceduralGridGenerator.Instance != null)
+            {
+                ProceduralGridGenerator.Instance.OnChunkGenerated -= HandleChunkGenerated;
+            }
+        }
+
+        private void HandleChunkGenerated(Vector2Int chunkCoord)
+        {
+            BakeChunkToMap(chunkCoord);
+            if (IsMapOpen && _mapTexture != null)
+            {
+                _mapTexture.Apply();
+            }
+        }
+
+        private void InitMapTexture()
+        {
+            if (_mapTexture == null)
+            {
+                _mapTexture = new Texture2D(MapTexSize, MapTexSize, TextureFormat.RGBA32, false);
+                _mapTexture.filterMode = FilterMode.Point;
+                _mapTexture.wrapMode = TextureWrapMode.Clamp;
+
+                Color fogColor = new Color(0.08f, 0.08f, 0.09f, 1f);
+                Color[] clearPixels = new Color[MapTexSize * MapTexSize];
+                for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = fogColor;
+                _mapTexture.SetPixels(clearPixels);
+                _mapTexture.Apply();
+            }
         }
 
         private void Update()
         {
             if (UnityEngine.InputSystem.Keyboard.current != null)
             {
-                // Toggle with M key
                 if (UnityEngine.InputSystem.Keyboard.current.mKey.wasPressedThisFrame)
                 {
-                    ToggleMap();
+                    bool blockByOtherModals = Input.InputReader.BlockGameplayInput ||
+                                              (PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen) ||
+                                              (WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible);
+                    if (!blockByOtherModals)
+                    {
+                        ToggleMap();
+                    }
                 }
-                // Close with Esc key if open
                 else if (IsMapOpen && UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
                 {
                     CloseMap();
@@ -95,12 +141,19 @@ namespace Willowstead.UI
 
             if (!IsMapOpen) return;
 
-            // Smooth pan interpolation
-            _currentPanPos = Vector2.Lerp(_currentPanPos, _targetPanPos, Time.unscaledDeltaTime * 15f);
+            _currentPanPos = Vector2.Lerp(_currentPanPos, _targetPanPos, Time.unscaledDeltaTime * 16f);
             if (_contentRect != null)
             {
                 _contentRect.anchoredPosition = _currentPanPos;
                 _contentRect.localScale = new Vector3(_currentZoom, _currentZoom, 1f);
+
+                // Counter-scale pins and labels so they don't blow up or overlap when zoomed in
+                float pinScale = Mathf.Clamp(1f / Mathf.Sqrt(_currentZoom), 0.35f, 1.2f);
+                if (_playerPinRect != null) _playerPinRect.localScale = new Vector3(pinScale, pinScale, 1f);
+                foreach (var pin in _spawnedPoiPins)
+                {
+                    if (pin != null) pin.transform.localScale = new Vector3(pinScale, pinScale, 1f);
+                }
             }
 
             UpdatePlayerPin();
@@ -121,6 +174,7 @@ namespace Willowstead.UI
             Input.InputReader.BlockGameplayInput = true;
 
             GenerateMapTexture();
+            RebuildPOIPins();
             CenterOnPlayerInstant();
         }
 
@@ -139,127 +193,163 @@ namespace Willowstead.UI
             Transform existing = canvas.transform.Find("FullMapOverlay");
             if (existing != null) DestroyImmediate(existing.gameObject);
 
-            // ── Fullscreen Dim Overlay ──
-            _rootGo = new GameObject("FullMapOverlay");
+            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+
+            _rootGo = new GameObject("FullMapOverlay", typeof(RectTransform), typeof(Image));
             _rootGo.transform.SetParent(canvas.transform, false);
 
-            RectTransform rootRect = _rootGo.AddComponent<RectTransform>();
+            RectTransform rootRect = (RectTransform)_rootGo.transform;
             rootRect.anchorMin = Vector2.zero;
             rootRect.anchorMax = Vector2.one;
             rootRect.sizeDelta = Vector2.zero;
 
-            Image dimImg = _rootGo.AddComponent<Image>();
-            dimImg.color = new Color(0.04f, 0.05f, 0.07f, 0.88f);
+            Image dimImg = _rootGo.GetComponent<Image>();
+            dimImg.color = new Color(0.03f, 0.04f, 0.05f, 0.88f);
 
-            // ── Main Window Frame (920 x 660) ──
-            _windowPanel = new GameObject("WindowPanel");
+            _windowPanel = new GameObject("WindowPanel", typeof(RectTransform));
             _windowPanel.transform.SetParent(_rootGo.transform, false);
 
-            RectTransform winRect = _windowPanel.AddComponent<RectTransform>();
+            RectTransform winRect = (RectTransform)_windowPanel.transform;
             winRect.anchorMin = new Vector2(0.5f, 0.5f);
             winRect.anchorMax = new Vector2(0.5f, 0.5f);
             winRect.pivot = new Vector2(0.5f, 0.5f);
-            winRect.sizeDelta = new Vector2(920f, 660f);
+            winRect.sizeDelta = new Vector2(960f, 700f);
 
-            Image winBg = _windowPanel.AddComponent<Image>();
-            winBg.sprite = UIResourceHelper.GetBackgroundSprite();
-            winBg.type = Image.Type.Sliced;
-            winBg.color = new Color(0.12f, 0.10f, 0.09f, 0.96f);
+            GameObject winShadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
+            winShadowGo.transform.SetParent(_windowPanel.transform, false);
+            RectTransform winShadowRt = (RectTransform)winShadowGo.transform;
+            winShadowRt.anchorMin = Vector2.zero; winShadowRt.anchorMax = Vector2.one;
+            winShadowRt.offsetMin = new Vector2(-12f, -12f);
+            winShadowRt.offsetMax = new Vector2(12f, 12f);
+            Image winShadowImg = winShadowGo.GetComponent<Image>();
+            winShadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            winShadowImg.type = Image.Type.Sliced;
+            winShadowImg.color = new Color(0f, 0f, 0f, 0.6f);
 
-            // Gold Header Bar
-            GameObject headerGo = new GameObject("Header");
-            headerGo.transform.SetParent(_windowPanel.transform, false);
+            GameObject winWoodGo = new GameObject("WoodFrame", typeof(RectTransform), typeof(Image));
+            winWoodGo.transform.SetParent(_windowPanel.transform, false);
+            RectTransform winWoodRt = (RectTransform)winWoodGo.transform;
+            winWoodRt.anchorMin = Vector2.zero; winWoodRt.anchorMax = Vector2.one;
+            winWoodRt.offsetMin = Vector2.zero; winWoodRt.offsetMax = Vector2.zero;
+            Image winWoodImg = winWoodGo.GetComponent<Image>();
+            winWoodImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            winWoodImg.type = Image.Type.Sliced;
+            winWoodImg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
 
-            RectTransform headRect = headerGo.AddComponent<RectTransform>();
+            GameObject winTrimGo = new GameObject("GoldTrim", typeof(RectTransform), typeof(Image));
+            winTrimGo.transform.SetParent(winWoodGo.transform, false);
+            RectTransform winTrimRt = (RectTransform)winTrimGo.transform;
+            winTrimRt.anchorMin = Vector2.zero; winTrimRt.anchorMax = Vector2.one;
+            winTrimRt.offsetMin = new Vector2(4f, 4f);
+            winTrimRt.offsetMax = new Vector2(-4f, -4f);
+            Image winTrimImg = winTrimGo.GetComponent<Image>();
+            winTrimImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            winTrimImg.type = Image.Type.Sliced;
+            winTrimImg.color = new Color(0.72f, 0.58f, 0.32f, 0.65f);
+
+            GameObject winInnerGo = new GameObject("InnerBacking", typeof(RectTransform), typeof(Image));
+            winInnerGo.transform.SetParent(winTrimGo.transform, false);
+            RectTransform winInnerRt = (RectTransform)winInnerGo.transform;
+            winInnerRt.anchorMin = Vector2.zero; winInnerRt.anchorMax = Vector2.one;
+            winInnerRt.offsetMin = new Vector2(3f, 3f);
+            winInnerRt.offsetMax = new Vector2(-3f, -3f);
+            Image winInnerImg = winInnerGo.GetComponent<Image>();
+            winInnerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            winInnerImg.type = Image.Type.Sliced;
+            winInnerImg.color = new Color(0.10f, 0.09f, 0.08f, 0.98f);
+
+            GameObject headerGo = new GameObject("Header", typeof(RectTransform), typeof(Image));
+            headerGo.transform.SetParent(winInnerGo.transform, false);
+
+            RectTransform headRect = (RectTransform)headerGo.transform;
             headRect.anchorMin = new Vector2(0f, 1f);
             headRect.anchorMax = new Vector2(1f, 1f);
             headRect.pivot = new Vector2(0.5f, 1f);
-            headRect.sizeDelta = new Vector2(0f, 48f);
+            headRect.sizeDelta = new Vector2(0f, 52f);
 
-            Image headBg = headerGo.AddComponent<Image>();
+            Image headBg = headerGo.GetComponent<Image>();
             headBg.sprite = UIResourceHelper.GetBackgroundSprite();
             headBg.type = Image.Type.Sliced;
-            headBg.color = new Color(0.18f, 0.15f, 0.11f, 0.98f);
+            headBg.color = new Color(0.18f, 0.13f, 0.09f, 1f);
 
-            Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-            // Title Text
-            GameObject titleGo = new GameObject("TitleText");
+            GameObject titleGo = new GameObject("TitleText", typeof(RectTransform));
             titleGo.transform.SetParent(headerGo.transform, false);
-            RectTransform titleRt = titleGo.AddComponent<RectTransform>();
+            RectTransform titleRt = (RectTransform)titleGo.transform;
             titleRt.anchorMin = new Vector2(0f, 0f);
-            titleRt.anchorMax = new Vector2(0.4f, 1f);
-            titleRt.anchoredPosition = new Vector2(16f, 0f);
+            titleRt.anchorMax = new Vector2(0.35f, 1f);
+            titleRt.offsetMin = new Vector2(20f, 0f);
+            titleRt.offsetMax = Vector2.zero;
 
-            Text titleTxt = titleGo.AddComponent<Text>();
-            titleTxt.font = legacyFont;
+            var titleTxt = titleGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) titleTxt.font = font;
             titleTxt.fontSize = 20;
-            titleTxt.fontStyle = FontStyle.Bold;
-            titleTxt.alignment = TextAnchor.MiddleLeft;
-            titleTxt.color = new Color(1f, 0.88f, 0.55f, 1f);
-            titleTxt.text = "WORLD MAP";
+            titleTxt.fontStyle = FontStyles.Bold;
+            titleTxt.alignment = TextAlignmentOptions.MidlineLeft;
+            titleTxt.color = new Color(1f, 0.88f, 0.52f, 1f);
+            titleTxt.text = "✦ WORLD MAP";
 
-            // Player Coords Badge
-            GameObject pCoordsGo = new GameObject("PlayerCoords");
+            GameObject pCoordsGo = new GameObject("PlayerCoords", typeof(RectTransform));
             pCoordsGo.transform.SetParent(headerGo.transform, false);
-            RectTransform pCoordsRt = pCoordsGo.AddComponent<RectTransform>();
+            RectTransform pCoordsRt = (RectTransform)pCoordsGo.transform;
             pCoordsRt.anchorMin = new Vector2(0.35f, 0f);
             pCoordsRt.anchorMax = new Vector2(0.65f, 1f);
+            pCoordsRt.offsetMin = Vector2.zero; pCoordsRt.offsetMax = Vector2.zero;
 
-            _playerCoordsText = pCoordsGo.AddComponent<Text>();
-            _playerCoordsText.font = legacyFont;
-            _playerCoordsText.fontSize = 12;
-            _playerCoordsText.alignment = TextAnchor.MiddleCenter;
-            _playerCoordsText.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+            _playerCoordsText = pCoordsGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) _playerCoordsText.font = font;
+            _playerCoordsText.fontSize = 13;
+            _playerCoordsText.alignment = TextAlignmentOptions.Center;
+            _playerCoordsText.color = new Color(0.85f, 0.82f, 0.75f, 0.95f);
             _playerCoordsText.text = "Player: (0, 0)";
 
-            // Close Button [X]
-            GameObject closeGo = new GameObject("CloseButton");
+            GameObject closeGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
             closeGo.transform.SetParent(headerGo.transform, false);
-            RectTransform closeRt = closeGo.AddComponent<RectTransform>();
+            RectTransform closeRt = (RectTransform)closeGo.transform;
             closeRt.anchorMin = new Vector2(1f, 0.5f);
             closeRt.anchorMax = new Vector2(1f, 0.5f);
             closeRt.pivot = new Vector2(1f, 0.5f);
-            closeRt.anchoredPosition = new Vector2(-10f, 0f);
-            closeRt.sizeDelta = new Vector2(32f, 32f);
+            closeRt.anchoredPosition = new Vector2(-12f, 0f);
+            closeRt.sizeDelta = new Vector2(34f, 34f);
 
-            Image closeImg = closeGo.AddComponent<Image>();
+            Image closeImg = closeGo.GetComponent<Image>();
             closeImg.sprite = UIResourceHelper.GetBackgroundSprite();
             closeImg.type = Image.Type.Sliced;
-            closeImg.color = new Color(0.55f, 0.20f, 0.20f, 0.95f);
+            closeImg.color = new Color(0.52f, 0.20f, 0.20f, 0.95f);
 
-            Button closeBtn = closeGo.AddComponent<Button>();
+            Button closeBtn = closeGo.GetComponent<Button>();
+            ColorBlock closeCb = closeBtn.colors;
+            closeCb.normalColor = new Color(0.52f, 0.20f, 0.20f, 0.95f);
+            closeCb.highlightedColor = new Color(0.72f, 0.25f, 0.25f, 1f);
+            closeCb.pressedColor = new Color(0.35f, 0.12f, 0.12f, 1f);
+            closeBtn.colors = closeCb;
             closeBtn.onClick.AddListener(CloseMap);
 
-            GameObject closeTxtGo = new GameObject("X");
+            GameObject closeTxtGo = new GameObject("X", typeof(RectTransform));
             closeTxtGo.transform.SetParent(closeGo.transform, false);
-            RectTransform closeTxtRt = closeTxtGo.AddComponent<RectTransform>();
-            closeTxtRt.anchorMin = Vector2.zero;
-            closeTxtRt.anchorMax = Vector2.one;
+            RectTransform closeTxtRt = (RectTransform)closeTxtGo.transform;
+            closeTxtRt.anchorMin = Vector2.zero; closeTxtRt.anchorMax = Vector2.one;
+            closeTxtRt.offsetMin = Vector2.zero; closeTxtRt.offsetMax = Vector2.zero;
 
-            Text closeTxt = closeTxtGo.AddComponent<Text>();
-            closeTxt.font = legacyFont;
+            var closeTxt = closeTxtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) closeTxt.font = font;
             closeTxt.fontSize = 16;
-            closeTxt.fontStyle = FontStyle.Bold;
-            closeTxt.alignment = TextAnchor.MiddleCenter;
+            closeTxt.fontStyle = FontStyles.Bold;
+            closeTxt.alignment = TextAlignmentOptions.Center;
             closeTxt.color = Color.white;
             closeTxt.text = "X";
 
-            // ── Viewport Container (Clip Mask) ──
-            GameObject vpGo = new GameObject("MapViewport");
-            vpGo.transform.SetParent(_windowPanel.transform, false);
+            GameObject vpGo = new GameObject("MapViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+            vpGo.transform.SetParent(winInnerGo.transform, false);
 
-            _viewportRect = vpGo.AddComponent<RectTransform>();
+            _viewportRect = (RectTransform)vpGo.transform;
             _viewportRect.anchorMin = new Vector2(0f, 0f);
             _viewportRect.anchorMax = new Vector2(1f, 1f);
             _viewportRect.offsetMin = new Vector2(16f, 48f); // Left, Bottom
-            _viewportRect.offsetMax = new Vector2(-16f, -54f); // Right, Top
+            _viewportRect.offsetMax = new Vector2(-16f, -58f); // Right, Top
 
-            Image vpBg = vpGo.AddComponent<Image>();
-            vpBg.color = new Color(0.06f, 0.08f, 0.10f, 1f);
-            vpGo.AddComponent<RectMask2D>();
+            Image vpBg = vpGo.GetComponent<Image>();
+            vpBg.color = new Color(0.05f, 0.07f, 0.08f, 1f);
 
-            // Viewport event proxy for drag/scroll
             EventTrigger trigger = vpGo.AddComponent<EventTrigger>();
             EventTrigger.Entry dragEntry = new EventTrigger.Entry { eventID = EventTriggerType.Drag };
             dragEntry.callback.AddListener((data) => OnDrag((PointerEventData)data));
@@ -269,305 +359,258 @@ namespace Willowstead.UI
             scrollEntry.callback.AddListener((data) => OnScroll((PointerEventData)data));
             trigger.triggers.Add(scrollEntry);
 
-            // ── Map Content Container (Panned & Zoomed) ──
-            GameObject contentGo = new GameObject("MapContent");
+            GameObject contentGo = new GameObject("MapContent", typeof(RectTransform), typeof(RawImage));
             contentGo.transform.SetParent(vpGo.transform, false);
 
-            _contentRect = contentGo.AddComponent<RectTransform>();
+            _contentRect = (RectTransform)contentGo.transform;
             _contentRect.anchorMin = new Vector2(0.5f, 0.5f);
             _contentRect.anchorMax = new Vector2(0.5f, 0.5f);
             _contentRect.pivot = new Vector2(0.5f, 0.5f);
-            _contentRect.sizeDelta = new Vector2(600f, 600f);
+            _contentRect.sizeDelta = new Vector2(680f, 680f);
 
-            // Map RawImage
-            _mapRawImage = contentGo.AddComponent<RawImage>();
+            _mapRawImage = contentGo.GetComponent<RawImage>();
             _mapRawImage.color = Color.white;
 
-            // ── Player Pin Marker ──
-            GameObject playerPinGo = new GameObject("PlayerPin");
+            // ── Player Pin Marker (Scale adjusted to look clean and proportional) ──
+            GameObject playerPinGo = new GameObject("PlayerPin", typeof(RectTransform));
             playerPinGo.transform.SetParent(contentGo.transform, false);
 
-            _playerPinRect = playerPinGo.AddComponent<RectTransform>();
+            _playerPinRect = (RectTransform)playerPinGo.transform;
             _playerPinRect.anchorMin = new Vector2(0.5f, 0.5f);
             _playerPinRect.anchorMax = new Vector2(0.5f, 0.5f);
             _playerPinRect.pivot = new Vector2(0.5f, 0.5f);
-            _playerPinRect.sizeDelta = new Vector2(20f, 20f);
+            _playerPinRect.sizeDelta = new Vector2(10f, 10f);
 
-            Image pCircleImg = playerPinGo.AddComponent<Image>();
-            pCircleImg.sprite = UIResourceHelper.GetCircleSprite();
-            pCircleImg.color = new Color(0.2f, 0.85f, 1f, 0.95f); // Glowing cyan marker
+            GameObject pulseGo = new GameObject("PulseRing", typeof(RectTransform), typeof(Image));
+            pulseGo.transform.SetParent(playerPinGo.transform, false);
+            RectTransform pulseRt = (RectTransform)pulseGo.transform;
+            pulseRt.anchorMin = Vector2.zero; pulseRt.anchorMax = Vector2.one;
+            pulseRt.offsetMin = new Vector2(-4f, -4f); pulseRt.offsetMax = new Vector2(4f, 4f);
+            _playerPulseImg = pulseGo.GetComponent<Image>();
+            _playerPulseImg.sprite = UIResourceHelper.GetCircleSprite();
+            _playerPulseImg.color = new Color(0.2f, 0.85f, 1f, 0.4f);
 
-            // Directional Arrow
-            GameObject arrowGo = new GameObject("Arrow");
+            GameObject coreDotGo = new GameObject("CoreDot", typeof(RectTransform), typeof(Image));
+            coreDotGo.transform.SetParent(playerPinGo.transform, false);
+            RectTransform coreDotRt = (RectTransform)coreDotGo.transform;
+            coreDotRt.anchorMin = Vector2.zero; coreDotRt.anchorMax = Vector2.one;
+            coreDotRt.offsetMin = Vector2.zero; coreDotRt.offsetMax = Vector2.zero;
+            Image coreImg = coreDotGo.GetComponent<Image>();
+            coreImg.sprite = UIResourceHelper.GetCircleSprite();
+            coreImg.color = new Color(0.2f, 0.9f, 1f, 1f);
+
+            GameObject arrowGo = new GameObject("FacingArrow", typeof(RectTransform), typeof(Image));
             arrowGo.transform.SetParent(playerPinGo.transform, false);
-
-            _playerArrowRect = arrowGo.AddComponent<RectTransform>();
+            _playerArrowRect = (RectTransform)arrowGo.transform;
             _playerArrowRect.anchorMin = new Vector2(0.5f, 0.5f);
             _playerArrowRect.anchorMax = new Vector2(0.5f, 0.5f);
-            _playerArrowRect.pivot = new Vector2(0.5f, 0.5f);
-            _playerArrowRect.sizeDelta = new Vector2(10f, 16f);
-            _playerArrowRect.anchoredPosition = new Vector2(0f, 12f);
+            _playerArrowRect.pivot = new Vector2(0.5f, 0f);
+            _playerArrowRect.anchoredPosition = new Vector2(0f, 0f);
+            _playerArrowRect.sizeDelta = new Vector2(3.5f, 8f);
 
-            Image arrowImg = arrowGo.AddComponent<Image>();
+            Image arrowImg = arrowGo.GetComponent<Image>();
             arrowImg.sprite = UIResourceHelper.GetCircleSprite();
-            arrowImg.color = new Color(1f, 0.9f, 0.3f, 1f);
+            arrowImg.color = new Color(1f, 0.95f, 0.45f, 0.95f);
 
-            // ── POI Pins on Map Content ──
-            CreatePOIPinOnMap(contentGo, "Farm Plot", Vector3.zero, new Color(0.35f, 0.85f, 0.35f, 1f));
-            CreatePOIPinOnMap(contentGo, "Shop", new Vector3(8f, 4f, 0f), new Color(0.95f, 0.75f, 0.25f, 1f));
-
-            // ── Bottom Control Toolbar ──
-            GameObject barGo = new GameObject("BottomBar");
-            barGo.transform.SetParent(_windowPanel.transform, false);
-
-            RectTransform barRt = barGo.AddComponent<RectTransform>();
-            barRt.anchorMin = new Vector2(0f, 0f);
-            barRt.anchorMax = new Vector2(1f, 0f);
-            barRt.pivot = new Vector2(0.5f, 0f);
-            barRt.sizeDelta = new Vector2(0f, 44f);
-
-            Image barBg = barGo.AddComponent<Image>();
-            barBg.sprite = UIResourceHelper.GetBackgroundSprite();
-            barBg.type = Image.Type.Sliced;
-            barBg.color = new Color(0.15f, 0.12f, 0.10f, 0.95f);
-
-            // Recenter Button
-            GameObject centerBtnGo = new GameObject("CenterBtn");
-            centerBtnGo.transform.SetParent(barGo.transform, false);
-            RectTransform centerRt = centerBtnGo.AddComponent<RectTransform>();
-            centerRt.anchorMin = new Vector2(0f, 0.5f);
-            centerRt.anchorMax = new Vector2(0f, 0.5f);
-            centerRt.pivot = new Vector2(0f, 0.5f);
-            centerRt.anchoredPosition = new Vector2(16f, 0f);
-            centerRt.sizeDelta = new Vector2(160f, 30f);
-
-            Image centerImg = centerBtnGo.AddComponent<Image>();
-            centerImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            centerImg.type = Image.Type.Sliced;
-            centerImg.color = new Color(0.25f, 0.32f, 0.42f, 0.95f);
-
-            Button centerBtn = centerBtnGo.AddComponent<Button>();
-            centerBtn.onClick.AddListener(CenterOnPlayerInstant);
-
-            GameObject centerTxtGo = new GameObject("CenterTxt");
-            centerTxtGo.transform.SetParent(centerBtnGo.transform, false);
-            RectTransform cTxtRt = centerTxtGo.AddComponent<RectTransform>();
-            cTxtRt.anchorMin = Vector2.zero;
-            cTxtRt.anchorMax = Vector2.one;
-
-            Text cTxt = centerTxtGo.AddComponent<Text>();
-            cTxt.font = legacyFont;
-            cTxt.fontSize = 12;
-            cTxt.fontStyle = FontStyle.Bold;
-            cTxt.alignment = TextAnchor.MiddleCenter;
-            cTxt.color = Color.white;
-            cTxt.text = "CENTER ON PLAYER";
-
-            // Zoom Controls (+) (-)
-            CreateZoomButton(barGo, "+", 200f, () => AdjustZoom(0.25f));
-            CreateZoomButton(barGo, "-", 240f, () => AdjustZoom(-0.25f));
-
-            // Zoom Level Text Badge
-            GameObject zoomTxtGo = new GameObject("ZoomText");
-            zoomTxtGo.transform.SetParent(barGo.transform, false);
-            RectTransform zTxtRt = zoomTxtGo.AddComponent<RectTransform>();
-            zTxtRt.anchorMin = new Vector2(0f, 0.5f);
-            zTxtRt.anchorMax = new Vector2(0f, 0.5f);
-            zTxtRt.pivot = new Vector2(0f, 0.5f);
-            zTxtRt.anchoredPosition = new Vector2(280f, 0f);
-            zTxtRt.sizeDelta = new Vector2(60f, 24f);
-
-            _zoomLevelText = zoomTxtGo.AddComponent<Text>();
-            _zoomLevelText.font = legacyFont;
-            _zoomLevelText.fontSize = 11;
-            _zoomLevelText.alignment = TextAnchor.MiddleLeft;
-            _zoomLevelText.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
-            _zoomLevelText.text = "100%";
-
-            // Legend indicators on right of bottom bar
-            CreateLegendItem(barGo, "Player", new Color(0.2f, 0.85f, 1f), -240f);
-            CreateLegendItem(barGo, "Farm", new Color(0.35f, 0.85f, 0.35f), -160f);
-            CreateLegendItem(barGo, "Water", new Color(0.2f, 0.5f, 0.9f), -80f);
+            CreateBottomControls(winInnerGo, font);
         }
 
-        private void CreateZoomButton(GameObject parent, string label, float xPos, UnityEngine.Events.UnityAction onClick)
+        private void CreateBottomControls(GameObject parent, TMP_FontAsset font)
         {
-            GameObject btnGo = new GameObject($"ZoomBtn_{label}");
+            GameObject barGo = new GameObject("BottomBar", typeof(RectTransform), typeof(Image));
+            barGo.transform.SetParent(parent.transform, false);
+
+            RectTransform barRect = (RectTransform)barGo.transform;
+            barRect.anchorMin = new Vector2(0f, 0f);
+            barRect.anchorMax = new Vector2(1f, 0f);
+            barRect.pivot = new Vector2(0.5f, 0f);
+            barRect.sizeDelta = new Vector2(0f, 44f);
+
+            Image barBg = barGo.GetComponent<Image>();
+            barBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            barBg.type = Image.Type.Sliced;
+            barBg.color = new Color(0.14f, 0.11f, 0.08f, 1f);
+
+            CreateToolbarButton(barGo, "Center on Player", 18f, 160f, font, CenterOnPlayer);
+
+            CreateToolbarButton(barGo, "−", 190f, 36f, font, ZoomOut);
+            CreateToolbarButton(barGo, "+", 232f, 36f, font, ZoomIn);
+            CreateToolbarButton(barGo, "1:1", 274f, 44f, font, ZoomReset);
+
+            GameObject zoomTxtGo = new GameObject("ZoomLabel", typeof(RectTransform));
+            zoomTxtGo.transform.SetParent(barGo.transform, false);
+            RectTransform zoomRt = (RectTransform)zoomTxtGo.transform;
+            zoomRt.anchorMin = new Vector2(0f, 0.5f);
+            zoomRt.anchorMax = new Vector2(0f, 0.5f);
+            zoomRt.pivot = new Vector2(0f, 0.5f);
+            zoomRt.anchoredPosition = new Vector2(326f, 0f);
+            zoomRt.sizeDelta = new Vector2(60f, 26f);
+
+            _zoomLevelText = zoomTxtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) _zoomLevelText.font = font;
+            _zoomLevelText.fontSize = 14;
+            _zoomLevelText.fontStyle = FontStyles.Bold;
+            _zoomLevelText.alignment = TextAlignmentOptions.MidlineLeft;
+            _zoomLevelText.color = new Color(0.92f, 0.88f, 0.78f, 1f);
+            _zoomLevelText.text = "100%";
+
+            CreateLegendItem(barGo, "Player", new Color(0.2f, 0.9f, 1f), -195f, font);
+            CreateLegendItem(barGo, "Water", new Color(0.25f, 0.55f, 0.95f), -100f, font);
+        }
+
+        private void CreateToolbarButton(GameObject parent, string label, float xPos, float width, TMP_FontAsset font, UnityEngine.Events.UnityAction onClick)
+        {
+            GameObject btnGo = new GameObject($"Btn_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
             btnGo.transform.SetParent(parent.transform, false);
-            RectTransform rt = btnGo.AddComponent<RectTransform>();
+            RectTransform rt = (RectTransform)btnGo.transform;
             rt.anchorMin = new Vector2(0f, 0.5f);
             rt.anchorMax = new Vector2(0f, 0.5f);
             rt.pivot = new Vector2(0f, 0.5f);
             rt.anchoredPosition = new Vector2(xPos, 0f);
-            rt.sizeDelta = new Vector2(30f, 30f);
+            rt.sizeDelta = new Vector2(width, 32f);
 
-            Image img = btnGo.AddComponent<Image>();
+            Image img = btnGo.GetComponent<Image>();
             img.sprite = UIResourceHelper.GetBackgroundSprite();
             img.type = Image.Type.Sliced;
-            img.color = new Color(0.28f, 0.28f, 0.30f, 0.95f);
+            img.color = new Color(0.28f, 0.20f, 0.14f, 1f); // Wood tone
 
-            Button btn = btnGo.AddComponent<Button>();
+            Button btn = btnGo.GetComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = new Color(0.28f, 0.20f, 0.14f, 1f);
+            cb.highlightedColor = new Color(0.42f, 0.30f, 0.20f, 1f);
+            cb.pressedColor = new Color(0.18f, 0.12f, 0.08f, 1f);
+            btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
-            GameObject txtGo = new GameObject("Txt");
+            GameObject txtGo = new GameObject("Txt", typeof(RectTransform));
             txtGo.transform.SetParent(btnGo.transform, false);
-            RectTransform txtRt = txtGo.AddComponent<RectTransform>();
-            txtRt.anchorMin = Vector2.zero;
-            txtRt.anchorMax = Vector2.one;
+            RectTransform txtRt = (RectTransform)txtGo.transform;
+            txtRt.anchorMin = Vector2.zero; txtRt.anchorMax = Vector2.one;
+            txtRt.offsetMin = Vector2.zero; txtRt.offsetMax = Vector2.zero;
 
-            Text txt = txtGo.AddComponent<Text>();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 14;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = Color.white;
+            var txt = txtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) txt.font = font;
+            txt.fontSize = 13.5f;
+            txt.fontStyle = FontStyles.Bold;
+            txt.alignment = TextAlignmentOptions.Center;
+            txt.color = new Color(1f, 0.92f, 0.78f, 1f);
             txt.text = label;
         }
 
-        private void CreateLegendItem(GameObject parent, string label, Color color, float xPosRight)
+        private void CreateLegendItem(GameObject parent, string label, Color color, float xPosRight, TMP_FontAsset font)
         {
-            GameObject legendGo = new GameObject($"Legend_{label}");
+            GameObject legendGo = new GameObject($"Legend_{label}", typeof(RectTransform));
             legendGo.transform.SetParent(parent.transform, false);
-            RectTransform rt = legendGo.AddComponent<RectTransform>();
+            RectTransform rt = (RectTransform)legendGo.transform;
             rt.anchorMin = new Vector2(1f, 0.5f);
             rt.anchorMax = new Vector2(1f, 0.5f);
             rt.pivot = new Vector2(1f, 0.5f);
             rt.anchoredPosition = new Vector2(xPosRight, 0f);
-            rt.sizeDelta = new Vector2(70f, 24f);
+            rt.sizeDelta = new Vector2(85f, 26f);
 
-            // Dot
-            GameObject dotGo = new GameObject("Dot");
+            GameObject dotGo = new GameObject("Dot", typeof(RectTransform), typeof(Image));
             dotGo.transform.SetParent(legendGo.transform, false);
-            RectTransform dotRt = dotGo.AddComponent<RectTransform>();
+            RectTransform dotRt = (RectTransform)dotGo.transform;
             dotRt.anchorMin = new Vector2(0f, 0.5f);
             dotRt.anchorMax = new Vector2(0f, 0.5f);
             dotRt.pivot = new Vector2(0f, 0.5f);
             dotRt.anchoredPosition = new Vector2(0f, 0f);
-            dotRt.sizeDelta = new Vector2(10f, 10f);
+            dotRt.sizeDelta = new Vector2(12f, 12f);
 
-            Image dotImg = dotGo.AddComponent<Image>();
+            Image dotImg = dotGo.GetComponent<Image>();
             dotImg.sprite = UIResourceHelper.GetCircleSprite();
             dotImg.color = color;
 
-            // Label
-            GameObject txtGo = new GameObject("Text");
+            GameObject txtGo = new GameObject("Text", typeof(RectTransform));
             txtGo.transform.SetParent(legendGo.transform, false);
-            RectTransform txtRt = txtGo.AddComponent<RectTransform>();
+            RectTransform txtRt = (RectTransform)txtGo.transform;
             txtRt.anchorMin = new Vector2(0f, 0f);
             txtRt.anchorMax = new Vector2(1f, 1f);
-            txtRt.offsetMin = new Vector2(14f, 0f);
+            txtRt.offsetMin = new Vector2(18f, 0f);
+            txtRt.offsetMax = Vector2.zero;
 
-            Text txt = txtGo.AddComponent<Text>();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 11;
-            txt.alignment = TextAnchor.MiddleLeft;
-            txt.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+            var txt = txtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) txt.font = font;
+            txt.fontSize = 13.5f;
+            txt.alignment = TextAlignmentOptions.MidlineLeft;
+            txt.color = new Color(0.92f, 0.90f, 0.85f, 0.95f);
             txt.text = label;
+        }
+
+        private void RebuildPOIPins()
+        {
+            foreach (var pin in _spawnedPoiPins)
+            {
+                if (pin != null) Destroy(pin);
+            }
+            _spawnedPoiPins.Clear();
         }
 
         private void CreatePOIPinOnMap(GameObject container, string name, Vector3 worldPos, Color pinColor)
         {
-            GameObject poiGo = new GameObject($"MapPin_{name}");
+            GameObject poiGo = new GameObject($"MapPin_{name}", typeof(RectTransform));
             poiGo.transform.SetParent(container.transform, false);
 
-            RectTransform rt = poiGo.AddComponent<RectTransform>();
+            RectTransform rt = (RectTransform)poiGo.transform;
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(14f, 14f);
+            rt.sizeDelta = new Vector2(18f, 18f);
 
-            // Convert world pos to map content anchored position (600x600 grid over MapWorldRadius * 2)
-            float mapScale = 600f / (MapWorldRadius * 2f);
+            float mapScale = 680f / (MapWorldRadius * 2f);
             rt.anchoredPosition = new Vector2(worldPos.x * mapScale, worldPos.y * mapScale);
 
-            Image img = poiGo.AddComponent<Image>();
+            GameObject glowGo = new GameObject("Glow", typeof(RectTransform), typeof(Image));
+            glowGo.transform.SetParent(poiGo.transform, false);
+            RectTransform glowRt = (RectTransform)glowGo.transform;
+            glowRt.anchorMin = Vector2.zero; glowRt.anchorMax = Vector2.one;
+            glowRt.offsetMin = new Vector2(-4f, -4f); glowRt.offsetMax = new Vector2(4f, 4f);
+            Image glowImg = glowGo.GetComponent<Image>();
+            glowImg.sprite = UIResourceHelper.GetCircleSprite();
+            glowImg.color = new Color(0f, 0f, 0f, 0.75f);
+
+            GameObject dotGo = new GameObject("Dot", typeof(RectTransform), typeof(Image));
+            dotGo.transform.SetParent(poiGo.transform, false);
+            RectTransform dotRt = (RectTransform)dotGo.transform;
+            dotRt.anchorMin = Vector2.zero; dotRt.anchorMax = Vector2.one;
+            dotRt.offsetMin = Vector2.zero; dotRt.offsetMax = Vector2.zero;
+            Image img = dotGo.GetComponent<Image>();
             img.sprite = UIResourceHelper.GetCircleSprite();
             img.color = pinColor;
 
-            // Label above
-            GameObject txtGo = new GameObject("Label");
+            GameObject txtGo = new GameObject("Label", typeof(RectTransform));
             txtGo.transform.SetParent(poiGo.transform, false);
-            RectTransform txtRt = txtGo.AddComponent<RectTransform>();
+            RectTransform txtRt = (RectTransform)txtGo.transform;
             txtRt.anchorMin = new Vector2(0.5f, 1f);
             txtRt.anchorMax = new Vector2(0.5f, 1f);
             txtRt.pivot = new Vector2(0.5f, 0f);
-            txtRt.anchoredPosition = new Vector2(0f, 2f);
-            txtRt.sizeDelta = new Vector2(80f, 14f);
+            txtRt.anchoredPosition = new Vector2(0f, 4f);
+            txtRt.sizeDelta = new Vector2(160f, 24f);
 
-            Text txt = txtGo.AddComponent<Text>();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 9;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = new Color(1f, 1f, 1f, 0.9f);
+            var txt = txtGo.AddComponent<TextMeshProUGUI>();
+            if (TMP_Settings.defaultFontAsset != null) txt.font = TMP_Settings.defaultFontAsset;
+            txt.fontSize = 15f;
+            txt.fontStyle = FontStyles.Bold;
+            txt.alignment = TextAlignmentOptions.Center;
+            txt.color = new Color(1f, 1f, 1f, 0.98f);
+            txt.outlineWidth = 0.25f;
+            txt.outlineColor = new Color32(0, 0, 0, 255);
             txt.text = name;
+
+            _spawnedPoiPins.Add(poiGo);
         }
 
         private void GenerateMapTexture()
         {
-            if (_mapTexture == null || _mapTexture.width != MapTexSize)
-            {
-                _mapTexture = new Texture2D(MapTexSize, MapTexSize, TextureFormat.RGBA32, false);
-                _mapTexture.filterMode = FilterMode.Point;
-                _mapTexture.wrapMode = TextureWrapMode.Clamp;
-            }
-
-            Color grassBase = new Color(0.24f, 0.55f, 0.28f, 1f);
-            Color grassAlt = new Color(0.20f, 0.48f, 0.25f, 1f);
-            Color dirtColor = new Color(0.55f, 0.42f, 0.28f, 1f);
-            Color waterColor = new Color(0.20f, 0.50f, 0.85f, 1f);
-            Color farmColor = new Color(0.45f, 0.34f, 0.22f, 1f);
-
             ProceduralGridGenerator gen = ProceduralGridGenerator.Instance;
             if (gen == null) gen = FindAnyObjectByType<ProceduralGridGenerator>();
 
-            GridManager gridMgr = GridManager.Instance;
-            if (gridMgr == null) gridMgr = FindAnyObjectByType<GridManager>();
+            InitMapTexture();
 
-            for (int y = 0; y < MapTexSize; y++)
+            if (_mapTexture != null)
             {
-                float normY = (float)y / MapTexSize;
-                int worldY = Mathf.RoundToInt((normY - 0.5f) * MapWorldRadius * 2f);
-
-                for (int x = 0; x < MapTexSize; x++)
-                {
-                    float normX = (float)x / MapTexSize;
-                    int worldX = Mathf.RoundToInt((normX - 0.5f) * MapWorldRadius * 2f);
-
-                    Color pixelColor = grassBase;
-
-                    // Checker pattern noise simulation or direct procedural generator query
-                    if ((worldX + worldY) % 2 == 0) pixelColor = grassAlt;
-
-                    if (gen != null)
-                    {
-                        if (gen.IsWaterAt(worldX, worldY))
-                        {
-                            pixelColor = waterColor;
-                        }
-                        else if (!gen.IsGrassAt(worldX, worldY))
-                        {
-                            pixelColor = dirtColor;
-                        }
-                    }
-
-                    // Highlight pre-generated farm plot area near (0, 0)
-                    if (worldX >= -4 && worldX <= 4 && worldY >= -3 && worldY <= 3)
-                    {
-                        pixelColor = farmColor;
-                    }
-
-                    // Tilled soil grid
-                    if (gridMgr != null && gridMgr.IsCellTilled(new Vector3Int(worldX, worldY, 0)))
-                    {
-                        pixelColor = new Color(0.38f, 0.28f, 0.18f, 1f);
-                    }
-
-                    _mapTexture.SetPixel(x, y, pixelColor);
-                }
+                _mapTexture.Apply();
             }
-
-            _mapTexture.Apply();
 
             if (_mapRawImage != null)
             {
@@ -575,19 +618,149 @@ namespace Willowstead.UI
             }
         }
 
+        private void BakeChunkToMap(Vector2Int chunkCoord)
+        {
+            if (_mapTexture == null) InitMapTexture();
+
+            ProceduralGridGenerator gen = ProceduralGridGenerator.Instance;
+            if (gen == null) gen = FindAnyObjectByType<ProceduralGridGenerator>();
+
+            GridManager gridMgr = GridManager.Instance;
+            if (gridMgr == null) gridMgr = FindAnyObjectByType<GridManager>();
+
+            Tilemap waterMap = gen != null ? gen.WaterTilemap : null;
+            Tilemap grassMap = gen != null ? gen.GrassTilemap : null;
+            Tilemap dirtMap  = gen != null ? gen.DirtTilemap : null;
+            Tilemap farmMap  = gridMgr != null ? gridMgr.FarmingTilemap : null;
+
+            Color fallbackGrass = new Color(0.26f, 0.54f, 0.28f, 1f);
+            Color fallbackDirt  = new Color(0.58f, 0.44f, 0.28f, 1f);
+            Color fallbackWater = new Color(0.20f, 0.48f, 0.78f, 1f);
+
+            int chunkSize = 16;
+            int startX = chunkCoord.x * chunkSize;
+            int startY = chunkCoord.y * chunkSize;
+
+            Color[] tileBlock = new Color[TileRes * TileRes];
+
+            for (int y = 0; y < chunkSize; y++)
+            {
+                int worldY = startY + y;
+                int ty = worldY + MapWorldRadius;
+                if (ty < 0 || ty >= TotalTiles) continue;
+
+                for (int x = 0; x < chunkSize; x++)
+                {
+                    int worldX = startX + x;
+                    int tx = worldX + MapWorldRadius;
+                    if (tx < 0 || tx >= TotalTiles) continue;
+
+                    Vector3Int cellPos = new Vector3Int(worldX, worldY, 0);
+                    Sprite activeSprite = null;
+
+                    if (waterMap != null && waterMap.HasTile(cellPos)) activeSprite = waterMap.GetSprite(cellPos);
+                    else if (farmMap != null && farmMap.HasTile(cellPos)) activeSprite = farmMap.GetSprite(cellPos);
+                    else if (grassMap != null && grassMap.HasTile(cellPos)) activeSprite = grassMap.GetSprite(cellPos);
+                    else if (dirtMap != null && dirtMap.HasTile(cellPos)) activeSprite = dirtMap.GetSprite(cellPos);
+
+                    if (activeSprite != null)
+                    {
+                        if (!_spritePixelCache.TryGetValue(activeSprite, out Color[] cachedPixels))
+                        {
+                            cachedPixels = new Color[TileRes * TileRes];
+                            if (activeSprite.texture != null && activeSprite.texture.isReadable)
+                            {
+                                Rect rect = activeSprite.rect;
+                                int rx = Mathf.RoundToInt(rect.x);
+                                int ry = Mathf.RoundToInt(rect.y);
+                                int rw = Mathf.RoundToInt(rect.width);
+                                int rh = Mathf.RoundToInt(rect.height);
+
+                                Color[] rawPixels = activeSprite.texture.GetPixels(rx, ry, rw, rh);
+                                for (int py = 0; py < TileRes; py++)
+                                {
+                                    int srcY = Mathf.Clamp(Mathf.FloorToInt(((float)py / TileRes) * rh), 0, rh - 1);
+                                    for (int px = 0; px < TileRes; px++)
+                                    {
+                                        int srcX = Mathf.Clamp(Mathf.FloorToInt(((float)px / TileRes) * rw), 0, rw - 1);
+                                        cachedPixels[py * TileRes + px] = rawPixels[srcY * rw + srcX];
+                                    }
+                                }
+                            }
+                            else if (activeSprite.texture != null)
+                            {
+                                RenderTexture rt = RenderTexture.GetTemporary(TileRes, TileRes, 0, RenderTextureFormat.ARGB32);
+                                Texture2D readTex = new Texture2D(TileRes, TileRes, TextureFormat.RGBA32, false);
+                                Rect rect = activeSprite.rect;
+                                float uMin = rect.x / activeSprite.texture.width;
+                                float vMin = rect.y / activeSprite.texture.height;
+                                float uMax = (rect.x + rect.width) / activeSprite.texture.width;
+                                float vMax = (rect.y + rect.height) / activeSprite.texture.height;
+
+                                RenderTexture prevRT = RenderTexture.active;
+                                RenderTexture.active = rt;
+                                GL.PushMatrix();
+                                GL.LoadPixelMatrix(0, TileRes, 0, TileRes);
+                                Graphics.DrawTexture(new Rect(0, 0, TileRes, TileRes), activeSprite.texture, new Rect(uMin, vMin, uMax - uMin, vMax - vMin), 0, 0, 0, 0);
+                                GL.PopMatrix();
+
+                                readTex.ReadPixels(new Rect(0, 0, TileRes, TileRes), 0, 0);
+                                readTex.Apply();
+                                RenderTexture.active = prevRT;
+
+                                cachedPixels = readTex.GetPixels();
+                                RenderTexture.ReleaseTemporary(rt);
+                                Destroy(readTex);
+                            }
+                            _spritePixelCache[activeSprite] = cachedPixels;
+                        }
+
+                        for (int i = 0; i < tileBlock.Length; i++)
+                        {
+                            Color c = cachedPixels[i];
+                            tileBlock[i] = (c.a < 0.98f) ? Color.Lerp(fallbackDirt, c, c.a) : c;
+                        }
+                    }
+                    else
+                    {
+                        Color solid = fallbackGrass;
+                        if (gen != null)
+                        {
+                            if (gen.IsWaterAt(worldX, worldY)) solid = fallbackWater;
+                            else if (!gen.IsGrassAt(worldX, worldY)) solid = fallbackDirt;
+                        }
+                        if (gridMgr != null && gridMgr.IsCellTilled(cellPos)) solid = new Color(0.34f, 0.24f, 0.14f, 1f);
+
+                        for (int i = 0; i < tileBlock.Length; i++) tileBlock[i] = solid;
+                    }
+
+                    _mapTexture.SetPixels(tx * TileRes, ty * TileRes, TileRes, TileRes, tileBlock);
+                }
+            }
+
+            _renderedChunks.Add(chunkCoord);
+        }
+
         private void UpdatePlayerPin()
         {
             if (PlayerController.Instance == null || _playerPinRect == null) return;
 
             Vector3 pPos = PlayerController.Instance.transform.position;
-            float mapScale = 600f / (MapWorldRadius * 2f);
+            float mapScale = 680f / (MapWorldRadius * 2f);
             _playerPinRect.anchoredPosition = new Vector2(pPos.x * mapScale, pPos.y * mapScale);
 
-            // Rotate facing arrow
             if (_playerArrowRect != null)
             {
-                float angle = PlayerController.Instance.FacingAngle; // 0=East, 90=North
-                _playerArrowRect.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
+                float facingAngle = PlayerController.Instance.FacingAngle; // 0=East, 90=North, 180=West, 270=South
+                _playerArrowRect.localRotation = Quaternion.Euler(0f, 0f, facingAngle - 90f);
+            }
+
+            if (_playerPulseImg != null)
+            {
+                float pulse = 0.35f + Mathf.PingPong(Time.unscaledTime * 1.5f, 0.45f);
+                Color c = _playerPulseImg.color;
+                c.a = pulse;
+                _playerPulseImg.color = c;
             }
         }
 
@@ -595,53 +768,59 @@ namespace Willowstead.UI
         {
             if (PlayerController.Instance != null && _playerCoordsText != null)
             {
-                Vector3 pos = PlayerController.Instance.transform.position;
-                _playerCoordsText.text = $"Player: (X: {Mathf.RoundToInt(pos.x)}, Y: {Mathf.RoundToInt(pos.y)})";
+                Vector3 pPos = PlayerController.Instance.transform.position;
+                _playerCoordsText.text = $"Player: ({Mathf.RoundToInt(pPos.x)}, {Mathf.RoundToInt(pPos.y)})";
             }
+        }
 
+        public void CenterOnPlayer()
+        {
+            if (PlayerController.Instance == null) return;
+            Vector3 pPos = PlayerController.Instance.transform.position;
+            float mapScale = 680f / (MapWorldRadius * 2f);
+            _targetPanPos = -new Vector2(pPos.x * mapScale, pPos.y * mapScale) * _currentZoom;
+        }
+
+        private void CenterOnPlayerInstant()
+        {
+            if (PlayerController.Instance == null) return;
+            Vector3 pPos = PlayerController.Instance.transform.position;
+            float mapScale = 680f / (MapWorldRadius * 2f);
+            _targetPanPos = -new Vector2(pPos.x * mapScale, pPos.y * mapScale) * _currentZoom;
+            _currentPanPos = _targetPanPos;
+            if (_contentRect != null)
+            {
+                _contentRect.anchoredPosition = _currentPanPos;
+            }
+        }
+
+        public void ZoomIn() => SetZoom(_currentZoom + 0.3f);
+        public void ZoomOut() => SetZoom(_currentZoom - 0.3f);
+        public void ZoomReset() => SetZoom(1.0f);
+
+        private void SetZoom(float targetZoom)
+        {
+            _currentZoom = Mathf.Clamp(targetZoom, MinZoom, MaxZoom);
             if (_zoomLevelText != null)
             {
-                _zoomLevelText.text = $"{Mathf.RoundToInt(_currentZoom * 100f)}%";
+                _zoomLevelText.text = $"{Mathf.RoundToInt(_currentZoom * 100)}%";
             }
-        }
-
-        public void CenterOnPlayerInstant()
-        {
-            if (PlayerController.Instance == null)
-            {
-                _targetPanPos = Vector2.zero;
-                return;
-            }
-
-            Vector3 pPos = PlayerController.Instance.transform.position;
-            float mapScale = 600f / (MapWorldRadius * 2f);
-            _targetPanPos = new Vector2(-pPos.x * mapScale * _currentZoom, -pPos.y * mapScale * _currentZoom);
-            _currentPanPos = _targetPanPos;
-        }
-
-        public void AdjustZoom(float delta)
-        {
-            _currentZoom = Mathf.Clamp(_currentZoom + delta, MinZoom, MaxZoom);
         }
 
         public void OnDrag(PointerEventData eventData)
         {
             _targetPanPos += eventData.delta;
-            _currentPanPos = _targetPanPos;
+            float maxPan = 340f * _currentZoom;
+            _targetPanPos.x = Mathf.Clamp(_targetPanPos.x, -maxPan, maxPan);
+            _targetPanPos.y = Mathf.Clamp(_targetPanPos.y, -maxPan, maxPan);
         }
 
         public void OnScroll(PointerEventData eventData)
         {
-            float scroll = eventData.scrollDelta.y;
-            if (Mathf.Abs(scroll) > 0.01f)
-            {
-                AdjustZoom(scroll * 0.15f);
-            }
+            float zoomDelta = eventData.scrollDelta.y * 0.15f;
+            SetZoom(_currentZoom + zoomDelta);
         }
 
-        public void OnPointerDown(PointerEventData eventData)
-        {
-            // Focus viewport
-        }
+        public void OnPointerDown(PointerEventData eventData) { }
     }
 }

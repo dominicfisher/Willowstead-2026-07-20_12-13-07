@@ -13,7 +13,6 @@ namespace Willowstead.Player
 
         private void Update()
         {
-            // Smoothly lerp to target scale
             transform.localScale = Vector3.Lerp(transform.localScale, _targetScale, Time.deltaTime * 14f);
         }
 

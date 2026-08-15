@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Willowstead.Persistence
 {
-    // ─── Serializable core root ────────────────────────────────────────────
     /// <summary>
     /// Root persistence record for one world save. Serialized via Unity's
     /// JsonUtility to plain JSON (no Newtonsoft dependency). One file per
@@ -94,7 +93,6 @@ namespace Willowstead.Persistence
     public class SavedCrop
     {
         public Vector3IntRecord cell;
-        // The CropData ScriptableObject name property (e.g. "Carrot"). The
         // restored loader looks this up via Resources.FindObjectsOfTypeAll.
         public string cropDataName;
         public int currentStage;

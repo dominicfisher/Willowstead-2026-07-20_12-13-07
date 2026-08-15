@@ -64,11 +64,9 @@ namespace Willowstead.Farming
             _selectedSlotIndex = Mathf.Clamp(idx, 0, Mathf.Max(0, max));
         }
 
-        // Drag-tilling state
         private bool _isAttackHeld;
         private Vector3Int _lastDragHoeCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
-        // ─── Seed mapping entry ──────────────────────────────────────────────────
         [System.Serializable]
         public class SeedEntry
         {
@@ -90,9 +88,15 @@ namespace Willowstead.Farming
                     : seedItemName;
         }
 
+        private void Awake()
+        {
+            EnsureFarmingConfig();
+        }
+
         private void Start()
         {
-            // Auto-locate GridSelector if not assigned
+            EnsureFarmingConfig();
+
             if (_gridSelector == null)
             {
                 _gridSelector = FindAnyObjectByType<World.GridSelector>();
@@ -102,7 +106,6 @@ namespace Willowstead.Farming
                 }
             }
 
-            // Cache InventoryManager reference
             _inventory = GetComponent<Player.InventoryManager>();
             if (_inventory == null)
             {
@@ -111,6 +114,41 @@ namespace Willowstead.Farming
 
 #if UNITY_EDITOR
             Debug.Log($"[FarmingController] Initialized. Default Tool: {_currentTool}. Use 1-8 or scroll wheel to switch slots. Press G to advance day.");
+#endif
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            EnsureFarmingConfig();
+        }
+#endif
+
+        private void EnsureFarmingConfig()
+        {
+#if UNITY_EDITOR
+            if (_cropPrefab == null)
+            {
+                _cropPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CropPrefab.prefab");
+            }
+
+            if (_seedMappings == null || _seedMappings.Length == 0)
+            {
+                var carrotData = UnityEditor.AssetDatabase.LoadAssetAtPath<CropData>("Assets/Prefabs/Carrot.asset");
+                var potatoData = UnityEditor.AssetDatabase.LoadAssetAtPath<CropData>("Assets/Prefabs/Potato.asset");
+                var tomatoData = UnityEditor.AssetDatabase.LoadAssetAtPath<CropData>("Assets/Prefabs/Tomato.asset");
+                var cornData   = UnityEditor.AssetDatabase.LoadAssetAtPath<CropData>("Assets/Prefabs/Corn.asset");
+                var strawData  = UnityEditor.AssetDatabase.LoadAssetAtPath<CropData>("Assets/Prefabs/Straw.asset");
+
+                var list = new System.Collections.Generic.List<SeedEntry>();
+                if (carrotData != null) list.Add(new SeedEntry { seedItemName = "Carrot Seeds", cropData = carrotData });
+                if (potatoData != null) list.Add(new SeedEntry { seedItemName = "Potato Seeds", cropData = potatoData });
+                if (tomatoData != null) list.Add(new SeedEntry { seedItemName = "Tomato Seeds", cropData = tomatoData });
+                if (cornData != null)   list.Add(new SeedEntry { seedItemName = "Corn Seeds", cropData = cornData });
+                if (strawData != null)  list.Add(new SeedEntry { seedItemName = "Straw Seeds", cropData = strawData });
+
+                _seedMappings = list.ToArray();
+            }
 #endif
         }
 
@@ -150,6 +188,11 @@ namespace Willowstead.Farming
 
         private void Update()
         {
+            if (Input.InputReader.BlockGameplayInput)
+            {
+                return;
+            }
+
             HandleToolSelectionInput();
             HandleDebugTimeInput();
 
@@ -157,7 +200,7 @@ namespace Willowstead.Farming
             var mouse = UnityEngine.InputSystem.Mouse.current;
             if (mouse != null && mouse.leftButton.wasPressedThisFrame)
             {
-                if (!Input.InputReader.BlockGameplayInput && !Player.UIResourceHelper.IsPointerOverAnyUI())
+                if (!Player.UIResourceHelper.IsPointerOverAnyUI())
                 {
                     Debug.Log($"[FarmingController] Left Click detected. Using tool: {_currentTool}");
                     OnUseToolInput();
@@ -176,6 +219,8 @@ namespace Willowstead.Farming
         /// </summary>
         private void HandleToolSelectionInput()
         {
+            if (Input.InputReader.BlockGameplayInput) return;
+
             var keyboard = UnityEngine.InputSystem.Keyboard.current;
             if (keyboard != null)
             {
@@ -198,9 +243,10 @@ namespace Willowstead.Farming
             }
 
             // Only scroll hotbar if Alt is NOT held (Alt + mouse scroll is reserved for camera zoom)
+            bool isMapOpen = UI.FullMapUI.Instance != null && UI.FullMapUI.Instance.IsMapOpen;
             bool isAltHeld = keyboard != null && (keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed);
             var mouse = UnityEngine.InputSystem.Mouse.current;
-            if (!isAltHeld && mouse != null)
+            if (!isAltHeld && !isMapOpen && mouse != null)
             {
                 float scroll = mouse.scroll.ReadValue().y;
                 if (scroll > 0f)
@@ -251,11 +297,18 @@ namespace Willowstead.Farming
             }
             else
             {
-                // Check every registered seed mapping
                 CropData matched = null;
+                string slotNameTrim = slot.itemName.Trim();
+
                 foreach (SeedEntry entry in _seedMappings)
                 {
-                    if (entry.cropData != null && slot.itemName == entry.SeedItemName)
+                    if (entry.cropData == null) continue;
+
+                    string entryName = entry.SeedItemName;
+                    if (string.Equals(slotNameTrim, entryName, System.StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(slotNameTrim, entry.cropData.CropName + " Seed", System.StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(slotNameTrim, entry.cropData.CropName + " Seeds", System.StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(slotNameTrim, entry.cropData.CropName, System.StringComparison.OrdinalIgnoreCase))
                     {
                         matched = entry.cropData;
                         break;

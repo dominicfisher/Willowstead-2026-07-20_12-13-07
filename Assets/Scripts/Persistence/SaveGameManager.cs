@@ -24,7 +24,6 @@ namespace Willowstead.Persistence
     /// </summary>
     public class SaveGameManager : MonoBehaviour
     {
-        // ─── Singleton + global flags ──────────────────────────────────
         public static SaveGameManager Instance { get; private set; }
 
         /// <summary>
@@ -34,12 +33,10 @@ namespace Willowstead.Persistence
         /// </summary>
         public static bool IsLoadingFromSave { get; private set; }
 
-        // ─── Slots config ───────────────────────────────────────────────
         public const int SlotCount = 3;
         public const string SlotFilePrefix = "slot_";
         public const string AutosaveFileName = "autosave.json";
 
-        // ─── Autosave ───────────────────────────────────────────────────
         [Header("Autosave")]
         [Tooltip("If true, an autosave is written every _autosaveIntervalSeconds seconds while in-world.")]
         [SerializeField] private bool _enableAutosave = true;
@@ -49,12 +46,10 @@ namespace Willowstead.Persistence
         private float _autosaveTimer;
         private bool _inWorld; // True once Start has completed; autosave only runs then.
 
-        // ─── Events ─────────────────────────────────────────────────────
         public event Action<int> OnSaveCompleted;
         public event Action<int> OnLoadStarted;
         public event Action<int> OnLoadCompleted;
 
-        // ─── Bootstrap ──────────────────────────────────────────────────
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoBootstrap()
         {
@@ -115,7 +110,6 @@ namespace Willowstead.Persistence
             _autosaveTimer = 0f;
         }
 
-        // ─── Runtime autosave controls (read by Pause → Gameplay panel) ───
 
         /// <summary>Current seconds between autosaves (0 / negative = off).</summary>
         public float AutosaveIntervalSeconds => _autosaveIntervalSeconds;
@@ -141,7 +135,6 @@ namespace Willowstead.Persistence
             _autosaveTimer = 0f;
         }
 
-        // ─── Path helpers ──────────────────────────────────────────────
         public static string SaveDirectoryPath
         {
             get
@@ -170,7 +163,6 @@ namespace Willowstead.Persistence
             }
         }
 
-        // ─── Save API ───────────────────────────────────────────────────
 
         /// <summary>Capture current world state and write JSON to <paramref name="path"/>.</summary>
         public bool SaveToPath(string path, string saveName = null)
@@ -210,7 +202,6 @@ namespace Willowstead.Persistence
         public bool SaveToAutosave(string saveName = null) =>
             SaveToPath(GetAutosavePath(), string.IsNullOrEmpty(saveName) ? "Autosave" : saveName);
 
-        // ─── Load API ───────────────────────────────────────────────────
 
         /// <summary>Restore the world from <paramref name="path"/>. Returns false on any failure.</summary>
         public bool LoadFromPath(string path)
@@ -258,7 +249,6 @@ namespace Willowstead.Persistence
         public bool LoadFromSlot(int slotIndex) => LoadFromPath(GetSlotPath(slotIndex));
         public bool LoadFromAutosave() => LoadFromPath(GetAutosavePath());
 
-        // ─── Delete API ─────────────────────────────────────────────────
         public bool DeleteSlot(int slotIndex)
         {
             string path = GetSlotPath(slotIndex);
@@ -283,7 +273,6 @@ namespace Willowstead.Persistence
             }
         }
 
-        // ─── List API ───────────────────────────────────────────────────
 
         /// <summary>Returns summaries for all manual slots plus the autosave.</summary>
         public List<SaveSlotSummary> ListSlots()
@@ -313,7 +302,6 @@ namespace Willowstead.Persistence
             return best;
         }
 
-        // ─── Capture (Save side) ───────────────────────────────────────
 
         /// <summary>
         /// Pulls the current state out of every gameplay system into a
@@ -354,7 +342,6 @@ namespace Willowstead.Persistence
             return d;
         }
 
-        // ─── Restore (Load side) ───────────────────────────────────────
 
         /// <summary>
         /// Push <paramref name="data"/> into every gameplay system in the
@@ -367,42 +354,29 @@ namespace Willowstead.Persistence
             IsLoadingFromSave = true;
             try
             {
-                // 1. Seed the world FIRST so ProceduralGridGenerator's
                 //    Regenerate() reproduces the right terrain.
-                // 0. Repopulate felled-tile memory BEFORE SetSeed so the
                 //    chunk-spawn pass on regen honours previously-felled tiles.
                 TreeChoppable.RestoreFelledTiles(FelledFromData(data));
 
-                // 1. Apply the saved seed. The OnSeedChanged → HandleSeedChanged
-                //    chain triggers ProceduralGridGenerator.Regenerate() exactly
                 //    once; do not call Regenerate() again from this method.
                 if (WorldSeedService.Instance != null)
                     WorldSeedService.Instance.SetSeed(data.worldSeed, userProvided: true);
 
-                // (Regenerate is triggered automatically by the SetSeed's
-                //  OnSeedChanged chain above. Do not call it again here.)
 
-                // 3. Apply grid modifications on top of the freshly generated
-                //    world via the GridManager. This calls ClearGrassAt for
-                //    every tilled cell (otherwise the chunk would respawn its
                 //    grass on top of the tile mid-load).
                 if (GridManager.Instance != null)
                     GridManager.Instance.RestoreGridState(data);
 
-                // 4. Player position (teleport via Rigidbody2D).
                 if (PlayerController.Instance != null)
                     PlayerController.Instance.RestorePosition(data.playerPosition);
 
-                // 6. Inventory slots + gold.
                 if (InventoryManager.Instance != null)
                     InventoryManager.Instance.RestoreInventory(data.inventory, data.gold);
 
-                // 7. Hotbar selection (after inventory because slot count
                 //    may differ for newly-created vs loaded sessions).
                 if (FarmingController.Instance != null)
                     FarmingController.Instance.SetSelectedSlotIndex(data.selectedHotbarIndex);
 
-                // 8. Time / weather / day-counter.
                 if (DayNightCycle.Instance != null)
                     DayNightCycle.Instance.RestoreTime(data.timeOfDay01, data.currentDay);
                 if (WeatherCycle.Instance != null)
@@ -411,8 +385,6 @@ namespace Willowstead.Persistence
                         (WeatherType)data.weatherType,
                         (WindIntensity)data.windIntensity,
                         (WindDirection)data.windDirection);
-                    // Save doesn't carry the day count for weather; for
-                    // parity, replay the chance once so the rolling logic
                     // continues from the snapshot without immediate re-roll.
                 }
             }
@@ -427,7 +399,6 @@ namespace Willowstead.Persistence
             return data != null && data.felledTrees != null ? data.felledTrees : new List<Vector2IntRecord>();
         }
 
-        // ─── Summary helper (used by both list and dev-console) ────────
 
         private static SaveSlotSummary BuildSummary(string path, int slotIndex, string fileName)
         {

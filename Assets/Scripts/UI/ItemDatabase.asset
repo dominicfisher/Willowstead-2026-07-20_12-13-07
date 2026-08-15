@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82b12f7b13a61464882328c2c948b4d1, type: 3}
+  m_Name: ItemDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::Willowstead.Inventory.ItemDatabase
+  _items:
+  - itemName: Carrot Seeds
+    icon: {fileID: 4489080965793271111, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Carrot
+    icon: {fileID: -1676167664862477823, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Potato Seeds
+    icon: {fileID: 194035269617077776, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Potato
+    icon: {fileID: -4013514139513567718, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Straw Seeds
+    icon: {fileID: -7032405354595595156, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Straw
+    icon: {fileID: 1904288579492725082, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Tomato Seeds
+    icon: {fileID: -2557875991350262050, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Tomato
+    icon: {fileID: -1691594577879807577, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Corn Seeds
+    icon: {fileID: -7036616988850829104, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Corn
+    icon: {fileID: -4727365549373307934, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Hoe
+    icon: {fileID: -3190335049457495340, guid: bad8f2c204b7df345afe566f1a1978f6, type: 3}
+  - itemName: Log
+    icon: {fileID: 21300000, guid: f1ed42f40378dd24b88d35eafba65b88, type: 3}
+  - itemName: Gold
+    icon: {fileID: 867430906297013300, guid: 538d3f0d9f9ce8940b2a76ece7be0474, type: 3}
+  - itemName: Watering Can
+    icon: {fileID: -720151078975379389, guid: 7f7f5dd5cd0a50446991df86eb8be977, type: 3}
+  - itemName: Axe
+    icon: {fileID: 21300000, guid: dcee98bd87f9fb746b21372cb7b2bc89, type: 3}

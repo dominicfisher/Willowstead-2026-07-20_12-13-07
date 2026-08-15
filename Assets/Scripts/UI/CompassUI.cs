@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Willowstead.Player;
@@ -6,10 +7,9 @@ using Willowstead.Player;
 namespace Willowstead.UI
 {
     /// <summary>
-    /// Programmatically constructs and manages the Top HUD Compass bar.
-    /// Displays cardinal / intercardinal direction markers and tracked world POIs
-    /// (Home / Farm, Water sources, Shop) relative to player position and heading.
-    /// Pure code-built UI: 100% self-contained, requires zero inspector wiring.
+    /// Premium Top-HUD Compass bar with rich fantasy-rpg aesthetics.
+    /// Displays cardinal & intercardinal direction markers (N, NE, E, SE, S, SW, W, NW),
+    /// notch ticks, dynamic heading badge, and tracked world POIs relative to player heading.
     /// </summary>
     public class CompassUI : MonoBehaviour
     {
@@ -17,22 +17,31 @@ namespace Willowstead.UI
 
         private GameObject _compassRootGo;
         private RectTransform _tickerTransform;
-        private Text _headingDegreeText;
+        private TextMeshProUGUI _headingDegreeText;
         private Button _mapButton;
 
-        // Direction markers (Degrees relative to North: 0=N, 45=NE, 90=E, 135=SE, 180=S, 225=SW, 270=W, 315=NW)
         private struct DirectionMarker
         {
             public string label;
             public float bearing;
-            public Text textElement;
+            public TextMeshProUGUI textElement;
             public RectTransform rectTransform;
             public bool isMajor;
+            public Color baseColor;
         }
 
         private readonly List<DirectionMarker> _directionMarkers = new List<DirectionMarker>();
 
-        // POI Marker Data
+        private struct TickMarker
+        {
+            public float bearing;
+            public RectTransform rectTransform;
+            public Image image;
+            public bool isMedium;
+        }
+
+        private readonly List<TickMarker> _tickMarkers = new List<TickMarker>();
+
         public class POIInfo
         {
             public string id;
@@ -41,16 +50,16 @@ namespace Willowstead.UI
             public Color iconColor;
             public GameObject uiGo;
             public RectTransform rectTransform;
-            public Text distanceText;
+            public TextMeshProUGUI distanceText;
+            public Image iconImage;
         }
 
         private readonly List<POIInfo> _poiList = new List<POIInfo>();
 
-        // Pixels per degree on the horizontal compass ticker
-        private const float PixelsPerDegree = 3.2f;
-        private const float TickerWidth = 380f;
+        private const float PixelsPerDegree = 3.5f;
+        private const float TickerWidth = 420f;
 
-        private float _currentBearing = 0f; // 0 = North
+        private float _currentBearing = 0f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -82,19 +91,6 @@ namespace Willowstead.UI
 
         private void Update()
         {
-            // Listen for 'M' key to toggle Full Map
-            if (UnityEngine.InputSystem.Keyboard.current != null &&
-                UnityEngine.InputSystem.Keyboard.current.mKey.wasPressedThisFrame)
-            {
-                if (!Input.InputReader.BlockGameplayInput || (FullMapUI.Instance != null && FullMapUI.Instance.IsMapOpen))
-                {
-                    if (FullMapUI.Instance != null)
-                    {
-                        FullMapUI.Instance.ToggleMap();
-                    }
-                }
-            }
-
             UpdateCompassHeading();
             UpdatePOIMarkers();
         }
@@ -108,75 +104,110 @@ namespace Willowstead.UI
             Transform existing = canvas.transform.Find("CompassPanel");
             if (existing != null) DestroyImmediate(existing.gameObject);
 
-            // ── Main Compass Panel Box ──
-            _compassRootGo = new GameObject("CompassPanel");
+            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+
+            _compassRootGo = new GameObject("CompassPanel", typeof(RectTransform));
             _compassRootGo.transform.SetParent(canvas.transform, false);
 
-            RectTransform mainRect = _compassRootGo.AddComponent<RectTransform>();
+            CanvasGroup cg = _compassRootGo.AddComponent<CanvasGroup>();
+            if (MainMenuUI.Instance != null && !MainMenuUI.HasGameStarted)
+            {
+                cg.alpha = 0f;
+            }
+
+            RectTransform mainRect = (RectTransform)_compassRootGo.transform;
             mainRect.anchorMin = new Vector2(0.5f, 1f);
             mainRect.anchorMax = new Vector2(0.5f, 1f);
             mainRect.pivot = new Vector2(0.5f, 1f);
-            mainRect.anchoredPosition = new Vector2(0f, -16f);
-            mainRect.sizeDelta = new Vector2(460f, 44f);
+            mainRect.anchoredPosition = new Vector2(0f, -14f);
+            mainRect.sizeDelta = new Vector2(520f, 48f);
 
-            // Background frame
-            Image bgImage = _compassRootGo.AddComponent<Image>();
-            bgImage.sprite = UIResourceHelper.GetBackgroundSprite();
-            bgImage.type = Image.Type.Sliced;
-            bgImage.color = new Color(0.10f, 0.08f, 0.07f, 0.90f);
+            GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
+            shadowGo.transform.SetParent(_compassRootGo.transform, false);
+            RectTransform shadowRt = (RectTransform)shadowGo.transform;
+            shadowRt.anchorMin = Vector2.zero; shadowRt.anchorMax = Vector2.one;
+            shadowRt.offsetMin = new Vector2(-4f, -4f);
+            shadowRt.offsetMax = new Vector2(4f, 2f);
+            Image shadowImg = shadowGo.GetComponent<Image>();
+            shadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            shadowImg.type = Image.Type.Sliced;
+            shadowImg.color = new Color(0f, 0f, 0f, 0.5f);
 
-            // Subtle border outline panel
-            GameObject borderGo = new GameObject("Border");
-            borderGo.transform.SetParent(_compassRootGo.transform, false);
-            RectTransform borderRect = borderGo.AddComponent<RectTransform>();
-            borderRect.anchorMin = Vector2.zero;
-            borderRect.anchorMax = Vector2.one;
-            borderRect.sizeDelta = Vector2.zero;
-            Image borderImg = borderGo.AddComponent<Image>();
-            borderImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            borderImg.type = Image.Type.Sliced;
-            borderImg.color = new Color(0.82f, 0.68f, 0.38f, 0.35f); // Soft gold frame tint
+            GameObject outerFrameGo = new GameObject("OuterFrame", typeof(RectTransform), typeof(Image));
+            outerFrameGo.transform.SetParent(_compassRootGo.transform, false);
+            RectTransform outerRt = (RectTransform)outerFrameGo.transform;
+            outerRt.anchorMin = Vector2.zero; outerRt.anchorMax = Vector2.one;
+            outerRt.offsetMin = Vector2.zero; outerRt.offsetMax = Vector2.zero;
+            Image outerImg = outerFrameGo.GetComponent<Image>();
+            outerImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            outerImg.type = Image.Type.Sliced;
+            outerImg.color = new Color(0.24f, 0.17f, 0.11f, 0.96f); // Rich walnut wood
 
-            // ── Center Pointer / Caret ──
-            GameObject caretGo = new GameObject("CenterCaret");
-            caretGo.transform.SetParent(_compassRootGo.transform, false);
-            RectTransform caretRect = caretGo.AddComponent<RectTransform>();
-            caretRect.anchorMin = new Vector2(0.5f, 1f);
-            caretRect.anchorMax = new Vector2(0.5f, 1f);
-            caretRect.pivot = new Vector2(0.5f, 1f);
-            caretRect.anchoredPosition = new Vector2(-25f, -2f);
-            caretRect.sizeDelta = new Vector2(10f, 10f);
+            GameObject goldBorderGo = new GameObject("GoldBorder", typeof(RectTransform), typeof(Image));
+            goldBorderGo.transform.SetParent(outerFrameGo.transform, false);
+            RectTransform goldRt = (RectTransform)goldBorderGo.transform;
+            goldRt.anchorMin = Vector2.zero; goldRt.anchorMax = Vector2.one;
+            goldRt.offsetMin = new Vector2(2f, 2f);
+            goldRt.offsetMax = new Vector2(-2f, -2f);
+            Image goldImg = goldBorderGo.GetComponent<Image>();
+            goldImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            goldImg.type = Image.Type.Sliced;
+            goldImg.color = new Color(0.78f, 0.62f, 0.32f, 0.75f); // Warm polished gold
 
-            Image caretImg = caretGo.AddComponent<Image>();
-            caretImg.sprite = UIResourceHelper.GetCircleSprite();
-            caretImg.color = new Color(1f, 0.85f, 0.3f, 0.95f); // Bright golden indicator
+            GameObject innerBgGo = new GameObject("InnerBackground", typeof(RectTransform), typeof(Image));
+            innerBgGo.transform.SetParent(goldBorderGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerBgGo.transform;
+            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(3f, 3f);
+            innerRt.offsetMax = new Vector2(-56f, -3f); // Leaves space on right for map button
+            Image innerImg = innerBgGo.GetComponent<Image>();
+            innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerImg.type = Image.Type.Sliced;
+            innerImg.color = new Color(0.08f, 0.07f, 0.07f, 0.96f);
 
-            // ── Ticker Mask Viewport ──
-            GameObject maskGo = new GameObject("TickerMask");
-            maskGo.transform.SetParent(_compassRootGo.transform, false);
-            RectTransform maskRect = maskGo.AddComponent<RectTransform>();
-            maskRect.anchorMin = new Vector2(0.5f, 0.5f);
-            maskRect.anchorMax = new Vector2(0.5f, 0.5f);
-            maskRect.pivot = new Vector2(0.5f, 0.5f);
-            maskRect.anchoredPosition = new Vector2(-25f, -1f);
-            maskRect.sizeDelta = new Vector2(TickerWidth, 36f);
+            GameObject maskGo = new GameObject("TickerMask", typeof(RectTransform), typeof(RectMask2D));
+            maskGo.transform.SetParent(innerBgGo.transform, false);
+            RectTransform maskRect = (RectTransform)maskGo.transform;
+            maskRect.anchorMin = Vector2.zero;
+            maskRect.anchorMax = Vector2.one;
+            maskRect.offsetMin = new Vector2(10f, 2f);
+            maskRect.offsetMax = new Vector2(-10f, -2f);
 
-            maskGo.AddComponent<RectMask2D>();
-
-            // Ticker container
-            GameObject tickerGo = new GameObject("Ticker");
+            GameObject tickerGo = new GameObject("Ticker", typeof(RectTransform));
             tickerGo.transform.SetParent(maskGo.transform, false);
-            _tickerTransform = tickerGo.AddComponent<RectTransform>();
+            _tickerTransform = (RectTransform)tickerGo.transform;
             _tickerTransform.anchorMin = new Vector2(0.5f, 0.5f);
             _tickerTransform.anchorMax = new Vector2(0.5f, 0.5f);
             _tickerTransform.pivot = new Vector2(0.5f, 0.5f);
             _tickerTransform.anchoredPosition = Vector2.zero;
-            _tickerTransform.sizeDelta = new Vector2(TickerWidth, 36f);
+            _tickerTransform.sizeDelta = new Vector2(TickerWidth, 34f);
 
-            // Font setup
-            Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _tickMarkers.Clear();
+            for (int deg = 0; deg < 360; deg += 15)
+            {
+                if (deg % 45 == 0) continue; // Major/intercardinals have labels
 
-            // ── Create Direction Labels (N, NE, E, SE, S, SW, W, NW) ──
+                bool isMedium = (deg % 30 == 0);
+                GameObject tickGo = new GameObject($"Tick_{deg}", typeof(RectTransform), typeof(Image));
+                tickGo.transform.SetParent(_tickerTransform, false);
+                RectTransform trt = (RectTransform)tickGo.transform;
+                trt.anchorMin = new Vector2(0.5f, 0.5f);
+                trt.anchorMax = new Vector2(0.5f, 0.5f);
+                trt.pivot = new Vector2(0.5f, 0.5f);
+                trt.sizeDelta = isMedium ? new Vector2(2f, 12f) : new Vector2(1.5f, 7f);
+
+                Image tImg = tickGo.GetComponent<Image>();
+                tImg.color = isMedium ? new Color(0.88f, 0.76f, 0.48f, 0.65f) : new Color(0.68f, 0.68f, 0.68f, 0.40f);
+
+                _tickMarkers.Add(new TickMarker
+                {
+                    bearing = deg,
+                    rectTransform = trt,
+                    image = tImg,
+                    isMedium = isMedium
+                });
+            }
+
             _directionMarkers.Clear();
             (string label, float bearing, bool major)[] directions = new[]
             {
@@ -192,22 +223,32 @@ namespace Willowstead.UI
 
             foreach (var (lbl, brg, isMaj) in directions)
             {
-                GameObject lblGo = new GameObject($"Dir_{lbl}");
+                GameObject lblGo = new GameObject($"Dir_{lbl}", typeof(RectTransform));
                 lblGo.transform.SetParent(_tickerTransform, false);
 
-                RectTransform rt = lblGo.AddComponent<RectTransform>();
+                RectTransform rt = (RectTransform)lblGo.transform;
                 rt.anchorMin = new Vector2(0.5f, 0.5f);
                 rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
                 rt.sizeDelta = new Vector2(40f, 30f);
 
-                Text txt = lblGo.AddComponent<Text>();
-                txt.font = legacyFont;
+                var txt = lblGo.AddComponent<TextMeshProUGUI>();
+                if (font != null) txt.font = font;
                 txt.fontSize = isMaj ? 16 : 12;
-                txt.fontStyle = isMaj ? FontStyle.Bold : FontStyle.Normal;
-                txt.alignment = TextAnchor.MiddleCenter;
-                txt.color = isMaj ? new Color(1f, 0.92f, 0.65f, 1f) : new Color(0.85f, 0.85f, 0.85f, 0.85f);
-                if (lbl == "N") txt.color = new Color(0.95f, 0.35f, 0.35f, 1f); // Red N for North
+                txt.fontStyle = isMaj ? FontStyles.Bold : FontStyles.Normal;
+                txt.alignment = TextAlignmentOptions.Center;
+                txt.richText = false;
+
+                Color baseCol;
+                if (lbl == "N")
+                    baseCol = new Color(1f, 0.35f, 0.35f, 1f); // Vibrant Ruby Red for True North
+                else if (isMaj)
+                    baseCol = new Color(1f, 0.88f, 0.48f, 1f); // Warm Gold for Major Cardinals (E, S, W)
+                else
+                    baseCol = new Color(0.88f, 0.88f, 0.85f, 0.85f); // Soft Silver for Intercardinals (NE, SE, SW, NW)
+
+                txt.color = baseCol;
+                txt.text = lbl;
 
                 _directionMarkers.Add(new DirectionMarker
                 {
@@ -215,47 +256,61 @@ namespace Willowstead.UI
                     bearing = brg,
                     textElement = txt,
                     rectTransform = rt,
-                    isMajor = isMaj
+                    isMajor = isMaj,
+                    baseColor = baseCol
                 });
             }
 
-            // ── Heading Degree Text Badge ──
-            GameObject degGo = new GameObject("HeadingBadge");
+            GameObject caretGo = new GameObject("CenterCaret", typeof(RectTransform), typeof(Image));
+            caretGo.transform.SetParent(innerBgGo.transform, false);
+            RectTransform caretRect = (RectTransform)caretGo.transform;
+            caretRect.anchorMin = new Vector2(0.5f, 1f);
+            caretRect.anchorMax = new Vector2(0.5f, 1f);
+            caretRect.pivot = new Vector2(0.5f, 1f);
+            caretRect.anchoredPosition = new Vector2(0f, 1f);
+            caretRect.sizeDelta = new Vector2(10f, 12f);
+
+            Image caretImg = caretGo.GetComponent<Image>();
+            caretImg.sprite = UIResourceHelper.GetCircleSprite();
+            caretImg.color = new Color(1f, 0.84f, 0.28f, 1f);
+
+            GameObject degGo = new GameObject("HeadingBadge", typeof(RectTransform));
             degGo.transform.SetParent(_compassRootGo.transform, false);
-            RectTransform degRect = degGo.AddComponent<RectTransform>();
+            RectTransform degRect = (RectTransform)degGo.transform;
             degRect.anchorMin = new Vector2(0.5f, 0f);
             degRect.anchorMax = new Vector2(0.5f, 0f);
             degRect.pivot = new Vector2(0.5f, 1f);
-            degRect.anchoredPosition = new Vector2(-25f, 0f);
-            degRect.sizeDelta = new Vector2(60f, 14f);
+            degRect.anchoredPosition = new Vector2(-28f, -2f);
+            degRect.sizeDelta = new Vector2(100f, 18f);
 
-            _headingDegreeText = degGo.AddComponent<Text>();
-            _headingDegreeText.font = legacyFont;
-            _headingDegreeText.fontSize = 10;
-            _headingDegreeText.alignment = TextAnchor.MiddleCenter;
-            _headingDegreeText.color = new Color(0.75f, 0.70f, 0.60f, 0.9f);
+            _headingDegreeText = degGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) _headingDegreeText.font = font;
+            _headingDegreeText.fontSize = 11;
+            _headingDegreeText.fontStyle = FontStyles.Bold;
+            _headingDegreeText.alignment = TextAlignmentOptions.Center;
+            _headingDegreeText.color = new Color(0.92f, 0.80f, 0.55f, 0.95f);
             _headingDegreeText.text = "0° N";
 
-            // ── Open Map Button (Right side of compass) ──
-            GameObject btnGo = new GameObject("OpenMapButton");
-            btnGo.transform.SetParent(_compassRootGo.transform, false);
-            RectTransform btnRect = btnGo.AddComponent<RectTransform>();
+            GameObject mapBtnGo = new GameObject("OpenMapButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            mapBtnGo.transform.SetParent(_compassRootGo.transform, false);
+            RectTransform btnRect = (RectTransform)mapBtnGo.transform;
             btnRect.anchorMin = new Vector2(1f, 0.5f);
             btnRect.anchorMax = new Vector2(1f, 0.5f);
             btnRect.pivot = new Vector2(1f, 0.5f);
             btnRect.anchoredPosition = new Vector2(-6f, 0f);
-            btnRect.sizeDelta = new Vector2(40f, 32f);
+            btnRect.sizeDelta = new Vector2(46f, 36f);
 
-            Image btnImg = btnGo.AddComponent<Image>();
+            Image btnImg = mapBtnGo.GetComponent<Image>();
             btnImg.sprite = UIResourceHelper.GetBackgroundSprite();
             btnImg.type = Image.Type.Sliced;
-            btnImg.color = new Color(0.22f, 0.26f, 0.32f, 0.95f);
+            btnImg.color = new Color(0.32f, 0.22f, 0.14f, 1f);
 
-            _mapButton = btnGo.AddComponent<Button>();
-            ColorBlock colors = _mapButton.colors;
-            colors.highlightedColor = new Color(0.35f, 0.42f, 0.55f, 1f);
-            colors.pressedColor = new Color(0.15f, 0.18f, 0.25f, 1f);
-            _mapButton.colors = colors;
+            _mapButton = mapBtnGo.GetComponent<Button>();
+            ColorBlock cb = _mapButton.colors;
+            cb.normalColor = new Color(0.32f, 0.22f, 0.14f, 1f);
+            cb.highlightedColor = new Color(0.48f, 0.34f, 0.22f, 1f);
+            cb.pressedColor = new Color(0.20f, 0.14f, 0.08f, 1f);
+            _mapButton.colors = cb;
 
             _mapButton.onClick.AddListener(() =>
             {
@@ -265,70 +320,73 @@ namespace Willowstead.UI
                 }
             });
 
-            // Map button icon label
-            GameObject btnTxtGo = new GameObject("MapText");
-            btnTxtGo.transform.SetParent(btnGo.transform, false);
-            RectTransform btnTxtRect = btnTxtGo.AddComponent<RectTransform>();
-            btnTxtRect.anchorMin = Vector2.zero;
-            btnTxtRect.anchorMax = Vector2.one;
-            btnTxtRect.sizeDelta = Vector2.zero;
+            GameObject btnTxtGo = new GameObject("MapText", typeof(RectTransform));
+            btnTxtGo.transform.SetParent(mapBtnGo.transform, false);
+            RectTransform btnTxtRt = (RectTransform)btnTxtGo.transform;
+            btnTxtRt.anchorMin = Vector2.zero; btnTxtRt.anchorMax = Vector2.one;
+            btnTxtRt.offsetMin = Vector2.zero; btnTxtRt.offsetMax = Vector2.zero;
 
-            Text btnTxt = btnTxtGo.AddComponent<Text>();
-            btnTxt.font = legacyFont;
-            btnTxt.fontSize = 11;
-            btnTxt.fontStyle = FontStyle.Bold;
-            btnTxt.alignment = TextAnchor.MiddleCenter;
-            btnTxt.color = new Color(0.95f, 0.95f, 0.95f, 1f);
-            btnTxt.text = "MAP\n[M]";
+            var btnTxt = btnTxtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) btnTxt.font = font;
+            btnTxt.fontSize = 10;
+            btnTxt.fontStyle = FontStyles.Bold;
+            btnTxt.alignment = TextAlignmentOptions.Center;
+            btnTxt.color = new Color(1f, 0.92f, 0.75f, 1f);
+            btnTxt.text = "MAP\n<size=8>[M]</size>";
         }
 
         private void InitializeDefaultPOIs()
         {
             _poiList.Clear();
-
-            // 1. Home / Farm Plot POI
             AddPOI("home", "Farm Plot", Vector3.zero, new Color(0.35f, 0.85f, 0.35f, 1f));
-
-            // 2. Shop POI
             AddPOI("shop", "Merchant Shop", new Vector3(8f, 4f, 0f), new Color(0.95f, 0.75f, 0.25f, 1f));
         }
 
         public void AddPOI(string id, string name, Vector3 worldPos, Color iconColor)
         {
-            // Remove if existing
             RemovePOI(id);
 
-            Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-            GameObject poiGo = new GameObject($"POI_{id}");
+            GameObject poiGo = new GameObject($"POI_{id}", typeof(RectTransform));
             poiGo.transform.SetParent(_tickerTransform, false);
 
-            RectTransform rt = poiGo.AddComponent<RectTransform>();
+            RectTransform rt = (RectTransform)poiGo.transform;
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(24f, 24f);
+            rt.sizeDelta = new Vector2(18f, 18f);
 
-            // Icon background dot
-            Image iconImg = poiGo.AddComponent<Image>();
+            GameObject glowGo = new GameObject("Glow", typeof(RectTransform), typeof(Image));
+            glowGo.transform.SetParent(poiGo.transform, false);
+            RectTransform glowRt = (RectTransform)glowGo.transform;
+            glowRt.anchorMin = Vector2.zero; glowRt.anchorMax = Vector2.one;
+            glowRt.offsetMin = new Vector2(-2f, -2f); glowRt.offsetMax = new Vector2(2f, 2f);
+            Image glowImg = glowGo.GetComponent<Image>();
+            glowImg.sprite = UIResourceHelper.GetCircleSprite();
+            glowImg.color = new Color(0f, 0f, 0f, 0.6f);
+
+            GameObject dotGo = new GameObject("Dot", typeof(RectTransform), typeof(Image));
+            dotGo.transform.SetParent(poiGo.transform, false);
+            RectTransform dotRt = (RectTransform)dotGo.transform;
+            dotRt.anchorMin = Vector2.zero; dotRt.anchorMax = Vector2.one;
+            dotRt.offsetMin = Vector2.zero; dotRt.offsetMax = Vector2.zero;
+            Image iconImg = dotGo.GetComponent<Image>();
             iconImg.sprite = UIResourceHelper.GetCircleSprite();
             iconImg.color = iconColor;
 
-            // Distance / label text below icon
-            GameObject distGo = new GameObject("DistText");
+            GameObject distGo = new GameObject("DistText", typeof(RectTransform));
             distGo.transform.SetParent(poiGo.transform, false);
-            RectTransform distRt = distGo.AddComponent<RectTransform>();
+            RectTransform distRt = (RectTransform)distGo.transform;
             distRt.anchorMin = new Vector2(0.5f, 0f);
             distRt.anchorMax = new Vector2(0.5f, 0f);
             distRt.pivot = new Vector2(0.5f, 1f);
             distRt.anchoredPosition = new Vector2(0f, -2f);
-            distRt.sizeDelta = new Vector2(60f, 12f);
+            distRt.sizeDelta = new Vector2(70f, 12f);
 
-            Text distTxt = distGo.AddComponent<Text>();
-            distTxt.font = legacyFont;
-            distTxt.fontSize = 9;
-            distTxt.alignment = TextAnchor.MiddleCenter;
-            distTxt.color = new Color(0.9f, 0.9f, 0.9f, 0.85f);
+            var distTxt = distGo.AddComponent<TextMeshProUGUI>();
+            if (TMP_Settings.defaultFontAsset != null) distTxt.font = TMP_Settings.defaultFontAsset;
+            distTxt.fontSize = 8.5f;
+            distTxt.alignment = TextAlignmentOptions.Center;
+            distTxt.color = new Color(0.92f, 0.92f, 0.92f, 0.9f);
             distTxt.text = name;
 
             _poiList.Add(new POIInfo
@@ -339,7 +397,8 @@ namespace Willowstead.UI
                 iconColor = iconColor,
                 uiGo = poiGo,
                 rectTransform = rt,
-                distanceText = distTxt
+                distanceText = distTxt,
+                iconImage = iconImg
             });
         }
 
@@ -359,14 +418,12 @@ namespace Willowstead.UI
         {
             if (PlayerController.Instance == null) return;
 
-            // Convert facing angle to bearing where North (+Y) = 0°, East (+X) = 90°, South (-Y) = 180°, West (-X) = 270°
             float angle = PlayerController.Instance.FacingAngle; // 0=East, 90=North, 180=West, 270=South
             float bearing = 90f - angle;
             if (bearing < 0f) bearing += 360f;
 
-            _currentBearing = Mathf.LerpAngle(_currentBearing, bearing, Time.deltaTime * 12f);
+            _currentBearing = Mathf.LerpAngle(_currentBearing, bearing, Time.deltaTime * 14f);
 
-            // Update direction labels on horizontal ticker
             foreach (var marker in _directionMarkers)
             {
                 float deltaAngle = Mathf.DeltaAngle(_currentBearing, marker.bearing);
@@ -374,14 +431,27 @@ namespace Willowstead.UI
 
                 marker.rectTransform.anchoredPosition = new Vector2(xPos, 0f);
 
-                // Fade out edges
-                float alpha = Mathf.Clamp01(1f - (Mathf.Abs(xPos) / (TickerWidth * 0.48f)));
-                Color col = marker.textElement.color;
-                col.a = alpha;
+                float edgeFactor = Mathf.Clamp01(1f - (Mathf.Abs(xPos) / (TickerWidth * 0.48f)));
+                float alpha = Mathf.SmoothStep(0f, 1f, edgeFactor);
+                Color col = marker.baseColor;
+                col.a = alpha * marker.baseColor.a;
                 marker.textElement.color = col;
             }
 
-            // Update degree text readout
+            foreach (var tick in _tickMarkers)
+            {
+                float deltaAngle = Mathf.DeltaAngle(_currentBearing, tick.bearing);
+                float xPos = deltaAngle * PixelsPerDegree;
+
+                tick.rectTransform.anchoredPosition = new Vector2(xPos, 0f);
+
+                float edgeFactor = Mathf.Clamp01(1f - (Mathf.Abs(xPos) / (TickerWidth * 0.48f)));
+                float alpha = Mathf.SmoothStep(0f, 1f, edgeFactor);
+                Color col = tick.image.color;
+                col.a = alpha * (tick.isMedium ? 0.7f : 0.4f);
+                tick.image.color = col;
+            }
+
             if (_headingDegreeText != null)
             {
                 int deg = Mathf.RoundToInt(_currentBearing);
@@ -415,24 +485,23 @@ namespace Willowstead.UI
                 diff.z = 0f;
                 float dist = diff.magnitude;
 
-                // Calculate bearing from player to POI
-                float poiAngleRad = Mathf.Atan2(diff.x, diff.y); // North = 0
+                float poiAngleRad = Mathf.Atan2(diff.x, diff.y);
                 float poiBearing = poiAngleRad * Mathf.Rad2Deg;
                 if (poiBearing < 0f) poiBearing += 360f;
 
                 float deltaAngle = Mathf.DeltaAngle(_currentBearing, poiBearing);
                 float xPos = deltaAngle * PixelsPerDegree;
 
-                poi.rectTransform.anchoredPosition = new Vector2(xPos, 4f);
+                poi.rectTransform.anchoredPosition = new Vector2(xPos, 2f);
 
-                // Fade out edges
-                float alpha = Mathf.Clamp01(1f - (Mathf.Abs(xPos) / (TickerWidth * 0.48f)));
-                Image iconImg = poi.uiGo.GetComponent<Image>();
-                if (iconImg != null)
+                float edgeFactor = Mathf.Clamp01(1f - (Mathf.Abs(xPos) / (TickerWidth * 0.48f)));
+                float alpha = Mathf.SmoothStep(0f, 1f, edgeFactor);
+
+                if (poi.iconImage != null)
                 {
                     Color c = poi.iconColor;
                     c.a = alpha;
-                    iconImg.color = c;
+                    poi.iconImage.color = c;
                 }
 
                 if (poi.distanceText != null)

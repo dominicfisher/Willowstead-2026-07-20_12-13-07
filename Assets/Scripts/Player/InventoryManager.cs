@@ -35,11 +35,14 @@ namespace Willowstead.Player
             public int quantity;
         }
 
+        [Header("Item Database (Global Icon Registry)")]
+        [Tooltip("Optional: Assign your ItemDatabase asset here, or leave empty to automatically load from Resources/ItemDatabase.")]
+        [SerializeField] private Willowstead.Inventory.ItemDatabase _itemDatabase;
+
         [Header("Starting Items")]
         [Tooltip("Configure additional starting items. Hoe, Watering Can, and Axe are force-equipped in hotbar slots 0, 1, and 2 automatically.")]
         [SerializeField] private List<StartingItem> _startingItems = new List<StartingItem>
         {
-            // Axe is also force-equipped via slots[2] below, so AddItem's
             // "prefer main inventory" path can't accidentally bury it.
             new StartingItem { itemName = "Carrot Seeds", quantity = 10 },
             new StartingItem { itemName = "Gold", quantity = 100 }
@@ -59,27 +62,26 @@ namespace Willowstead.Player
                 Instance = this;
             }
 
-            // Initialize slot array
+            if (_itemDatabase != null)
+            {
+                Willowstead.Inventory.ItemDatabase.Instance = _itemDatabase;
+            }
+
             for (int i = 0; i < slots.Length; i++)
             {
                 slots[i] = new InventorySlot();
             }
 
-            // 1. Force equip tools in first slots
             slots[0].itemName = "Hoe";
             slots[0].quantity = 1;
 
             slots[1].itemName = "Watering Can";
             slots[1].quantity = 1;
 
-            // Force Axe into hotbar slot 2 unconditionally — sidesteps both
-            // AddItem's "prefer main inventory" preference and any scene-side
-            // _startingItems serialization override that could otherwise keep
             // the woodcutting tool out of the player's 1-8 quick-swap.
             slots[2].itemName = "Axe";
             slots[2].quantity = 1;
 
-            // 2. Distribute additional starting items configuration
             foreach (var item in _startingItems)
             {
                 if (string.IsNullOrEmpty(item.itemName)) continue;
@@ -90,10 +92,8 @@ namespace Willowstead.Player
                 }
                 else
                 {
-                    // Skip tools if already assigned
                     if (item.itemName == "Hoe" || item.itemName == "Watering Can") continue;
 
-                    // Place starting items in remaining slots
                     AddItem(item.itemName, item.quantity);
                 }
             }
@@ -184,23 +184,20 @@ namespace Willowstead.Player
 
             int remaining = amount;
 
-            // Step 1: Try to stack in existing slots of the same item type
             for (int i = 0; i < slots.Length; i++)
             {
                 if (!slots[i].IsEmpty && slots[i].itemName == itemName)
                 {
-                    // Unlimited stack limit for dev convenience, or 99
                     slots[i].quantity += remaining;
                     remaining = 0;
                     break;
                 }
             }
 
-            // Step 2: Try to find an empty slot (prefer main inventory 8-23 for testing/testing visuals)
             if (remaining > 0)
             {
-                // Check main inventory first (8-23)
-                for (int i = 8; i < slots.Length; i++)
+                // First try to place in empty Hotbar slots (0..7)
+                for (int i = 0; i < 8; i++)
                 {
                     if (slots[i].IsEmpty)
                     {
@@ -211,10 +208,10 @@ namespace Willowstead.Player
                     }
                 }
 
-                // Fallback to hotbar (0-7) if main inventory is full
+                // If hotbar is full, place in main Inventory slots (8..23)
                 if (remaining > 0)
                 {
-                    for (int i = 0; i < 8; i++)
+                    for (int i = 8; i < slots.Length; i++)
                     {
                         if (slots[i].IsEmpty)
                         {
@@ -271,7 +268,6 @@ namespace Willowstead.Player
 
             int remaining = amount;
 
-            // Remove from slots containing the item, starting from hotbar to main inventory
             for (int i = 0; i < slots.Length; i++)
             {
                 if (!slots[i].IsEmpty && slots[i].itemName == itemName)
@@ -312,7 +308,6 @@ namespace Willowstead.Player
         /// <summary>
         /// Returns the total quantity of an item across all slots (or gold balance).
         /// </summary>
-        // ─── Save / load hooks ─────────────────────────────────────────
         /// <summary>Read every slot out for serialization.</summary>
         public List<Willowstead.Persistence.SavedInventorySlot> CaptureInventory()
         {
@@ -362,7 +357,6 @@ namespace Willowstead.Player
                 slots[i].quantity = 0;
             }
 
-            // Restore gold as an AddItem delta against the current count,
             // because gold lives as a regular stack like any other item.
             int currentGold = GetItemCount("Gold");
             int delta = gold - currentGold;

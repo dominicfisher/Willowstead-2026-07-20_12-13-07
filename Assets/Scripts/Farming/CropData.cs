@@ -60,7 +60,6 @@ namespace Willowstead.Farming
         [Tooltip("Whether to randomly flip crop sprites horizontally.")]
         [SerializeField] private bool _allowHorizontalFlip = true;
 
-        // Public getters
         public string CropName => _cropName;
         public int DaysPerStage => _daysPerStage;
         public Sprite[] GrowthStageSprites => _growthStageSprites;

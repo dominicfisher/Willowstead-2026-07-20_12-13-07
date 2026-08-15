@@ -154,7 +154,6 @@ namespace Willowstead.World
                 }
                 else
                 {
-                    // Linear fade-out so the burst doesn't pop off suddenly.
                     float lifeRatio = Mathf.Clamp01(s.timer / _splashLifetime);
                     Color c = _splashTint;
                     c.a = _splashTint.a * lifeRatio;
@@ -167,13 +166,11 @@ namespace Willowstead.World
         {
             SpawnSplashAt(worldPos);
 
-            // Throttled soil-wetness nudge so a storm doesn't hit WorldToCell
             // hundreds of times per second.
             _wateringTimer -= Time.deltaTime;
             if (_wateringTimer > 0f) return;
             _wateringTimer = _wateringThrottleSeconds;
 
-            // Broadcast the throttled event for downstream subscribers (e.g.
             // ambient mud audio, wet-footstep tint, custom crop logic).
             OnSoilWet?.Invoke(worldPos);
 
@@ -187,7 +184,6 @@ namespace Willowstead.World
 
         private void SpawnSplashAt(Vector3 worldPos)
         {
-            // Convert world -> camera-local (parent is camera).
             Vector3 local = _mainCamera.transform.InverseTransformPoint(worldPos);
 
             Splash s = _splashPool[_nextPoolIndex];

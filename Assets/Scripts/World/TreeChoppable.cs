@@ -129,7 +129,6 @@ namespace Willowstead.World
             {
                 t += Time.deltaTime;
                 float phase = t * _shakeFrequency * 2f * Mathf.PI;
-                // Sin gives a smooth back-and-forth; envelope fades the tail so it
                 // settles naturally instead of chopping the rotation back at the last frame.
                 float envelope = 1f - (t / _shakeDuration);
                 float angle = Mathf.Sin(phase) * _shakeAngle * envelope;
@@ -168,7 +167,6 @@ namespace Willowstead.World
             var occluder = GetComponent<TreeOccluder>();
             if (occluder != null) occluder.enabled = false;
 
-            // Hide the sprite and destroy. No retained tree because cutting a tree
             // ought to commit the change visually; the persistence layer keeps it gone
             // across reloads.
             if (_sr != null) _sr.enabled = false;
@@ -208,7 +206,6 @@ namespace Willowstead.World
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = new Color(1f, 0.6f, 0.2f, 0.7f);
-            // Show the world-grid tile this tree is anchored to, in tile units.
             Gizmos.DrawWireCube(new Vector3(_tileGridCoord.x + 0.5f, _tileGridCoord.y + 0.5f, 0f), Vector3.one);
         }
 #endif

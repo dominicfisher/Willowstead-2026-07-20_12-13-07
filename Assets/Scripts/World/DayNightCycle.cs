@@ -85,7 +85,6 @@ namespace Willowstead.World
         [Tooltip("Maximum alpha the lightning-flash can reach (0..1). Use lower values for softer, more distant flashes.")]
         [Range(0f, 1f)] [SerializeField] private float _lightningMaxAlpha = 0.85f;
 
-        // ─── Runtime state ───────────────────────────────────────────────────
         private float _time01;
         private SpriteRenderer _overlay;          // world-space tint quad
         private Text _clockText;                  // UI clock (still on HUDCanvas or Canvas fallback)
@@ -104,7 +103,6 @@ namespace Willowstead.World
         public float SecondsPerDay { get => _dayLengthSeconds; set => _dayLengthSeconds = Mathf.Max(1f, value); }
         public float TimeScale { get => _timeScale; set => _timeScale = Mathf.Max(0f, value); }
 
-        // ─── Unity lifecycle ─────────────────────────────────────────────────
 
         private void Start()
         {
@@ -120,7 +118,6 @@ namespace Willowstead.World
             float prev = _time01;
             _time01 = Mathf.Repeat(_time01 + (Time.deltaTime * _timeScale) / _dayLengthSeconds, 1f);
 
-            // Detect noon crossing
             if (_halfDayGrowthAtNoon && GridManager.Instance != null)
             {
                 if (prev < 0.5f && _time01 >= 0.5f)
@@ -129,7 +126,6 @@ namespace Willowstead.World
                 }
             }
 
-            // Detect wrap-around from ~1 back to ~0 (midnight)
             if (_time01 < prev && _advanceGridDayOnMidnight && GridManager.Instance != null)
             {
                 GridManager.Instance.AdvanceDay();
@@ -160,7 +156,6 @@ namespace Willowstead.World
             _tintCamera = null;
         }
 
-        // ─── Tint follow logic ──────────────────────────────────────────────
 
         private void EnsureTintFollowCamera()
         {
@@ -193,13 +188,8 @@ namespace Willowstead.World
         private static void StretchToCameraFrustum(Transform t, Camera cam)
         {
             // IMPORTANT: this assumes the tint sprite has pixelsPerUnit = 1 (see
-            // GetOrCreateWhiteSquareSprite). With that convention, 1 localScale
-            // unit == 1 world unit, so the (w, h, 1) below directly produces a
-            // quad of that many world units. If you ever change the sprite's
-            // pixelsPerUnit, multiply these localScale values by
             // sprite.pixelsPerUnit to keep the same world coverage.
 
-            // Push just past the near plane so the quad is unambiguously inside the
             // frustum. The Default-layer sortingOrder of -32767 further guarantees
             // we draw before any world sprite regardless of Z.
             float z = cam.nearClipPlane + 0.01f;
@@ -222,7 +212,6 @@ namespace Willowstead.World
             t.localRotation = Quaternion.identity;
         }
 
-        // ─── Visuals update (color over time) ────────────────────────────────
 
         private void UpdateVisuals()
         {
@@ -235,7 +224,6 @@ namespace Willowstead.World
 
             if (_showClock && _clockText != null)
             {
-                // Map 0..1 to 24h clock (0 = 00:00, 0.5 = 12:00)
                 float totalMinutes = _time01 * 24f * 60f;
                 int hh = Mathf.FloorToInt(totalMinutes / 60f) % 24;
                 int mm = Mathf.FloorToInt(totalMinutes % 60f);
@@ -243,7 +231,6 @@ namespace Willowstead.World
             }
         }
 
-        // ─── Public API ──────────────────────────────────────────────────────
 
         public void SetTime01(float t)
         {
@@ -276,8 +263,6 @@ namespace Willowstead.World
 
         private System.Collections.IEnumerator FlashLightningRoutine(Color baseTint, float totalDuration)
         {
-            // Phase 1: ramp up to lightning color. Use the inspector's
-            // _lightningRampSeconds (capped to totalDuration/2) so a 0.05s flash
             // doesn't spend longer flashing than fading.
             float ramp = Mathf.Min(_lightningRampSeconds, totalDuration * 0.5f);
             Color target = _lightningColor;
@@ -294,8 +279,6 @@ namespace Willowstead.World
                 yield return null;
             }
 
-            // Phase 2: fade back to baseTint. Use the longer of the
-            // inspector-configured fade and the remaining duration budget so
             // we always finish within the requested total.
             float fade = Mathf.Max(_lightningFadeSeconds, totalDuration - ramp);
             float fadeStartAlpha = _overlay.color.a;
@@ -334,11 +317,9 @@ namespace Willowstead.World
             UpdateVisuals();
         }
 
-        // ─── Overlay construction ───────────────────────────────────────────
 
         private void EnsureOverlay()
         {
-            // Ensure an HUD-like canvas exists for the (optional) clock UI. The tint
             // itself does not live on any canvas.
             Player.UIResourceHelper.GetOrCreateHUDCanvas("HUDCanvas", "Canvas", "UIRoot");
 
@@ -351,7 +332,6 @@ namespace Willowstead.World
                 return;
             }
 
-            // Build the world-space quad.
             GameObject tintGo = new GameObject("WorldTintQuad");
             _overlay = tintGo.AddComponent<SpriteRenderer>();
             _overlay.sprite                = GetOrCreateWhiteSquareSprite();
@@ -391,10 +371,8 @@ namespace Willowstead.World
             }
         }
 
-        // ─── Shared 1x1 white-square sprite (lazy, single instance) ────────
         //
         // IMPORTANT: pixelsPerUnit = 1 so 1 localScale unit maps to 1 world unit.
-        // The default Sprite.Create overload uses pixelsPerUnit = 100, which
         // would shrink a 2x2 sprite to 0.02 world units — the quad would barely
         // cover a single tile and the tint would render as "a little square on
         // the character" right at the camera origin. Using a 1x1 texture with

@@ -16,8 +16,12 @@ namespace Willowstead.Player
             {
                 if (_instance == null)
                 {
-                    GameObject go = new GameObject("[ItemNotificationManager]");
-                    _instance = go.AddComponent<ItemNotificationManager>();
+                    _instance = FindAnyObjectByType<ItemNotificationManager>();
+                    if (_instance == null)
+                    {
+                        GameObject go = new GameObject("[ItemNotificationManager]");
+                        _instance = go.AddComponent<ItemNotificationManager>();
+                    }
                 }
                 return _instance;
             }
@@ -56,22 +60,19 @@ namespace Willowstead.Player
             if (_instance == null || _instance == this)
             {
                 _instance = this;
-                DontDestroyOnLoad(gameObject);
                 CreateContainer();
             }
             else
             {
-                Destroy(gameObject);
+                Destroy(this);
             }
         }
 
         private void CreateContainer()
         {
-            // Find or create HUDCanvas (with normalised CanvasScaler + GraphicRaycaster)
             Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
             _canvasGo = canvas != null ? canvas.gameObject : null;
 
-            // Create notification stacking group
             _containerGo = new GameObject("NotificationContainer");
             _containerGo.transform.SetParent(_canvasGo.transform, false);
 
@@ -80,11 +81,9 @@ namespace Willowstead.Player
             _containerRect.anchorMax = new Vector2(1f, 0f);
             _containerRect.pivot = new Vector2(1f, 0f);
             
-            // Offset to sit comfortably in the bottom right, just above the Hotbar slot area
             _containerRect.anchoredPosition = new Vector2(-15f, 110f); 
             _containerRect.sizeDelta = new Vector2(200f, 300f);
 
-            // Vertical Layout Group for automatic stacking and shifting
             VerticalLayoutGroup layout = _containerGo.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 8f;
             layout.childControlHeight = false;
@@ -108,7 +107,7 @@ namespace Willowstead.Player
             rowGo.transform.SetParent(_containerRect, false);
 
             RectTransform rect = rowGo.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(180f, 34f);
+            rect.sizeDelta = new Vector2(210f, 38f);
 
             NotificationItem rowItem = rowGo.AddComponent<NotificationItem>();
             rowItem.Initialize(icon, textContent, col);
@@ -124,34 +123,28 @@ namespace Willowstead.Player
             Sprite icon = null;
             Color iconColor = Color.white;
 
-            // Map item name to correct sprite
-            if (itemName == "Carrot Seeds")
-            {
-                icon = _seedIcon;
-            }
-            else if (itemName == "Carrot")
-            {
-                icon = _carrotIcon;
-            }
-            else if (itemName == "Gold")
+            // Check inspector overrides first, then global ItemDatabase / UIResourceHelper
+            if (itemName == "Carrot Seeds" && _seedIcon != null) icon = _seedIcon;
+            else if (itemName == "Carrot" && _carrotIcon != null) icon = _carrotIcon;
+            else if (itemName == "Gold" && _coinIcon != null)
             {
                 icon = _coinIcon;
-                iconColor = new Color(1.0f, 0.82f, 0.0f, 1f); // Gold coin tint
+                iconColor = new Color(1.0f, 0.82f, 0.0f, 1f);
             }
-            else if (itemName == "Log")
+            else if (itemName == "Log" && _logIcon != null) icon = _logIcon;
+            else
             {
-                icon = _logIcon;
+                icon = UIResourceHelper.GetItemIconSprite(itemName);
+                if (itemName == "Gold") iconColor = new Color(1.0f, 0.82f, 0.0f, 1f);
             }
 
-            // Default fallback if icon sprite is not loaded/assigned
             if (icon == null) icon = UIResourceHelper.GetInputFieldBackgroundSprite();
 
-            // Create row container
             GameObject rowGo = new GameObject("NotificationRow");
             rowGo.transform.SetParent(_containerRect, false);
 
             RectTransform rect = rowGo.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(180f, 34f);
+            rect.sizeDelta = new Vector2(210f, 38f);
 
             NotificationItem rowItem = rowGo.AddComponent<NotificationItem>();
             string sign = amount > 0 ? "+" : "";

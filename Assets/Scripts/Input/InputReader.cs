@@ -11,7 +11,6 @@ namespace Willowstead.Input
     [CreateAssetMenu(fileName = "InputReader", menuName = "Willowstead/Input/InputReader")]
     public class InputReader : ScriptableObject, InputSystem_Actions.IPlayerActions
     {
-        // Gameplay Events
         public event Action<Vector2> MoveEvent = delegate { };
         public event Action InteractEvent = delegate { };
         public event Action InteractCanceledEvent = delegate { };
@@ -83,7 +82,6 @@ namespace Willowstead.Input
 
         public void OnLook(InputAction.CallbackContext context)
         {
-            // Not used in this 2D prototype, but required by the interface
         }
 
         public void OnAttack(InputAction.CallbackContext context)
@@ -124,12 +122,10 @@ namespace Willowstead.Input
 
         public void OnCrouch(InputAction.CallbackContext context)
         {
-            // Not used in this prototype, but required by the interface
         }
 
         public void OnJump(InputAction.CallbackContext context)
         {
-            // Not used in this prototype, but required by the interface
         }
 
         public void OnPrevious(InputAction.CallbackContext context)

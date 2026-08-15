@@ -163,7 +163,6 @@ namespace Willowstead.Player
             Transform existing = _canvasGo.transform.Find("InventoryPanel");
             if (existing != null) DestroyImmediate(existing.gameObject);
 
-            // Main Panel Parent
             _panelGo = new GameObject("InventoryPanel");
             _panelGo.transform.SetParent(_canvasGo.transform, false);
 
@@ -188,7 +187,6 @@ namespace Willowstead.Player
 
             Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            // Header Title
             GameObject titleGo = new GameObject("InventoryTitle");
             titleGo.transform.SetParent(_panelGo.transform, false);
             Text titleText = titleGo.AddComponent<Text>();
@@ -206,7 +204,6 @@ namespace Willowstead.Player
             titleRect.anchoredPosition = new Vector2(0f, -14f);
             titleRect.sizeDelta = new Vector2(200f, 30f);
 
-            // Gold Text Display
             GameObject goldGo = new GameObject("InventoryGoldText");
             goldGo.transform.SetParent(_panelGo.transform, false);
             _goldText = goldGo.AddComponent<Text>();
@@ -224,7 +221,6 @@ namespace Willowstead.Player
             goldRect.anchoredPosition = new Vector2(-18f, -14f);
             goldRect.sizeDelta = new Vector2(150f, 30f);
 
-            // Slots Grid Container
             GameObject gridGo = new GameObject("SlotsContainer");
             gridGo.transform.SetParent(_panelGo.transform, false);
             RectTransform gridRect = gridGo.AddComponent<RectTransform>();
@@ -259,7 +255,6 @@ namespace Willowstead.Player
                     slotBg.type = Image.Type.Sliced;
                     slotBg.color = new Color(0.20f, 0.17f, 0.14f, 1.0f);
 
-                    // Slot Icon Image
                     GameObject iconGo = new GameObject("SlotIconImage");
                     iconGo.transform.SetParent(slotGo.transform, false);
                     RectTransform iconRect = iconGo.AddComponent<RectTransform>();
@@ -272,7 +267,6 @@ namespace Willowstead.Player
                     iconImg.raycastTarget = false;
                     _slotIcons[slotIdx] = iconImg;
 
-                    // Slot Count Text
                     GameObject countGo = new GameObject("SlotCountText");
                     countGo.transform.SetParent(slotGo.transform, false);
                     RectTransform countRect = countGo.AddComponent<RectTransform>();
@@ -292,7 +286,6 @@ namespace Willowstead.Player
                     countGo.AddComponent<Outline>().effectColor = Color.black;
                     _slotCountTexts[slotIdx] = countText;
 
-                    // Attach UIDragSlot for slot indices 8..23
                     UIDragSlot dragSlot = slotGo.AddComponent<UIDragSlot>();
                     dragSlot.slotIndex = 8 + slotIdx;
 
@@ -300,7 +293,6 @@ namespace Willowstead.Player
                 }
             }
 
-            // Footer instructions
             GameObject footerGo = new GameObject("InventoryFooterText");
             footerGo.transform.SetParent(_panelGo.transform, false);
             Text footerText = footerGo.AddComponent<Text>();
@@ -333,7 +325,6 @@ namespace Willowstead.Player
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                // Overshoot cubic curve
                 float scaleT = Mathf.Sin(t * Mathf.PI * 0.75f) * 1.08f;
                 target.localScale = Vector3.LerpUnclamped(startScale, targetScale, scaleT);
                 yield return null;
@@ -344,6 +335,9 @@ namespace Willowstead.Player
 
         private Sprite GetIconForItem(string itemName)
         {
+            Sprite dbSprite = UIResourceHelper.GetItemIconSprite(itemName);
+            if (dbSprite != null) return dbSprite;
+
             if (itemName == "Hoe" && _hoeIcon != null) return _hoeIcon;
             if (itemName == "Watering Can" && _wateringCanIcon != null) return _wateringCanIcon;
             if (itemName == "Axe" && _axeIcon != null) return _axeIcon;
@@ -351,7 +345,7 @@ namespace Willowstead.Player
             if (itemName == "Carrot" && _carrotIcon != null) return _carrotIcon;
             if ((itemName == "Wood" || itemName == "Log") && _logIcon != null) return _logIcon;
 
-            return UIResourceHelper.GetItemIconSprite(itemName);
+            return null;
         }
     }
 }

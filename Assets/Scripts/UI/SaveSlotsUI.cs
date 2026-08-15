@@ -81,7 +81,6 @@ namespace Willowstead.UI
             InputReader.BlockGameplayInput = false;
         }
 
-        // ─── Panel construction ────────────────────────────────────────
 
         private void BuildPanel(Canvas canvas)
         {
@@ -97,7 +96,6 @@ namespace Willowstead.UI
             bg.color = new Color(0.09f, 0.07f, 0.05f, 0.97f);
             bg.raycastTarget = true;
 
-            // Header
             GameObject headerGo = new GameObject("Header", typeof(RectTransform));
             headerGo.transform.SetParent(_panelGo.transform, false);
             RectTransform headerRt = (RectTransform)headerGo.transform;
@@ -114,7 +112,6 @@ namespace Willowstead.UI
             _headerLabel.alignment = TextAlignmentOptions.Center;
             _headerLabel.richText = false;
 
-            // Card container
             GameObject cardBg = new GameObject("CardContainer", typeof(RectTransform));
             cardBg.transform.SetParent(_panelGo.transform, false);
             RectTransform cardBgRt = (RectTransform)cardBg.transform;
@@ -125,7 +122,6 @@ namespace Willowstead.UI
             cardBgRt.offsetMax = new Vector2(-24f, -84f);
             _cardContainer = cardBg;
 
-            // Back button
             BuildBackButton(_panelGo.transform);
         }
 
@@ -165,13 +161,11 @@ namespace Willowstead.UI
             lbl.richText = false;
         }
 
-        // ─── Refresh ───────────────────────────────────────────────────
 
         private void Refresh()
         {
             if (_cardContainer == null || SaveGameManager.Instance == null) return;
 
-            // Wipe existing cards.
             foreach (var c in _cards) { if (c != null) Destroy(c); }
             _cards.Clear();
 
@@ -207,7 +201,6 @@ namespace Willowstead.UI
             Image bg = card.GetComponent<Image>();
             bg.color = new Color(0.18f, 0.14f, 0.10f, 1f);
 
-            // Title slot-name + exists/empty bar
             string titleText = summary.slotIndex < 0
                 ? "Autosave"
                 : $"Slot {summary.slotIndex}";
@@ -218,7 +211,6 @@ namespace Willowstead.UI
                 color: new Color(0.95f, 0.85f, 0.55f, 1f), fontSize: 22, style: FontStyles.Bold,
                 alignment: TextAlignmentOptions.MidlineLeft);
 
-            // Details (seed / playtime / date)
             string details = summary.exists
                 ? BuildSummaryLine(summary)
                 : "<i>(empty slot)</i>";
@@ -319,7 +311,6 @@ namespace Willowstead.UI
             lbl.richText = false;
         }
 
-        // ─── Actions ───────────────────────────────────────────────────
 
         private void OnPrimaryClicked(SaveSlotSummary summary)
         {
@@ -330,13 +321,13 @@ namespace Willowstead.UI
                 SaveGameManager.Instance.LoadFromPath(summary.fullPath);
                 if (MainMenuUI.Instance != null) MainMenuUI.Instance.Hide();
                 Hide();
+                MainMenuUI.StartGameSession();
             }
             else
             {
                 bool success = false;
                 if (summary.slotIndex < 0)
                 {
-                    // Autosave slot
                     success = SaveGameManager.Instance.SaveToAutosave();
                 }
                 else

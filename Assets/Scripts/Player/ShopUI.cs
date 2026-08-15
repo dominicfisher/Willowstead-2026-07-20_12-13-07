@@ -161,8 +161,8 @@ namespace Willowstead.Player
                 },
                 new ShopEntry
                 {
-                    seedItemName = "",
-                    seedSprite = null,
+                    seedItemName = "Wood",
+                    seedSprite = UIResourceHelper.GetItemIconSprite("Wood"),
                     seedBuyPrice = 0,
                     yieldItemName = "Wood",
                     yieldSprite = UIResourceHelper.GetItemIconSprite("Wood"),
@@ -670,69 +670,82 @@ namespace Willowstead.Player
         }
 
 
-        //  UI construction 
+        //      UI construction                                         
 
         private void CreateShopUI()
         {
-            // ── Canvas + EventSystem (shared helper handles scaler + raycaster + input module) ──
+            // ── Canvas + EventSystem ──
             Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
             _canvasGo = canvas != null ? canvas.gameObject : null;
             UIResourceHelper.EnsureEventSystem();
 
-	            Sprite bgSprite = _shopPanelFrameSprite != null ? _shopPanelFrameSprite : UIResourceHelper.GetBackgroundSprite();
-	            Font   font     = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Sprite bgSprite = _shopPanelFrameSprite != null ? _shopPanelFrameSprite : UIResourceHelper.GetBackgroundSprite();
+            Font   font     = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             int    entries  = _shopEntries != null ? _shopEntries.Length : 0;
             float  panelH   = HEADER_H + entries * ROW_HEIGHT + FOOTER_H;
             float  halfH    = panelH * 0.5f;
 
-            // ── Permanent gold HUD (always visible, even when shop is closed) ─
+            // ── Permanent gold HUD ─
             CreateGoldHud(bgSprite, font);
 
-            // ── Panel ─────────────────────────────────────────────────────────
+            // ── Main Wooden Panel ──────────────────────────────────────────────
             _panelGo = new GameObject("ShopPanel");
             _panelGo.transform.SetParent(_canvasGo.transform, false);
-            RectTransform panelRect   = _panelGo.AddComponent<RectTransform>();
-            panelRect.sizeDelta       = new Vector2(PANEL_WIDTH, panelH);
+            RectTransform panelRect = _panelGo.AddComponent<RectTransform>();
+            panelRect.sizeDelta     = new Vector2(PANEL_WIDTH, panelH);
             panelRect.anchoredPosition = Vector2.zero;
 
-            // Panel background
-            Image bg = CreateGO<Image>("Background", _panelGo.transform);
-	            bg.sprite = bgSprite;
-	            bg.type   = (bgSprite != null && bgSprite.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
-	            bg.color  = bg.type == Image.Type.Sliced ? Color.white : new Color(0.14f, 0.12f, 0.10f, 0.96f);
-            Rect(bg, 0f, 0f, PANEL_WIDTH, panelH);
+            // Wooden Board Outer Frame
+            Image bgFrame = CreateGO<Image>("OuterFrame", _panelGo.transform);
+            bgFrame.sprite = UIResourceHelper.GetBackgroundSprite();
+            bgFrame.type   = Image.Type.Sliced;
+            bgFrame.color  = new Color(0.18f, 0.13f, 0.09f, 0.98f); // Rich warm dark wood
+            Rect(bgFrame, 0f, 0f, PANEL_WIDTH, panelH);
 
-            // ── Header ────────────────────────────────────────────────────────
-            Text title = CreateGO<Text>("ShopTitle", _panelGo.transform);
-            title.text      = "Meadow Shop";
+            // Inner Board Panel
+            Image bgInner = CreateGO<Image>("InnerBoard", _panelGo.transform);
+            bgInner.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            bgInner.type   = Image.Type.Sliced;
+            bgInner.color  = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+            Rect(bgInner, 0f, 0f, PANEL_WIDTH - 16f, panelH - 16f);
+
+            // ── Title Sign Banner ──────────────────────────────────────────────
+            Image titleBanner = CreateGO<Image>("TitleBanner", _panelGo.transform);
+            titleBanner.sprite = _buttonSprite != null ? _buttonSprite : bgSprite;
+            titleBanner.type   = Image.Type.Sliced;
+            titleBanner.color  = new Color(0.32f, 0.22f, 0.14f, 1f);
+            Rect(titleBanner, 0f, halfH - 36f, 260f, 42f);
+
+            Text title = CreateGO<Text>("ShopTitle", titleBanner.transform);
+            title.text      = "MEADOW SHOP";
             title.font      = font;
-            title.fontSize  = 26;
+            title.fontSize  = 22;
             title.fontStyle = FontStyle.Bold;
-            title.color     = new Color(1f, 0.84f, 0f, 1f);
+            title.color     = new Color(1f, 0.88f, 0.45f, 1f); // Warm gold text
             title.alignment = TextAnchor.MiddleCenter;
-            Rect(title, 0f, halfH - 38f, 300f, 44f);   // top of panel
+            Rect(title, 0f, 0f, 260f, 42f);
 
-            // ── Tab buttons ───────────────────────────────────────────────────
-	            RectTransform buyTabRect = CreateButton(
-	                "BuyTab", _panelGo.transform,
-	                "Buy Seeds", font,
-	                new Color(0.75f, 0.48f, 0.22f, 1f),
-	                -100f, halfH - 85f, 160f, 38f, _buttonSprite != null ? _buttonSprite : bgSprite);
+            // ── Tab Buttons ────────────────────────────────────────────────────
+            RectTransform buyTabRect = CreateButton(
+                "BuyTab", _panelGo.transform,
+                "BUY SEEDS", font,
+                new Color(0.48f, 0.32f, 0.18f, 1f),
+                -110f, halfH - 85f, 170f, 38f, _buttonSprite != null ? _buttonSprite : bgSprite);
             _buyTabImg = buyTabRect.GetComponent<Image>();
             buyTabRect.GetComponent<Button>().onClick.AddListener(() => SwitchTab(0));
 
-	            RectTransform sellTabRect = CreateButton(
-	                "SellTab", _panelGo.transform,
-	                "Sell Crops", font,
-	                new Color(0.35f, 0.58f, 0.32f, 1f),
-	                100f, halfH - 85f, 160f, 38f, _buttonSprite != null ? _buttonSprite : bgSprite);
+            RectTransform sellTabRect = CreateButton(
+                "SellTab", _panelGo.transform,
+                "SELL CROPS", font,
+                new Color(0.25f, 0.38f, 0.22f, 1f),
+                110f, halfH - 85f, 170f, 38f, _buttonSprite != null ? _buttonSprite : bgSprite);
             _sellTabImg = sellTabRect.GetComponent<Image>();
             sellTabRect.GetComponent<Button>().onClick.AddListener(() => SwitchTab(1));
 
-            // Divider — sits below the tab buttons
+            // Wooden Divider line
             Image divider = CreateGO<Image>("Divider", _panelGo.transform);
-            divider.color = new Color(1f, 1f, 1f, 0.10f);
-            Rect(divider, 0f, halfH - 118f, PANEL_WIDTH - 40f, 2f);
+            divider.color = new Color(0.40f, 0.30f, 0.20f, 0.8f);
+            Rect(divider, 0f, halfH - 116f, PANEL_WIDTH - 48f, 3f);
 
             // Content containers
             _buyContent = new GameObject("BuyContent");
@@ -743,7 +756,7 @@ namespace Willowstead.Player
             _sellContent.transform.SetParent(_panelGo.transform, false);
             _sellContent.AddComponent<RectTransform>();
 
-            // ── Rows (one per ShopEntry) ──────────────────────────────────────
+            // ── Item Rows ──────────────────────────────────────────────────────
             _buyButtonRects.Clear();
             _sellButtonRects.Clear();
             _sellCountLabels.Clear();
@@ -754,79 +767,97 @@ namespace Willowstead.Player
                 ShopEntry entry = _shopEntries[i];
                 float rowY = halfH - HEADER_H - i * ROW_HEIGHT - ROW_HEIGHT * 0.5f;
 
-                // ── Buy row ───────────────────────────────────────────────────
-                if (i % 2 == 0)
-                {
-                    Image rowBg = CreateGO<Image>($"BuyRowBg_{i}", _buyContent.transform);
-                    rowBg.color = new Color(1f, 1f, 1f, 0.04f);
-                    Rect(rowBg, 0f, rowY, PANEL_WIDTH - 30f, ROW_HEIGHT - 4f);
-                }
+                // ── Buy Row Card ──────────────────────────────────────────────
+                Image buyRowPlank = CreateGO<Image>($"BuyRowPlank_{i}", _buyContent.transform);
+                buyRowPlank.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+                buyRowPlank.type   = Image.Type.Sliced;
+                buyRowPlank.color  = new Color(0.18f, 0.14f, 0.10f, 0.92f);
+                Rect(buyRowPlank, 0f, rowY, PANEL_WIDTH - 48f, ROW_HEIGHT - 10f);
 
-                Image buyIcon = CreateGO<Image>($"BuyIcon_{i}", _buyContent.transform);
+                // Slot Box
+                Image buySlotBox = CreateGO<Image>($"BuySlotBox_{i}", _buyContent.transform);
+                buySlotBox.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+                buySlotBox.type   = Image.Type.Sliced;
+                buySlotBox.color  = new Color(0.08f, 0.06f, 0.04f, 1f);
+                Rect(buySlotBox, -PANEL_WIDTH * 0.5f + 65f, rowY, 48f, 48f);
+
+                Image buyIcon = CreateGO<Image>($"BuyIcon_{i}", buySlotBox.transform);
                 buyIcon.sprite = entry.seedSprite != null ? entry.seedSprite : entry.yieldSprite;
                 buyIcon.color  = buyIcon.sprite != null ? Color.white : new Color(0.6f, 0.5f, 0.3f, 0.6f);
                 buyIcon.preserveAspect = true;
-                Rect(buyIcon, -290f, rowY, 48f, 48f);
+                Rect(buyIcon, 0f, 0f, 34f, 34f);
 
                 Text buyNameLabel = CreateGO<Text>($"BuyName_{i}", _buyContent.transform);
-                buyNameLabel.text      = entry.seedItemName;
+                buyNameLabel.text      = !string.IsNullOrEmpty(entry.seedItemName) ? entry.seedItemName : entry.yieldItemName;
                 buyNameLabel.font      = font;
-                buyNameLabel.fontSize  = 16;
-                buyNameLabel.color     = Color.white;
+                buyNameLabel.fontSize  = 17;
+                buyNameLabel.fontStyle = FontStyle.Bold;
+                buyNameLabel.color     = new Color(0.98f, 0.94f, 0.85f, 1f);
                 buyNameLabel.alignment = TextAnchor.MiddleLeft;
-                Rect(buyNameLabel, -130f, rowY, 260f, ROW_HEIGHT);
+                buyNameLabel.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.8f);
+                Rect(buyNameLabel, -40f, rowY, 260f, ROW_HEIGHT - 10f);
 
-	                string buyBtnLabel = entry.seedBuyPrice <= 0 ? "Free" : $"{entry.seedBuyPrice}g";
-	                RectTransform buyRect = CreateButton(
-	                    $"BuyBtn_{i}", _buyContent.transform,
-	                    buyBtnLabel, font,
-	                    new Color(0.75f, 0.48f, 0.22f, 1f),
-	                    195f, rowY, 160f, 42f,
-	                    _buttonSprite != null ? _buttonSprite : bgSprite);
+                string buyBtnLabel = entry.seedBuyPrice <= 0 ? "Free" : $"{entry.seedBuyPrice}g";
+                RectTransform buyRect = CreateButton(
+                    $"BuyBtn_{i}", _buyContent.transform,
+                    buyBtnLabel, font,
+                    new Color(0.62f, 0.42f, 0.20f, 1f),
+                    PANEL_WIDTH * 0.5f - 110f, rowY, 130f, 42f,
+                    UIResourceHelper.GetBackgroundSprite());
                 _buyButtonRects.Add(buyRect);
 
                 int capturedI = i;
                 buyRect.GetComponent<Button>().onClick.AddListener(
                     () => BuySeed(_shopEntries[capturedI], _buyButtonRects[capturedI]));
 
-                // ── Sell row ──────────────────────────────────────────────────
-                if (i % 2 == 0)
-                {
-                    Image sellRowBg = CreateGO<Image>($"SellRowBg_{i}", _sellContent.transform);
-                    sellRowBg.color = new Color(1f, 1f, 1f, 0.04f);
-                    Rect(sellRowBg, 0f, rowY, PANEL_WIDTH - 30f, ROW_HEIGHT - 4f);
-                }
+                // ── Sell Row Card ─────────────────────────────────────────────
+                Image sellRowPlank = CreateGO<Image>($"SellRowPlank_{i}", _sellContent.transform);
+                sellRowPlank.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+                sellRowPlank.type   = Image.Type.Sliced;
+                sellRowPlank.color  = new Color(0.18f, 0.14f, 0.10f, 0.92f);
+                Rect(sellRowPlank, 0f, rowY, PANEL_WIDTH - 48f, ROW_HEIGHT - 10f);
 
-                Image sellIcon = CreateGO<Image>($"SellIcon_{i}", _sellContent.transform);
+                // Slot Box
+                Image sellSlotBox = CreateGO<Image>($"SellSlotBox_{i}", _sellContent.transform);
+                sellSlotBox.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+                sellSlotBox.type   = Image.Type.Sliced;
+                sellSlotBox.color  = new Color(0.08f, 0.06f, 0.04f, 1f);
+                Rect(sellSlotBox, -PANEL_WIDTH * 0.5f + 65f, rowY, 48f, 48f);
+
+                Image sellIcon = CreateGO<Image>($"SellIcon_{i}", sellSlotBox.transform);
                 sellIcon.sprite = entry.yieldSprite != null ? entry.yieldSprite : entry.seedSprite;
                 sellIcon.color  = sellIcon.sprite != null ? Color.white : new Color(0.6f, 0.5f, 0.3f, 0.6f);
                 sellIcon.preserveAspect = true;
-                Rect(sellIcon, -290f, rowY, 48f, 48f);
+                Rect(sellIcon, 0f, 0f, 34f, 34f);
 
                 Text sellNameLabel = CreateGO<Text>($"SellName_{i}", _sellContent.transform);
                 sellNameLabel.text      = entry.yieldItemName;
                 sellNameLabel.font      = font;
-                sellNameLabel.fontSize  = 16;
-                sellNameLabel.color     = Color.white;
+                sellNameLabel.fontSize  = 17;
+                sellNameLabel.fontStyle = FontStyle.Bold;
+                sellNameLabel.color     = new Color(0.98f, 0.94f, 0.85f, 1f);
                 sellNameLabel.alignment = TextAnchor.MiddleLeft;
-                Rect(sellNameLabel, -130f, rowY, 200f, ROW_HEIGHT);
+                sellNameLabel.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.8f);
+                Rect(sellNameLabel, -80f, rowY, 200f, ROW_HEIGHT - 10f);
 
                 int initCount = _inventory != null ? _inventory.GetItemCount(entry.yieldItemName) : 0;
                 Text ownedLabel = CreateGO<Text>($"OwnedCount_{i}", _sellContent.transform);
                 ownedLabel.text      = $"\u00d7{initCount}";
                 ownedLabel.font      = font;
-                ownedLabel.fontSize  = 14;
-                ownedLabel.color     = new Color(0.75f, 0.75f, 0.75f, 1f);
+                ownedLabel.fontSize  = 16;
+                ownedLabel.fontStyle = FontStyle.Bold;
+                ownedLabel.color     = new Color(0.85f, 0.85f, 0.85f, 1f);
                 ownedLabel.alignment = TextAnchor.MiddleRight;
-                Rect(ownedLabel, 50f, rowY, 80f, ROW_HEIGHT);
+                ownedLabel.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.8f);
+                Rect(ownedLabel, 60f, rowY, 80f, ROW_HEIGHT - 10f);
                 _ownedCountLabels.Add(ownedLabel);
 
-	                RectTransform sellRect = CreateButton(
-	                    $"SellBtn_{i}", _sellContent.transform,
-	                    $"+{entry.yieldSellPrice}g", font,
-	                    new Color(0.35f, 0.58f, 0.32f, 1f),
-	                    220f, rowY, 145f, 42f,
-	                    _buttonSprite != null ? _buttonSprite : bgSprite);
+                RectTransform sellRect = CreateButton(
+                    $"SellBtn_{i}", _sellContent.transform,
+                    $"+{entry.yieldSellPrice}g", font,
+                    new Color(0.28f, 0.48f, 0.24f, 1f),
+                    PANEL_WIDTH * 0.5f - 110f, rowY, 130f, 42f,
+                    UIResourceHelper.GetBackgroundSprite());
                 _sellButtonRects.Add(sellRect);
 
                 Text sellLabelText = sellRect.GetComponentInChildren<Text>();

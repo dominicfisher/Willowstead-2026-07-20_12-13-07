@@ -650,6 +650,15 @@ namespace Willowstead.World
             return noiseVal < _grassThreshold;
         }
 
+        public bool IsWaterAt(int worldX, int worldY)
+        {
+            if (_waterTilemap != null && _waterTilemap.HasTile(new Vector3Int(worldX, worldY, 0)))
+                return true;
+            if (_puddleCells != null && _puddleCells.Contains(new Vector2Int(worldX, worldY)))
+                return true;
+            return false;
+        }
+
 
 
 	        // ─── Puddles / Ponds ────────────────────────────────────────────────────

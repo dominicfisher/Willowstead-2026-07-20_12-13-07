@@ -158,12 +158,27 @@ namespace Willowstead.UI
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(620f, 360f);
+            rt.sizeDelta = new Vector2(620f, 380f);
             rt.anchoredPosition = Vector2.zero;
-            Image bg = _panelGo.GetComponent<Image>();
-            bg.color = new Color(0.12f, 0.10f, 0.08f, 0.94f);
-            bg.raycastTarget = true;
-            bg.sprite = UIResourceHelper.GetBackgroundSprite();
+
+            Image bgFrame = _panelGo.GetComponent<Image>();
+            bgFrame.sprite = UIResourceHelper.GetBackgroundSprite();
+            bgFrame.type = Image.Type.Sliced;
+            bgFrame.color = new Color(0.18f, 0.13f, 0.09f, 0.98f);
+            bgFrame.raycastTarget = true;
+
+            // Inner Card
+            GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
+            innerGo.transform.SetParent(_panelGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerGo.transform;
+            innerRt.anchorMin = Vector2.zero;
+            innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(10f, 10f);
+            innerRt.offsetMax = new Vector2(-10f, -10f);
+            Image innerBg = innerGo.GetComponent<Image>();
+            innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerBg.type = Image.Type.Sliced;
+            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
 
             // Title
             GameObject titleGo = new GameObject("Title", typeof(RectTransform));

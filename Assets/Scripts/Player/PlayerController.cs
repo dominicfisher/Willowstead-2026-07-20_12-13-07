@@ -29,6 +29,8 @@ namespace Willowstead.Player
             if (GetComponent<HotbarUI>() == null) gameObject.AddComponent<HotbarUI>();
             if (GetComponent<InventoryUI>() == null) gameObject.AddComponent<InventoryUI>();
             if (GetComponent<ShopUI>() == null) gameObject.AddComponent<ShopUI>();
+            if (GetComponent<UI.CompassUI>() == null) gameObject.AddComponent<UI.CompassUI>();
+            if (GetComponent<UI.FullMapUI>() == null) gameObject.AddComponent<UI.FullMapUI>();
             Debug.Log("[PlayerController] All player components attached to GameObject in Editor! Press Ctrl+S to save.");
         }
 #endif
@@ -131,6 +133,12 @@ namespace Willowstead.Player
             if (playerGo.GetComponent<ShopUI>() == null)
                 playerGo.AddComponent<ShopUI>();
 
+            if (playerGo.GetComponent<UI.CompassUI>() == null)
+                playerGo.AddComponent<UI.CompassUI>();
+
+            if (playerGo.GetComponent<UI.FullMapUI>() == null)
+                playerGo.AddComponent<UI.FullMapUI>();
+
             // ── Attach PlayerController last (its Awake sets _instance) ──────────
             PlayerController pc = playerGo.GetComponent<PlayerController>();
             if (pc == null) pc = playerGo.AddComponent<PlayerController>();
@@ -184,6 +192,25 @@ namespace Willowstead.Player
         private bool _isSprinting;
         private Vector2 _lastMoveDirection = Vector2.down; // Default to facing down
         private float _footstepTimer;
+
+        /// <summary>Vector of player's current input direction or last movement direction.</summary>
+        public Vector2 LastMoveDirection => _lastMoveDirection;
+        public Vector2 MoveInput => _moveInput;
+
+        /// <summary>
+        /// Angle in degrees where 0 = East (+X), 90 = North (+Y), 180 = West (-X), 270 = South (-Y).
+        /// </summary>
+        public float FacingAngle
+        {
+            get
+            {
+                Vector2 dir = _moveInput.sqrMagnitude > 0.01f ? _moveInput : _lastMoveDirection;
+                if (dir.sqrMagnitude < 0.001f) return 270f; // Default South
+                float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+                if (angle < 0) angle += 360f;
+                return angle;
+            }
+        }
 
         private void Awake()
         {

@@ -57,6 +57,8 @@ namespace Willowstead.UI
             go.AddComponent<PauseMenuUI>();
         }
 
+        private UnityEngine.UIElements.VisualElement _toolkitPauseRoot;
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -75,6 +77,26 @@ namespace Willowstead.UI
                 _rootGo.AddComponent<GraphicRaycaster>();
             }
 
+            // Bind UI Toolkit UIDocument if present
+            var uiDoc = GetComponent<UnityEngine.UIElements.UIDocument>();
+            if (uiDoc == null) uiDoc = FindAnyObjectByType<UnityEngine.UIElements.UIDocument>();
+            if (uiDoc != null && uiDoc.rootVisualElement != null)
+            {
+                _toolkitPauseRoot = UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.VisualElement>(uiDoc.rootVisualElement, "PauseRoot");
+                if (_toolkitPauseRoot != null)
+                {
+                    var resumeBtn = UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Button>(_toolkitPauseRoot, "ResumeBtn");
+                    var saveBtn = UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Button>(_toolkitPauseRoot, "SaveBtn");
+                    var optionsBtn = UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Button>(_toolkitPauseRoot, "OptionsBtn");
+                    var mainMenuBtn = UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Button>(_toolkitPauseRoot, "MainMenuBtn");
+
+                    if (resumeBtn != null) resumeBtn.clicked += Hide;
+                    if (saveBtn != null) saveBtn.clicked += SaveCurrentWorld;
+                    if (optionsBtn != null) optionsBtn.clicked += EnterOptionsPanel;
+                    if (mainMenuBtn != null) mainMenuBtn.clicked += ExitToMainMenu;
+                }
+            }
+
             _rootGo.SetActive(false);
         }
 
@@ -83,8 +105,6 @@ namespace Willowstead.UI
             if (Instance == this)
             {
                 Instance = null;
-                // Restore time + input if we're torn down mid-pause so a domain reload
-                // (or scene swap mid-pause) can't leave the world frozen.
                 Time.timeScale = _priorTimeScale <= 0f ? 1f : _priorTimeScale;
                 InputReader.BlockGameplayInput = false;
             }
@@ -92,13 +112,13 @@ namespace Willowstead.UI
 
         // ─── Public API ────────────────────────────────────────────────
 
-        public bool IsOpen => _rootGo != null && _rootGo.activeSelf;
+        public bool IsOpen => (_rootGo != null && _rootGo.activeSelf) || (_toolkitPauseRoot != null && _toolkitPauseRoot.style.display == UnityEngine.UIElements.DisplayStyle.Flex);
 
         public void Show()
         {
-            if (_rootGo == null) return;
             if (IsOpen) return;
-            _rootGo.SetActive(true);
+            if (_rootGo != null) _rootGo.SetActive(true);
+            if (_toolkitPauseRoot != null) _toolkitPauseRoot.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
 
             EnterMainPanel();
 
@@ -109,9 +129,10 @@ namespace Willowstead.UI
 
         public void Hide()
         {
-            if (_rootGo == null) return;
             if (!IsOpen) return;
-            _rootGo.SetActive(false);
+            if (_rootGo != null) _rootGo.SetActive(false);
+            if (_toolkitPauseRoot != null) _toolkitPauseRoot.style.display = UnityEngine.UIElements.DisplayStyle.None;
+
             Time.timeScale = _priorTimeScale <= 0f ? 1f : _priorTimeScale;
             InputReader.BlockGameplayInput = false;
             _panelBackstack.Clear();
@@ -240,7 +261,8 @@ namespace Willowstead.UI
 
         private static GameObject NewFullScreen(string name, Transform parent, Color tint)
         {
-            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            // Transparent container (no black background image blocking the view)
+            GameObject go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = Vector2.zero;
@@ -248,47 +270,68 @@ namespace Willowstead.UI
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
-            Image img = go.GetComponent<Image>();
-            img.color = tint;
-            img.raycastTarget = true;
-            img.sprite = UIResourceHelper.GetBackgroundSprite();
             return go;
         }
 
         private static GameObject NewCenteredPanel(Transform parent, string name, Vector2 size)
         {
-            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(parent, false);
-            RectTransform rt = (RectTransform)go.transform;
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = Vector2.zero;
-            Image img = go.GetComponent<Image>();
-            img.color = new Color(0.12f, 0.10f, 0.08f, 0.94f);
-            img.raycastTarget = true;
-            img.sprite = UIResourceHelper.GetBackgroundSprite();
-            return go;
+            GameObject cardGo = new GameObject(name, typeof(RectTransform), typeof(Image));
+            cardGo.transform.SetParent(parent, false);
+            RectTransform cardRt = (RectTransform)cardGo.transform;
+            cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRt.pivot = new Vector2(0.5f, 0.5f);
+            cardRt.sizeDelta = size;
+            cardRt.anchoredPosition = Vector2.zero;
+            Image cardBg = cardGo.GetComponent<Image>();
+            cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            cardBg.type = Image.Type.Sliced;
+            cardBg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f); // Warm timber frame
+            cardBg.raycastTarget = true;
+
+            // Inner Board
+            GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
+            innerGo.transform.SetParent(cardGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerGo.transform;
+            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(10f, 10f); innerRt.offsetMax = new Vector2(-10f, -10f);
+            Image innerBg = innerGo.GetComponent<Image>();
+            innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerBg.type = Image.Type.Sliced;
+            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+
+            return cardGo;
         }
 
         private static void BuildHeader(Transform parent, string text)
         {
-            GameObject go = new GameObject("Header", typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            RectTransform rt = (RectTransform)go.transform;
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.offsetMin = new Vector2(24f, -68f);
-            rt.offsetMax = new Vector2(-24f, -16f);
-            TextMeshProUGUI txt = go.AddComponent<TextMeshProUGUI>();
+            GameObject bannerGo = new GameObject("HeaderBanner", typeof(RectTransform), typeof(Image));
+            bannerGo.transform.SetParent(parent, false);
+            RectTransform bannerRt = (RectTransform)bannerGo.transform;
+            bannerRt.anchorMin = new Vector2(0.5f, 1f);
+            bannerRt.anchorMax = new Vector2(0.5f, 1f);
+            bannerRt.pivot = new Vector2(0.5f, 1f);
+            bannerRt.sizeDelta = new Vector2(360f, 52f);
+            bannerRt.anchoredPosition = new Vector2(0f, -24f);
+            Image bannerBg = bannerGo.GetComponent<Image>();
+            bannerBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            bannerBg.type = Image.Type.Sliced;
+            bannerBg.color = new Color(0.35f, 0.24f, 0.15f, 1f);
+
+            GameObject titleTextGo = new GameObject("HeaderTitleText", typeof(RectTransform));
+            titleTextGo.transform.SetParent(bannerGo.transform, false);
+            RectTransform titleTextRt = (RectTransform)titleTextGo.transform;
+            titleTextRt.anchorMin = Vector2.zero; titleTextRt.anchorMax = Vector2.one;
+            titleTextRt.offsetMin = Vector2.zero; titleTextRt.offsetMax = Vector2.zero;
+
+            Text txt = titleTextGo.AddComponent<Text>();
             txt.text = text;
-            txt.fontSize = 30f;
-            txt.fontStyle = FontStyles.Bold;
-            txt.color = new Color(0.95f, 0.88f, 0.62f, 1f);
-            txt.alignment = TextAlignmentOptions.Center;
-            txt.richText = false;
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.fontSize = 24;
+            txt.fontStyle = UnityEngine.FontStyle.Bold;
+            txt.color = new Color(1f, 0.88f, 0.45f, 1f);
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.raycastTarget = false;
         }
 
         private static Button BuildMenuButton(Transform parent, string label, Vector2 anchoredPos,
@@ -303,16 +346,19 @@ namespace Willowstead.UI
             rt.sizeDelta = size;
             rt.anchoredPosition = anchoredPos;
             Image img = go.GetComponent<Image>();
-            img.color = new Color(0.20f, 0.18f, 0.14f, 1f);
             img.sprite = UIResourceHelper.GetBackgroundSprite();
+            img.type = Image.Type.Sliced;
+            img.color = new Color(0.38f, 0.26f, 0.16f, 1f);
+            img.raycastTarget = true;
+
             Button btn = go.GetComponent<Button>();
             btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
-            cb.normalColor      = new Color(0.20f, 0.18f, 0.14f, 1f);
-            cb.highlightedColor = new Color(0.36f, 0.30f, 0.22f, 1f);
-            cb.pressedColor     = new Color(0.10f, 0.09f, 0.07f, 1f);
+            cb.normalColor      = new Color(0.38f, 0.26f, 0.16f, 1f);
+            cb.highlightedColor = new Color(0.54f, 0.38f, 0.24f, 1f);
+            cb.pressedColor     = new Color(0.24f, 0.16f, 0.10f, 1f);
             cb.selectedColor    = cb.highlightedColor;
-            cb.disabledColor    = new Color(0.18f, 0.16f, 0.12f, 0.6f);
+            cb.disabledColor    = new Color(0.20f, 0.18f, 0.14f, 0.6f);
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
@@ -323,12 +369,16 @@ namespace Willowstead.UI
             lblRt.anchorMax = Vector2.one;
             lblRt.offsetMin = Vector2.zero;
             lblRt.offsetMax = Vector2.zero;
-            TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
-            lbl.text = label;
-            lbl.fontSize = 22f;
-            lbl.color = new Color(0.96f, 0.92f, 0.78f, 1f);
-            lbl.alignment = TextAlignmentOptions.Center;
-            lbl.richText = false;
+
+            Text txt = lblGo.AddComponent<Text>();
+            txt.text = label;
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.fontSize = 18;
+            txt.fontStyle = UnityEngine.FontStyle.Bold;
+            txt.color = new Color(1f, 0.94f, 0.82f, 1f);
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.raycastTarget = false;
+
             return btn;
         }
 

@@ -132,6 +132,9 @@ namespace Willowstead.UI
             InputReader.BlockGameplayInput = false;
         }
 
+        /// <summary>True when the Character Creation panel is visible on screen.</summary>
+        public bool IsVisible => _panelGo != null && _panelGo.activeSelf;
+
         private void BuildPanel(Canvas canvas)
         {
             _panelGo = new GameObject("CharacterCreationPanel", typeof(RectTransform), typeof(Image));

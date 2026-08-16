@@ -29,6 +29,10 @@ namespace Willowstead.Persistence
         public Vector3 playerPosition;
         public int selectedHotbarIndex;    // FarmingController._selectedSlotIndex
         public int gold;                   // InventoryManager.GetItemCount("Gold")
+        public float currentHealth = 100f;
+        public float maxHealth = 100f;
+        public float currentStamina = 100f;
+        public float maxStamina = 100f;
 
         // Time / weather / day counter (GridManager.AdvanceDay() bumps the day count).
         public float timeOfDay01;          // DayNightCycle.Time01, [0,1)

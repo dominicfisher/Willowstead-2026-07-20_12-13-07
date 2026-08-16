@@ -426,5 +426,63 @@ namespace Willowstead.Debugging.Commands
             ctx.PrintOk($"Seed changed: {previous} -> {currentDisp} (int: {seedSvc.CurrentSeed}). World regenerated.");
         }
     }
+
+    public sealed class GodCommand : DevConsoleCommand
+    {
+        public override string Id => "god";
+        public override string Help => "god - Toggles god mode (invulnerable + infinite stamina)";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var stats = Object.FindAnyObjectByType<PlayerStats>();
+            if (stats == null) { ctx.PrintError("No PlayerStats found in scene."); return; }
+            stats.GodMode = !stats.GodMode;
+            ctx.PrintOk($"God mode: {(stats.GodMode ? "ON" : "OFF")}");
+        }
+    }
+
+    public sealed class HealCommand : DevConsoleCommand
+    {
+        public override string Id => "heal";
+        public override string Help => "heal [amount=100] - Restores player health";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var stats = Object.FindAnyObjectByType<PlayerStats>();
+            if (stats == null) { ctx.PrintError("No PlayerStats found in scene."); return; }
+            float amt = 100f;
+            if (args.Length > 0 && float.TryParse(args[0], out float custom)) amt = custom;
+            stats.Heal(amt);
+            ctx.PrintOk($"Healed {amt}. Health: {stats.CurrentHealth}/{stats.MaxHealth}");
+        }
+    }
+
+    public sealed class DamageCommand : DevConsoleCommand
+    {
+        public override string Id => "damage";
+        public override string Help => "damage <amount> - Deals damage to player health";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var stats = Object.FindAnyObjectByType<PlayerStats>();
+            if (stats == null) { ctx.PrintError("No PlayerStats found in scene."); return; }
+            float amt = 20f;
+            if (args.Length > 0 && float.TryParse(args[0], out float custom)) amt = custom;
+            stats.TakeDamage(amt);
+            ctx.PrintOk($"Took {amt} damage. Health: {stats.CurrentHealth}/{stats.MaxHealth}");
+        }
+    }
+
+    public sealed class StaminaCommand : DevConsoleCommand
+    {
+        public override string Id => "stamina";
+        public override string Help => "stamina [amount=100] - Restores player stamina";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var stats = Object.FindAnyObjectByType<PlayerStats>();
+            if (stats == null) { ctx.PrintError("No PlayerStats found in scene."); return; }
+            float amt = 100f;
+            if (args.Length > 0 && float.TryParse(args[0], out float custom)) amt = custom;
+            stats.RestoreStamina(amt);
+            ctx.PrintOk($"Restored {amt} stamina. Stamina: {stats.CurrentStamina}/{stats.MaxStamina}");
+        }
+    }
 }
 #endif

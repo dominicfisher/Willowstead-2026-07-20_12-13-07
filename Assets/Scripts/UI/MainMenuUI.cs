@@ -114,6 +114,7 @@ namespace Willowstead.UI
                 {
                     var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                    else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
 
                 Transform compass = canvas.transform.Find("CompassPanel");
@@ -121,6 +122,7 @@ namespace Willowstead.UI
                 {
                     var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                    else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
 
                 Transform gold = canvas.transform.Find("GoldHUD");
@@ -128,6 +130,15 @@ namespace Willowstead.UI
                 {
                     var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                    else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
+                }
+
+                Transform status = canvas.transform.Find("PlayerStatusHUD");
+                if (status != null)
+                {
+                    var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                    if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                    else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
             }
         }
@@ -137,7 +148,6 @@ namespace Willowstead.UI
         /// </summary>
         public static void StartGameSession()
         {
-            if (HasGameStarted) return;
             HasGameStarted = true;
             OnGameStarted?.Invoke();
 
@@ -152,11 +162,15 @@ namespace Willowstead.UI
                 if (Instance._fadeCoroutine != null) Instance.StopCoroutine(Instance._fadeCoroutine);
                 Instance._fadeCoroutine = Instance.StartCoroutine(Instance.PlayHudFadeInAnimation());
             }
+            else
+            {
+                SetGameplayVisualsVisible(true);
+            }
         }
 
         private System.Collections.IEnumerator PlayHudFadeInAnimation()
         {
-            // Collect all gameplay HUD elements (Hotbar, Compass, GoldHUD)
+            // Collect all gameplay HUD elements (Hotbar, Compass, GoldHUD, PlayerStatusHUD)
             var groups = new System.Collections.Generic.List<CanvasGroup>();
 
             Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
@@ -185,6 +199,14 @@ namespace Willowstead.UI
                     cg.alpha = 0f;
                     groups.Add(cg);
                 }
+
+                Transform status = canvas.transform.Find("PlayerStatusHUD");
+                if (status != null)
+                {
+                    var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                    cg.alpha = 0f;
+                    groups.Add(cg);
+                }
             }
 
             float duration = 0.85f;
@@ -194,6 +216,35 @@ namespace Willowstead.UI
                 elapsed += Time.unscaledDeltaTime;
                 float alpha = Mathf.Clamp01(elapsed / duration);
                 float curvedAlpha = 1f - (1f - alpha) * (1f - alpha);
+
+                // Dynamically pick up any HUD groups created while coroutine is running
+                if (canvas != null)
+                {
+                    Transform hotbar = canvas.transform.Find("HotbarPanel");
+                    if (hotbar != null)
+                    {
+                        var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                        if (!groups.Contains(cg)) groups.Add(cg);
+                    }
+                    Transform compass = canvas.transform.Find("CompassPanel");
+                    if (compass != null)
+                    {
+                        var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                        if (!groups.Contains(cg)) groups.Add(cg);
+                    }
+                    Transform gold = canvas.transform.Find("GoldHUD");
+                    if (gold != null)
+                    {
+                        var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                        if (!groups.Contains(cg)) groups.Add(cg);
+                    }
+                    Transform status = canvas.transform.Find("PlayerStatusHUD");
+                    if (status != null)
+                    {
+                        var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                        if (!groups.Contains(cg)) groups.Add(cg);
+                    }
+                }
 
                 for (int i = 0; i < groups.Count; i++)
                 {
@@ -206,6 +257,7 @@ namespace Willowstead.UI
             {
                 if (groups[i] != null) groups[i].alpha = 1f;
             }
+            SetGameplayVisualsVisible(true);
             _fadeCoroutine = null;
         }
 
@@ -230,7 +282,7 @@ namespace Willowstead.UI
             cardRt.anchorMin = new Vector2(0.5f, 0.5f);
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
-            cardRt.sizeDelta = new Vector2(540f, 690f);
+            cardRt.sizeDelta = new Vector2(480f, 580f);
             cardRt.anchoredPosition = Vector2.zero;
             Image cardBg = cardGo.GetComponent<Image>();
             cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
@@ -256,8 +308,8 @@ namespace Willowstead.UI
             bannerRt.anchorMin = new Vector2(0.5f, 1f);
             bannerRt.anchorMax = new Vector2(0.5f, 1f);
             bannerRt.pivot = new Vector2(0.5f, 1f);
-            bannerRt.sizeDelta = new Vector2(400f, 60f);
-            bannerRt.anchoredPosition = new Vector2(0f, -25f);
+            bannerRt.sizeDelta = new Vector2(360f, 50f);
+            bannerRt.anchoredPosition = new Vector2(0f, -20f);
             Image bannerBg = bannerGo.GetComponent<Image>();
             bannerBg.sprite = UIResourceHelper.GetBackgroundSprite();
             bannerBg.type = Image.Type.Sliced;
@@ -269,7 +321,7 @@ namespace Willowstead.UI
             titleTextRt.anchorMin = Vector2.zero; titleTextRt.anchorMax = Vector2.one;
             titleTextRt.offsetMin = Vector2.zero; titleTextRt.offsetMax = Vector2.zero;
             BuildText(titleTextGo, "WILLOWSTEAD",
-                new Color(1f, 0.88f, 0.45f, 1f), fontSize: 32, style: FontStyles.Bold);
+                new Color(1f, 0.88f, 0.45f, 1f), fontSize: 26, style: FontStyles.Bold);
 
             GameObject subGo = new GameObject("Subtitle", typeof(RectTransform));
             subGo.transform.SetParent(cardGo.transform, false);
@@ -277,25 +329,25 @@ namespace Willowstead.UI
             subRt.anchorMin = new Vector2(0.5f, 1f);
             subRt.anchorMax = new Vector2(0.5f, 1f);
             subRt.pivot = new Vector2(0.5f, 1f);
-            subRt.sizeDelta = new Vector2(480f, 30f);
-            subRt.anchoredPosition = new Vector2(0f, -95f);
+            subRt.sizeDelta = new Vector2(440f, 24f);
+            subRt.anchoredPosition = new Vector2(0f, -76f);
             BuildText(subGo, "a cozy farm in a deterministic world",
-                new Color(0.92f, 0.86f, 0.74f, 1f), fontSize: 16, style: FontStyles.Italic);
+                new Color(0.92f, 0.86f, 0.74f, 1f), fontSize: 13, style: FontStyles.Italic);
 
             _continueButton = BuildMenuButton(cardGo.transform, "Continue (Most Recent)",
-                new Vector2(0f, -140f), OnContinueClicked);
+                new Vector2(0f, -110f), OnContinueClicked);
             BuildMenuButton(cardGo.transform, "New World",
-                new Vector2(0f, -210f), OnNewWorldClicked);
+                new Vector2(0f, -168f), OnNewWorldClicked);
             BuildMenuButton(cardGo.transform, "Host Co-op",
-                new Vector2(0f, -280f), OnHostMultiplayerClicked);
+                new Vector2(0f, -226f), OnHostMultiplayerClicked);
             BuildMenuButton(cardGo.transform, "Join Co-op with Code",
-                new Vector2(0f, -350f), OnJoinMultiplayerClicked);
+                new Vector2(0f, -284f), OnJoinMultiplayerClicked);
             BuildMenuButton(cardGo.transform, "Load Saves",
-                new Vector2(0f, -420f), OnLoadSavesClicked);
+                new Vector2(0f, -342f), OnLoadSavesClicked);
             BuildMenuButton(cardGo.transform, "Character & Profile",
-                new Vector2(0f, -490f), OnCharacterProfileClicked);
+                new Vector2(0f, -400f), OnCharacterProfileClicked);
             BuildMenuButton(cardGo.transform, "Quit",
-                new Vector2(0f, -560f), OnQuitClicked);
+                new Vector2(0f, -458f), OnQuitClicked);
             _continueLabel = _continueButton.GetComponentInChildren<Text>();
 
             GameObject hintGo = new GameObject("Hint", typeof(RectTransform));
@@ -304,10 +356,10 @@ namespace Willowstead.UI
             hintRt.anchorMin = new Vector2(0.5f, 0f);
             hintRt.anchorMax = new Vector2(0.5f, 0f);
             hintRt.pivot = new Vector2(0.5f, 0f);
-            hintRt.sizeDelta = new Vector2(500f, 30f);
-            hintRt.anchoredPosition = new Vector2(0f, 18f);
+            hintRt.sizeDelta = new Vector2(440f, 26f);
+            hintRt.anchoredPosition = new Vector2(0f, 14f);
             BuildText(hintGo, "Tip: press Enter in-game to open chat with friends.",
-                new Color(0.78f, 0.72f, 0.62f, 0.85f), fontSize: 13, style: FontStyles.Italic);
+                new Color(0.78f, 0.72f, 0.62f, 0.85f), fontSize: 12, style: FontStyles.Italic);
         }
 
         private void OnCharacterProfileClicked()

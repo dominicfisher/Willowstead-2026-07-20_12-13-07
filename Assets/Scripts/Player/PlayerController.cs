@@ -24,6 +24,8 @@ namespace Willowstead.Player
         [ContextMenu("Setup Permanent Player Components")]
         private void SetupComponentsInEditor()
         {
+            if (GetComponent<PlayerStats>() == null) gameObject.AddComponent<PlayerStats>();
+            if (GetComponent<UI.PlayerStatusUI>() == null) gameObject.AddComponent<UI.PlayerStatusUI>();
             if (GetComponent<InventoryManager>() == null) gameObject.AddComponent<InventoryManager>();
             if (GetComponent<Farming.FarmingController>() == null) gameObject.AddComponent<Farming.FarmingController>();
             if (GetComponent<HotbarUI>() == null) gameObject.AddComponent<HotbarUI>();
@@ -113,7 +115,12 @@ namespace Willowstead.Player
                 audio.playOnAwake = false;
             }
 
-            // ── Ensure all gameplay scripts ──────────────────────────────────────
+            if (playerGo.GetComponent<PlayerStats>() == null)
+                playerGo.AddComponent<PlayerStats>();
+
+            if (playerGo.GetComponent<UI.PlayerStatusUI>() == null)
+                playerGo.AddComponent<UI.PlayerStatusUI>();
+
             if (playerGo.GetComponent<InventoryManager>() == null)
                 playerGo.AddComponent<InventoryManager>();
 
@@ -382,7 +389,26 @@ namespace Willowstead.Player
 
         private void MovePlayer()
         {
-            float targetSpeed = _moveSpeed * (_isSprinting ? _sprintSpeedMultiplier : 1f);
+            bool wantsToSprint = _isSprinting && _moveInput.sqrMagnitude > 0.01f;
+            bool canSprint = false;
+
+            if (wantsToSprint)
+            {
+                if (PlayerStats.Instance != null)
+                {
+                    canSprint = PlayerStats.Instance.ConsumeSprintStamina(Time.fixedDeltaTime);
+                    if (!canSprint)
+                    {
+                        _isSprinting = false;
+                    }
+                }
+                else
+                {
+                    canSprint = true;
+                }
+            }
+
+            float targetSpeed = _moveSpeed * (canSprint ? _sprintSpeedMultiplier : 1f);
             Vector2 targetVelocity = _moveInput * targetSpeed;
 
             float lerpRate = _moveInput.magnitude > 0.01f ? _acceleration : _deceleration;

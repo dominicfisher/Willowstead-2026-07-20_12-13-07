@@ -34,6 +34,18 @@ namespace Willowstead.Farming
         [Tooltip("Maps each seed item name to its CropData. Add one entry per crop type.")]
         [SerializeField] private SeedEntry[] _seedMappings = new SeedEntry[0];
 
+        [Header("Audio")]
+        [Tooltip("Audio clip played when tilling soil with a hoe.")]
+        [SerializeField] private AudioClip _tillingAudioClip;
+
+        [Tooltip("Audio clip played when planting seeds.")]
+        [SerializeField] private AudioClip _plantingAudioClip;
+
+        [Range(0f, 1f)]
+        [SerializeField] private float _farmingAudioVolume = 0.85f;
+
+        private AudioSource _audioSource;
+
         /// <summary>Resolved at equip-time from _seedMappings.</summary>
         private CropData _currentCropData;
 
@@ -112,6 +124,14 @@ namespace Willowstead.Farming
                 _inventory = FindAnyObjectByType<Player.InventoryManager>();
             }
 
+            _audioSource = GetComponent<AudioSource>();
+            if (_audioSource == null)
+            {
+                _audioSource = gameObject.AddComponent<AudioSource>();
+                _audioSource.playOnAwake = false;
+                _audioSource.spatialBlend = 0f;
+            }
+
 #if UNITY_EDITOR
             Debug.Log($"[FarmingController] Initialized. Default Tool: {_currentTool}. Use 1-8 or scroll wheel to switch slots. Press G to advance day.");
 #endif
@@ -127,6 +147,16 @@ namespace Willowstead.Farming
         private void EnsureFarmingConfig()
         {
 #if UNITY_EDITOR
+            if (_tillingAudioClip == null)
+            {
+                _tillingAudioClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Farming/Tilling.mp3");
+            }
+
+            if (_plantingAudioClip == null)
+            {
+                _plantingAudioClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Farming/Planting.mp3");
+            }
+
             if (_cropPrefab == null)
             {
                 _cropPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CropPrefab.prefab");
@@ -413,6 +443,7 @@ namespace Willowstead.Farming
                         if (success)
                         {
                             _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
+                            PlayPlantingAudio();
                         }
                     }
                     else
@@ -440,7 +471,45 @@ namespace Willowstead.Farming
                 }
             }
 
+            if (World.GridManager.Instance.IsCellTilled(cell)) return;
+
+            if (Player.PlayerStats.Instance != null && !Player.PlayerStats.Instance.UseStamina(4f))
+            {
+                return;
+            }
+
             World.GridManager.Instance.HoeTile(cell);
+            PlayTillingAudio();
+        }
+
+        private void PlayTillingAudio()
+        {
+            if (_tillingAudioClip == null) return;
+            if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
+            if (_audioSource != null)
+            {
+                _audioSource.pitch = Random.Range(0.92f, 1.08f);
+                _audioSource.PlayOneShot(_tillingAudioClip, _farmingAudioVolume);
+            }
+            else
+            {
+                AudioSource.PlayClipAtPoint(_tillingAudioClip, transform.position, _farmingAudioVolume);
+            }
+        }
+
+        private void PlayPlantingAudio()
+        {
+            if (_plantingAudioClip == null) return;
+            if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
+            if (_audioSource != null)
+            {
+                _audioSource.pitch = Random.Range(0.94f, 1.06f);
+                _audioSource.PlayOneShot(_plantingAudioClip, _farmingAudioVolume);
+            }
+            else
+            {
+                AudioSource.PlayClipAtPoint(_plantingAudioClip, transform.position, _farmingAudioVolume);
+            }
         }
 
         /// <summary>
@@ -457,7 +526,14 @@ namespace Willowstead.Farming
             // cells off the cell center, so the adjacent-cell click range has to be
             // generous enough to catch trees near a corner of their tile.
             World.TreeChoppable tree = World.TreeChoppable.FindNearest(worldCenter, 1.25f);
-            if (tree != null) tree.Chop();
+            if (tree != null)
+            {
+                if (Player.PlayerStats.Instance != null && !Player.PlayerStats.Instance.UseStamina(5f))
+                {
+                    return;
+                }
+                tree.Chop();
+            }
         }
 
         private Vector3Int _lastDragCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
@@ -512,6 +588,10 @@ namespace Willowstead.Farming
             if (World.GridManager.Instance == null) return;
             if (World.GridManager.Instance.IsCellTilled(cell))
             {
+                if (Player.PlayerStats.Instance != null && !Player.PlayerStats.Instance.UseStamina(3f))
+                {
+                    return;
+                }
                 World.GridManager.Instance.WaterTile(cell);
             }
         }
@@ -528,6 +608,7 @@ namespace Willowstead.Farming
                 if (success)
                 {
                     _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
+                    PlayPlantingAudio();
                 }
             }
         }

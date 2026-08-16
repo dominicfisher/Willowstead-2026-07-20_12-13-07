@@ -55,28 +55,65 @@ namespace Willowstead.UI
 
         private void Update()
         {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            bool tPressed = false;
+            bool enterPressed = false;
+            bool escapePressed = false;
+
+            if (kb != null)
+            {
+                if (kb.tKey.wasPressedThisFrame) tPressed = true;
+                if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame) enterPressed = true;
+                if (kb.escapeKey.wasPressedThisFrame) escapePressed = true;
+            }
+
+            if (!tPressed)
+            {
+                try { if (UnityEngine.Input.GetKeyDown(KeyCode.T)) tPressed = true; } catch { }
+            }
+            if (!enterPressed)
+            {
+                try { if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter)) enterPressed = true; } catch { }
+            }
+            if (!escapePressed)
+            {
+                try { if (UnityEngine.Input.GetKeyDown(KeyCode.Escape)) escapePressed = true; } catch { }
+            }
+
+            if (tPressed || enterPressed)
+            {
+                string keyName = tPressed ? "T" : "Enter";
+                Debug.Log($"[ChatDebug] '{keyName}' pressed. IsOpen: {IsOpen}, " +
+                          $"MainMenuVisible: {MainMenuUI.Instance != null && MainMenuUI.Instance.IsVisible}, " +
+                          $"WorldSetupVisible: {WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible}, " +
+                          $"CharCreationVisible: {CharacterCreationUI.Instance != null && CharacterCreationUI.Instance.IsVisible}, " +
+                          $"PauseOpen: {PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen}, " +
+                          $"DevConsoleOpen: {Debugging.DevConsole.Instance != null && Debugging.DevConsole.Instance.IsOpen}");
+            }
+
             // Only handle chat hotkey when main menu / modals are not covering
             if (MainMenuUI.Instance != null && MainMenuUI.Instance.IsVisible) return;
             if (WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible) return;
-            if (CharacterCreationUI.Instance != null && CharacterCreationUI.Instance.gameObject.activeInHierarchy) return;
+            if (CharacterCreationUI.Instance != null && CharacterCreationUI.Instance.IsVisible) return;
+            if (PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen) return;
+            if (Debugging.DevConsole.Instance != null && Debugging.DevConsole.Instance.IsOpen) return;
 
-            if (UnityEngine.InputSystem.Keyboard.current != null)
+            bool openPressed = tPressed || enterPressed;
+            bool closePressed = escapePressed;
+
+            if (!IsOpen)
             {
-                var kb = UnityEngine.InputSystem.Keyboard.current;
-                if ((kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || (!IsOpen && kb.tKey.wasPressedThisFrame)) 
-                    && !(Debugging.DevConsole.Instance != null && Debugging.DevConsole.Instance.IsOpen))
+                if (openPressed)
                 {
-                    if (!IsOpen)
-                    {
-                        OpenChat();
-                    }
-                    else
-                    {
-                        SubmitMessage();
-                    }
+                    Debug.Log("[ChatDebug] Opening chat window!");
+                    OpenChat();
                 }
-                else if (IsOpen && kb.escapeKey.wasPressedThisFrame)
+            }
+            else
+            {
+                if (closePressed)
                 {
+                    Debug.Log("[ChatDebug] Closing chat window via Escape.");
                     CloseChat();
                 }
             }
@@ -95,15 +132,33 @@ namespace Willowstead.UI
 
         public void OpenChat()
         {
-            if (_chatRoot == null || _inputField == null) return;
+            if (_chatRoot == null || _inputField == null)
+            {
+                Debug.LogWarning($"[ChatDebug] Cannot OpenChat! _chatRoot: {_chatRoot != null}, _inputField: {_inputField != null}");
+                return;
+            }
             _chatRoot.SetActive(true);
             _inputField.gameObject.SetActive(true);
             _inputField.text = string.Empty;
-            _inputField.ActivateInputField();
+
+            StartCoroutine(FocusChatFieldNextFrame());
 
             InputReader.BlockGameplayInput = true;
             ShowChatLogs(true);
             SetLocalTyping(true);
+            Debug.Log("[ChatDebug] Chat successfully opened and activated.");
+        }
+
+        private IEnumerator FocusChatFieldNextFrame()
+        {
+            yield return null;
+            if (_inputField != null && _inputField.gameObject.activeSelf)
+            {
+                _inputField.text = string.Empty;
+                _inputField.ActivateInputField();
+                _inputField.Select();
+                _inputField.caretPosition = 0;
+            }
         }
 
         public void CloseChat()
@@ -117,14 +172,15 @@ namespace Willowstead.UI
             StartFadeOutCountdown();
         }
 
-        public void SubmitMessage()
+        public void SubmitMessage(string text = null)
         {
             if (_inputField == null) return;
-            string text = _inputField.text == null ? string.Empty : _inputField.text.Trim();
-            if (!string.IsNullOrEmpty(text))
+            string msg = text != null ? text : _inputField.text;
+            msg = msg == null ? string.Empty : msg.Trim();
+            if (!string.IsNullOrEmpty(msg))
             {
                 string sender = CharacterCreationUI.GetSavedUsername();
-                AddChatMessage(sender, text, isLocal: true);
+                AddChatMessage(sender, msg, isLocal: true);
             }
             CloseChat();
         }
@@ -221,8 +277,8 @@ namespace Willowstead.UI
             rt.anchorMin = new Vector2(0f, 0f);
             rt.anchorMax = new Vector2(0f, 0f);
             rt.pivot = new Vector2(0f, 0f);
-            rt.anchoredPosition = new Vector2(20f, 85f);
-            rt.sizeDelta = new Vector2(420f, 220f);
+            rt.anchoredPosition = new Vector2(24f, 118f);
+            rt.sizeDelta = new Vector2(380f, 180f);
 
             _canvasGroup = _chatRoot.GetComponent<CanvasGroup>();
             _canvasGroup.alpha = 0f; // Start hidden till message sent/received
@@ -305,12 +361,16 @@ namespace Willowstead.UI
             _inputField.textViewport = taRt;
             _inputField.textComponent = inTxt;
             _inputField.placeholder = ph;
+            _inputField.lineType = TMP_InputField.LineType.SingleLine;
             _inputField.characterLimit = 120;
+            _inputField.restoreOriginalTextOnEscape = false;
+            _inputField.navigation = new Navigation { mode = Navigation.Mode.None };
             _inputField.onValueChanged.AddListener(val =>
             {
                 SetLocalTyping(true);
                 _typingDebounceTimer = 2.5f;
             });
+            _inputField.onSubmit.AddListener(val => SubmitMessage(val));
             _inputField.gameObject.SetActive(false);
         }
     }

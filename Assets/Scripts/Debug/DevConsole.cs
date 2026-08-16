@@ -118,10 +118,10 @@ namespace Willowstead.Debugging
             _panelGo = new GameObject("DevConsolePanel");
             _panelRt = _panelGo.AddComponent<RectTransform>();
             _panelRt.SetParent(canvas.transform, false);
-            _panelRt.anchorMin = new Vector2(0f, 0f);
-            _panelRt.anchorMax = new Vector2(0f, 0f);
-            _panelRt.pivot = new Vector2(0f, 0f);
-            _panelRt.anchoredPosition = new Vector2(24f, 24f);
+            _panelRt.anchorMin = new Vector2(0.5f, 1f);
+            _panelRt.anchorMax = new Vector2(0.5f, 1f);
+            _panelRt.pivot = new Vector2(0.5f, 1f);
+            _panelRt.anchoredPosition = new Vector2(0f, -65f);
             _panelRt.sizeDelta = new Vector2(680f, 320f);
 
             // Cozy wood frame container

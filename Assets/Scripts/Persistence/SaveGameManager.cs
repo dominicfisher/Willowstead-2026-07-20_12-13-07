@@ -341,6 +341,13 @@ namespace Willowstead.Persistence
 
             if (WorldSeedService.Instance != null) d.worldSeed = WorldSeedService.Instance.CurrentSeed;
             if (PlayerController.Instance != null) d.playerPosition = PlayerController.Instance.transform.position;
+            if (PlayerStats.Instance != null)
+            {
+                d.currentHealth = PlayerStats.Instance.CurrentHealth;
+                d.maxHealth = PlayerStats.Instance.MaxHealth;
+                d.currentStamina = PlayerStats.Instance.CurrentStamina;
+                d.maxStamina = PlayerStats.Instance.MaxStamina;
+            }
             if (FarmingController.Instance != null) d.selectedHotbarIndex = FarmingController.Instance.SelectedSlotIndex;
             if (DayNightCycle.Instance != null) d.timeOfDay01 = DayNightCycle.Instance.Time01;
             if (WeatherCycle.Instance != null)
@@ -394,6 +401,16 @@ namespace Willowstead.Persistence
 
                 if (PlayerController.Instance != null)
                     PlayerController.Instance.RestorePosition(data.playerPosition);
+
+                if (PlayerStats.Instance != null)
+                {
+                    float maxH = data.maxHealth > 0f ? data.maxHealth : 100f;
+                    float curH = data.currentHealth > 0f ? data.currentHealth : maxH;
+                    float maxS = data.maxStamina > 0f ? data.maxStamina : 100f;
+                    float curS = data.currentStamina >= 0f ? data.currentStamina : maxS;
+                    PlayerStats.Instance.SetHealth(curH, maxH);
+                    PlayerStats.Instance.SetStamina(curS, maxS);
+                }
 
                 if (InventoryManager.Instance != null)
                     InventoryManager.Instance.RestoreInventory(data.inventory, data.gold);

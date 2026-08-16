@@ -476,7 +476,7 @@ namespace Willowstead.Player
             AudioClip clip = clips[Random.Range(0, clips.Length)];
             if (clip != null)
             {
-                _audioSource.PlayOneShot(clip, _footstepVolume);
+                _audioSource.PlayOneShot(clip, _footstepVolume * Audio.AudioManager.SfxVolume);
             }
         }
 

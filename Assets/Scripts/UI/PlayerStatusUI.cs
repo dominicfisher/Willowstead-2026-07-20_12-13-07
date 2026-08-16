@@ -253,7 +253,7 @@ namespace Willowstead.UI
             shadowImg.type = Image.Type.Sliced;
             shadowImg.color = new Color(0f, 0f, 0f, 0.50f);
 
-            // ── Outer Timber Frame ──────────────────────────────────────────────
+            // ── Outer Timber Frame & Cozy Mauve Slate ─────────────────────────
             GameObject woodGo = new GameObject("WoodFrame", typeof(RectTransform), typeof(Image));
             woodGo.transform.SetParent(_hudRootGo.transform, false);
             RectTransform woodRt = (RectTransform)woodGo.transform;
@@ -262,18 +262,18 @@ namespace Willowstead.UI
             Image woodImg = woodGo.GetComponent<Image>();
             woodImg.sprite = UIResourceHelper.GetBackgroundSprite();
             woodImg.type = Image.Type.Sliced;
-            woodImg.color = new Color(0.24f, 0.17f, 0.11f, 0.98f); // Warm dark walnut
+            woodImg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
 
-            // ── Inner Parchment Board ───────────────────────────────────────────
+            // ── Inner Parchment / Slate Board ───────────────────────────────────
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
             innerGo.transform.SetParent(woodGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
             innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(5f, 5f); innerRt.offsetMax = new Vector2(-5f, -5f);
+            innerRt.offsetMin = new Vector2(4f, 4f); innerRt.offsetMax = new Vector2(-4f, -4f);
             Image innerImg = innerGo.GetComponent<Image>();
             innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerImg.type = Image.Type.Sliced;
-            innerImg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+            innerImg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             // ── 1. HEALTH BAR ROW (Top) ─────────────────────────────────────────
             BuildGaugeRow(

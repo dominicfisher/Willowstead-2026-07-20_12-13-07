@@ -279,7 +279,7 @@ namespace Willowstead.UI
             _rootGo = NewFullScreen("PauseMenuRoot", canvas.transform, new Color(0f, 0f, 0f, 0.55f));
 
             _mainPanel     = NewCenteredPanel(_rootGo.transform, "MainPanel",     new Vector2(500f, 460f));
-            _optionsPanel  = NewCenteredPanel(_rootGo.transform, "OptionsPanel",  new Vector2(560f, 420f));
+            _optionsPanel  = NewCenteredPanel(_rootGo.transform, "OptionsPanel",  new Vector2(560f, 480f));
             _controlsPanel = NewCenteredPanel(_rootGo.transform, "ControlsPanel", new Vector2(600f, 560f));
             _gameplayPanel = NewCenteredPanel(_rootGo.transform, "GameplayPanel", new Vector2(560f, 480f));
 
@@ -318,18 +318,18 @@ namespace Willowstead.UI
             Image cardBg = cardGo.GetComponent<Image>();
             cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
             cardBg.type = Image.Type.Sliced;
-            cardBg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f); // Warm timber frame
+            cardBg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
             cardBg.raycastTarget = true;
 
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
             innerGo.transform.SetParent(cardGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
             innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(10f, 10f); innerRt.offsetMax = new Vector2(-10f, -10f);
+            innerRt.offsetMin = new Vector2(8f, 8f); innerRt.offsetMax = new Vector2(-8f, -8f);
             Image innerBg = innerGo.GetComponent<Image>();
             innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerBg.type = Image.Type.Sliced;
-            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+            innerBg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             return cardGo;
         }
@@ -342,12 +342,12 @@ namespace Willowstead.UI
             bannerRt.anchorMin = new Vector2(0.5f, 1f);
             bannerRt.anchorMax = new Vector2(0.5f, 1f);
             bannerRt.pivot = new Vector2(0.5f, 1f);
-            bannerRt.sizeDelta = new Vector2(360f, 52f);
-            bannerRt.anchoredPosition = new Vector2(0f, -24f);
+            bannerRt.sizeDelta = new Vector2(360f, 44f);
+            bannerRt.anchoredPosition = new Vector2(0f, -20f);
             Image bannerBg = bannerGo.GetComponent<Image>();
-            bannerBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            bannerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             bannerBg.type = Image.Type.Sliced;
-            bannerBg.color = new Color(0.35f, 0.24f, 0.15f, 1f);
+            bannerBg.color = new Color(0.96f, 0.88f, 0.78f, 1f); // Creamy parchment header
 
             GameObject titleTextGo = new GameObject("HeaderTitleText", typeof(RectTransform));
             titleTextGo.transform.SetParent(bannerGo.transform, false);
@@ -356,11 +356,11 @@ namespace Willowstead.UI
             titleTextRt.offsetMin = Vector2.zero; titleTextRt.offsetMax = Vector2.zero;
 
             Text txt = titleTextGo.AddComponent<Text>();
-            txt.text = text;
+            txt.text = text.ToUpperInvariant();
             txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 24;
+            txt.fontSize = 18;
             txt.fontStyle = UnityEngine.FontStyle.Bold;
-            txt.color = new Color(1f, 0.88f, 0.45f, 1f);
+            txt.color = new Color(0.35f, 0.22f, 0.16f, 1f);
             txt.alignment = TextAnchor.MiddleCenter;
             txt.raycastTarget = false;
         }
@@ -368,7 +368,7 @@ namespace Willowstead.UI
         private static Button BuildMenuButton(Transform parent, string label, Vector2 anchoredPos,
                                                Vector2 size, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(Player.UIHoverScale));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0.5f, 1f);
@@ -377,19 +377,19 @@ namespace Willowstead.UI
             rt.sizeDelta = size;
             rt.anchoredPosition = anchoredPos;
             Image img = go.GetComponent<Image>();
-            img.sprite = UIResourceHelper.GetBackgroundSprite();
+            img.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             img.type = Image.Type.Sliced;
-            img.color = new Color(0.38f, 0.26f, 0.16f, 1f);
+            img.color = new Color(0.96f, 0.90f, 0.82f, 1f); // Warm parchment card button
             img.raycastTarget = true;
 
             Button btn = go.GetComponent<Button>();
             btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
-            cb.normalColor      = new Color(0.38f, 0.26f, 0.16f, 1f);
-            cb.highlightedColor = new Color(0.54f, 0.38f, 0.24f, 1f);
-            cb.pressedColor     = new Color(0.24f, 0.16f, 0.10f, 1f);
+            cb.normalColor      = new Color(0.96f, 0.90f, 0.82f, 1f);
+            cb.highlightedColor = new Color(1.0f, 0.96f, 0.90f, 1f);
+            cb.pressedColor     = new Color(0.88f, 0.80f, 0.70f, 1f);
             cb.selectedColor    = cb.highlightedColor;
-            cb.disabledColor    = new Color(0.20f, 0.18f, 0.14f, 0.6f);
+            cb.disabledColor    = new Color(0.70f, 0.65f, 0.60f, 0.6f);
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
@@ -404,9 +404,9 @@ namespace Willowstead.UI
             Text txt = lblGo.AddComponent<Text>();
             txt.text = label;
             txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 18;
+            txt.fontSize = 16;
             txt.fontStyle = UnityEngine.FontStyle.Bold;
-            txt.color = new Color(1f, 0.94f, 0.82f, 1f);
+            txt.color = new Color(0.32f, 0.22f, 0.16f, 1f); // Rich dark roast text
             txt.alignment = TextAnchor.MiddleCenter;
             txt.raycastTarget = false;
 
@@ -445,39 +445,93 @@ namespace Willowstead.UI
 
         private void BuildOptionsPanel(Transform parent)
         {
-            BuildHeader(parent, "Options");
+            BuildHeader(parent, "Options & Audio");
 
-            GameObject header = NewChild(parent, "VolumeHeader");
-            RectTransform hr = SetAnchoredTopBand(header.transform, 60f, 100f);
-            TextMeshProUGUI hTxt = header.AddComponent<TextMeshProUGUI>();
-            hTxt.text = "Master Volume";
-            hTxt.fontSize = 18f;
-            hTxt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
-            hTxt.alignment = TextAlignmentOptions.Center;
-            hTxt.richText = false;
+            // Audio Channels Section (Neat card container with soft padding and spacing)
+            float startY = -68f;
+            float rowSpacing = 44f;
 
-            GameObject sliderGo = NewChild(parent, "VolumeSlider");
-            RectTransform sRt = SetAnchoredTopBand(sliderGo.transform, 110f, 150f);
+            BuildAudioVolumeRow(parent, "Master", Willowstead.Audio.AudioChannel.Master, startY);
+            BuildAudioVolumeRow(parent, "Weather", Willowstead.Audio.AudioChannel.Weather, startY - rowSpacing * 1);
+            BuildAudioVolumeRow(parent, "Music", Willowstead.Audio.AudioChannel.Music, startY - rowSpacing * 2);
+            BuildAudioVolumeRow(parent, "Sound Effects", Willowstead.Audio.AudioChannel.SFX, startY - rowSpacing * 3);
+            BuildAudioVolumeRow(parent, "Ambience", Willowstead.Audio.AudioChannel.Ambience, startY - rowSpacing * 4);
+
+            BuildMenuButton(parent, "Customize Controls", new Vector2(0f, -320f), new Vector2(260f, 44f), EnterControlsPanel);
+            BuildMenuButton(parent, "Back", new Vector2(0f, -378f), new Vector2(180f, 40f), Back);
+        }
+
+        private void BuildAudioVolumeRow(Transform parent, string label, Willowstead.Audio.AudioChannel channel, float yPos)
+        {
+            GameObject rowGo = new GameObject($"VolumeRow_{channel}", typeof(RectTransform), typeof(Image));
+            rowGo.transform.SetParent(parent, false);
+            RectTransform rRt = (RectTransform)rowGo.transform;
+            rRt.anchorMin = new Vector2(0.5f, 1f);
+            rRt.anchorMax = new Vector2(0.5f, 1f);
+            rRt.pivot = new Vector2(0.5f, 1f);
+            rRt.anchoredPosition = new Vector2(0f, yPos);
+            rRt.sizeDelta = new Vector2(480f, 38f);
+
+            Image rowBg = rowGo.GetComponent<Image>();
+            rowBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            rowBg.type = Image.Type.Sliced;
+            rowBg.color = new Color(0.10f, 0.08f, 0.06f, 0.50f); // subtle clean row backing
+
+            // Channel Label
+            GameObject lblGo = new GameObject("Label", typeof(RectTransform));
+            lblGo.transform.SetParent(rowGo.transform, false);
+            RectTransform lRt = (RectTransform)lblGo.transform;
+            lRt.anchorMin = new Vector2(0f, 0f);
+            lRt.anchorMax = new Vector2(0.36f, 1f);
+            lRt.offsetMin = new Vector2(14f, 0f);
+            lRt.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI lTxt = lblGo.AddComponent<TextMeshProUGUI>();
+            lTxt.text = label;
+            lTxt.fontSize = 14.5f;
+            lTxt.fontStyle = FontStyles.Bold;
+            lTxt.color = new Color(0.94f, 0.90f, 0.82f, 1f);
+            lTxt.alignment = TextAlignmentOptions.MidlineLeft;
+
+            // Slider
+            GameObject sliderGo = new GameObject("Slider", typeof(RectTransform));
+            sliderGo.transform.SetParent(rowGo.transform, false);
+            RectTransform sRt = (RectTransform)sliderGo.transform;
+            sRt.anchorMin = new Vector2(0.38f, 0f);
+            sRt.anchorMax = new Vector2(0.85f, 1f);
+            sRt.offsetMin = new Vector2(6f, 0f);
+            sRt.offsetMax = new Vector2(-6f, 0f);
+
             Slider slider = sliderGo.AddComponent<Slider>();
             slider.direction = Slider.Direction.LeftToRight;
             slider.minValue = 0f;
             slider.maxValue = 1f;
+            float initialVol = Willowstead.Audio.AudioManager.GetVolume(channel);
+            slider.value = initialVol;
 
-            float saved = PlayerPrefs.GetFloat(PlayerPrefKeys.MasterVolume, AudioListener.volume);
-            saved = Mathf.Clamp01(saved);
-            slider.value = saved;
-            AudioListener.volume = saved;
+            // Percentage readout
+            GameObject pctGo = new GameObject("Percent", typeof(RectTransform));
+            pctGo.transform.SetParent(rowGo.transform, false);
+            RectTransform pRt = (RectTransform)pctGo.transform;
+            pRt.anchorMin = new Vector2(0.86f, 0f);
+            pRt.anchorMax = new Vector2(1f, 1f);
+            pRt.offsetMin = Vector2.zero;
+            pRt.offsetMax = new Vector2(-12f, 0f);
+
+            TextMeshProUGUI pTxt = pctGo.AddComponent<TextMeshProUGUI>();
+            pTxt.text = $"{Mathf.RoundToInt(initialVol * 100)}%";
+            pTxt.fontSize = 13.5f;
+            pTxt.fontStyle = FontStyles.Bold;
+            pTxt.color = new Color(1f, 0.85f, 0.45f, 1f);
+            pTxt.alignment = TextAlignmentOptions.MidlineRight;
 
             slider.onValueChanged.AddListener(v =>
             {
-                AudioListener.volume = v;
-                PlayerPrefs.SetFloat(PlayerPrefKeys.MasterVolume, v);
-                PlayerPrefs.Save();
+                Willowstead.Audio.AudioManager.SetVolume(channel, v);
+                pTxt.text = $"{Mathf.RoundToInt(v * 100)}%";
             });
-            BuildSliderVisuals(slider);
 
-            BuildMenuButton(parent, "Customize Controls", new Vector2(0f, -220f), new Vector2(300f, 52f), EnterControlsPanel);
-            BuildMenuButton(parent, "Back", new Vector2(0f, -310f), new Vector2(220f, 50f), Back);
+            BuildSliderVisuals(slider);
         }
 
         private void BuildControlsPanel(Transform parent)
@@ -788,24 +842,30 @@ namespace Willowstead.UI
 
         private static void BuildSliderVisuals(Slider slider)
         {
+            // Background Groove (Thin, rounded dark track)
             GameObject bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
             bg.transform.SetParent(slider.transform, false);
             RectTransform bgRt = (RectTransform)bg.transform;
-            bgRt.anchorMin = new Vector2(0f, 0.35f);
-            bgRt.anchorMax = new Vector2(1f, 0.65f);
+            bgRt.anchorMin = new Vector2(0f, 0.40f);
+            bgRt.anchorMax = new Vector2(1f, 0.60f);
             bgRt.pivot = new Vector2(0.5f, 0.5f);
             bgRt.offsetMin = Vector2.zero;
             bgRt.offsetMax = Vector2.zero;
-            bg.GetComponent<Image>().color = new Color(0.10f, 0.09f, 0.07f, 1f);
 
+            Image bgImg = bg.GetComponent<Image>();
+            bgImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            bgImg.type = Image.Type.Sliced;
+            bgImg.color = new Color(0.05f, 0.04f, 0.03f, 0.90f);
+
+            // Fill Area (Sleek golden progress)
             GameObject fa = new GameObject("Fill Area", typeof(RectTransform));
             fa.transform.SetParent(slider.transform, false);
             RectTransform faRt = (RectTransform)fa.transform;
-            faRt.anchorMin = new Vector2(0f, 0.35f);
-            faRt.anchorMax = new Vector2(1f, 0.65f);
+            faRt.anchorMin = new Vector2(0f, 0.40f);
+            faRt.anchorMax = new Vector2(1f, 0.60f);
             faRt.pivot = new Vector2(0.5f, 0.5f);
-            faRt.offsetMin = new Vector2(8f, 0f);
-            faRt.offsetMax = new Vector2(-8f, 0f);
+            faRt.offsetMin = new Vector2(3f, 0f);
+            faRt.offsetMax = new Vector2(-3f, 0f);
 
             GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fill.transform.SetParent(fa.transform, false);
@@ -814,27 +874,37 @@ namespace Willowstead.UI
             fRt.anchorMax = Vector2.one;
             fRt.offsetMin = Vector2.zero;
             fRt.offsetMax = Vector2.zero;
-            fill.GetComponent<Image>().color = new Color(0.74f, 0.62f, 0.40f, 1f);
+
+            Image fillImg = fill.GetComponent<Image>();
+            fillImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            fillImg.type = Image.Type.Sliced;
+            fillImg.color = new Color(0.88f, 0.72f, 0.35f, 1f); // Warm amber gold fill
             slider.fillRect = fRt;
 
+            // Handle Slide Area
             GameObject ha = new GameObject("Handle Slide Area", typeof(RectTransform));
             ha.transform.SetParent(slider.transform, false);
             RectTransform haRt = (RectTransform)ha.transform;
             haRt.anchorMin = Vector2.zero;
             haRt.anchorMax = Vector2.one;
-            haRt.offsetMin = new Vector2(8f, 0f);
-            haRt.offsetMax = new Vector2(-8f, 0f);
+            haRt.offsetMin = new Vector2(4f, 0f);
+            haRt.offsetMax = new Vector2(-4f, 0f);
 
+            // Handle Thumb (Sleek, round-proportioned handle thumb)
             GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
             handle.transform.SetParent(ha.transform, false);
             RectTransform hRt = (RectTransform)handle.transform;
             hRt.anchorMin = new Vector2(0f, 0.5f);
             hRt.anchorMax = new Vector2(0f, 0.5f);
             hRt.pivot = new Vector2(0.5f, 0.5f);
-            hRt.sizeDelta = new Vector2(20f, 28f);
-            handle.GetComponent<Image>().color = new Color(0.94f, 0.88f, 0.62f, 1f);
+            hRt.sizeDelta = new Vector2(10f, 10f); // Sleek, small round button
+
+            Image hImg = handle.GetComponent<Image>();
+            hImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            hImg.type = Image.Type.Sliced;
+            hImg.color = new Color(1f, 0.96f, 0.88f, 1f); // Crisp ivory handle
             slider.handleRect = hRt;
-            slider.targetGraphic = handle.GetComponent<Image>();
+            slider.targetGraphic = hImg;
         }
 
         private void ApplyPreset(int idx)

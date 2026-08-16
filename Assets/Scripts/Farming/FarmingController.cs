@@ -17,6 +17,7 @@ namespace Willowstead.Farming
             WateringCan,
             Seeds,
             Axe,
+            Fertilizer,
             None
         }
 
@@ -325,6 +326,10 @@ namespace Willowstead.Farming
             {
                 _currentTool = FarmTool.Axe;
             }
+            else if (string.Equals(slot.itemName.Trim(), "Fertilizer", System.StringComparison.OrdinalIgnoreCase))
+            {
+                _currentTool = FarmTool.Fertilizer;
+            }
             else
             {
                 CropData matched = null;
@@ -427,6 +432,20 @@ namespace Willowstead.Farming
                     UseAxeAtCell(targetCell);
                     break;
 
+                case FarmTool.Fertilizer:
+                    {
+                        Player.InventorySlot fertSlot = _inventory.GetSlotItem(_selectedSlotIndex);
+                        if (fertSlot == null || fertSlot.IsEmpty) break;
+
+                        bool fertilized = World.GridManager.Instance.FertilizeCell(targetCell);
+                        if (fertilized)
+                        {
+                            _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
+                            PlayPlantingAudio();
+                        }
+                    }
+                    break;
+
                 case FarmTool.Seeds:
                     if (_currentCropData != null && _cropPrefab != null)
                     {
@@ -485,30 +504,32 @@ namespace Willowstead.Farming
         private void PlayTillingAudio()
         {
             if (_tillingAudioClip == null) return;
+            float vol = _farmingAudioVolume * Audio.AudioManager.SfxVolume;
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_audioSource != null)
             {
                 _audioSource.pitch = Random.Range(0.92f, 1.08f);
-                _audioSource.PlayOneShot(_tillingAudioClip, _farmingAudioVolume);
+                _audioSource.PlayOneShot(_tillingAudioClip, vol);
             }
             else
             {
-                AudioSource.PlayClipAtPoint(_tillingAudioClip, transform.position, _farmingAudioVolume);
+                AudioSource.PlayClipAtPoint(_tillingAudioClip, transform.position, vol);
             }
         }
 
         private void PlayPlantingAudio()
         {
             if (_plantingAudioClip == null) return;
+            float vol = _farmingAudioVolume * Audio.AudioManager.SfxVolume;
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_audioSource != null)
             {
                 _audioSource.pitch = Random.Range(0.94f, 1.06f);
-                _audioSource.PlayOneShot(_plantingAudioClip, _farmingAudioVolume);
+                _audioSource.PlayOneShot(_plantingAudioClip, vol);
             }
             else
             {
-                AudioSource.PlayClipAtPoint(_plantingAudioClip, transform.position, _farmingAudioVolume);
+                AudioSource.PlayClipAtPoint(_plantingAudioClip, transform.position, vol);
             }
         }
 

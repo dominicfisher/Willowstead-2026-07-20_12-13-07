@@ -141,7 +141,7 @@ namespace Willowstead.UI
             Image outerImg = outerFrameGo.GetComponent<Image>();
             outerImg.sprite = UIResourceHelper.GetBackgroundSprite();
             outerImg.type = Image.Type.Sliced;
-            outerImg.color = new Color(0.24f, 0.17f, 0.11f, 0.96f); // Rich walnut wood
+            outerImg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
 
             GameObject goldBorderGo = new GameObject("GoldBorder", typeof(RectTransform), typeof(Image));
             goldBorderGo.transform.SetParent(outerFrameGo.transform, false);
@@ -152,7 +152,7 @@ namespace Willowstead.UI
             Image goldImg = goldBorderGo.GetComponent<Image>();
             goldImg.sprite = UIResourceHelper.GetBackgroundSprite();
             goldImg.type = Image.Type.Sliced;
-            goldImg.color = new Color(0.78f, 0.62f, 0.32f, 0.75f); // Warm polished gold
+            goldImg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             GameObject innerBgGo = new GameObject("InnerBackground", typeof(RectTransform), typeof(Image));
             innerBgGo.transform.SetParent(goldBorderGo.transform, false);
@@ -163,7 +163,7 @@ namespace Willowstead.UI
             Image innerImg = innerBgGo.GetComponent<Image>();
             innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerImg.type = Image.Type.Sliced;
-            innerImg.color = new Color(0.08f, 0.07f, 0.07f, 0.96f);
+            innerImg.color = new Color(0.32f, 0.22f, 0.20f, 0.95f);
 
             GameObject maskGo = new GameObject("TickerMask", typeof(RectTransform), typeof(RectMask2D));
             maskGo.transform.SetParent(innerBgGo.transform, false);

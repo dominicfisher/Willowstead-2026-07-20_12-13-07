@@ -1,4 +1,5 @@
 using UnityEngine;
+using Willowstead.Player;
 
 namespace Willowstead.Farming
 {
@@ -23,6 +24,7 @@ namespace Willowstead.Farming
         public Vector3Int GridPosition => _gridPosition;
         public int CurrentStage => _currentStage;
         public int VisualsCount => _visualsCount;
+        public bool IsFertilized { get; set; } = false;
 
         /// <summary>
         /// True if the crop has reached its final growth stage.
@@ -117,6 +119,65 @@ namespace Willowstead.Farming
         private void Awake()
         {
             _spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        private void Start()
+        {
+            StartCoroutine(FertilizedGoldSparkleLoop());
+        }
+
+        private System.Collections.IEnumerator FertilizedGoldSparkleLoop()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(Random.Range(1.8f, 3.5f));
+
+                if (IsFertilized && gameObject.activeInHierarchy && _cropData != null)
+                {
+                    SpawnGoldSparkle();
+                }
+            }
+        }
+
+        private void SpawnGoldSparkle()
+        {
+            GameObject sparkGo = new GameObject("FertilizerGoldSpark");
+            sparkGo.transform.position = transform.position + new Vector3(Random.Range(-0.18f, 0.18f), Random.Range(-0.10f, 0.22f), 0f);
+            SpriteRenderer sr = sparkGo.AddComponent<SpriteRenderer>();
+            sr.sprite = UIResourceHelper.GetBackgroundSprite();
+            sr.color = new Color(1f, 0.88f, 0.40f, 0.95f); // Rich golden sparkle
+            sr.sortingLayerName = "Foreground";
+            sr.sortingOrder = 600;
+            sparkGo.transform.localScale = Vector3.one * 0.08f;
+            StartCoroutine(AnimateSingleSparkle(sparkGo, sr));
+        }
+
+        private System.Collections.IEnumerator AnimateSingleSparkle(GameObject go, SpriteRenderer sr)
+        {
+            float duration = Random.Range(0.6f, 0.9f);
+            float elapsed = 0f;
+            Vector3 startPos = go.transform.position;
+            Vector3 floatOffset = new Vector3(Random.Range(-0.06f, 0.06f), Random.Range(0.12f, 0.24f), 0f);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                if (go != null)
+                {
+                    go.transform.position = startPos + floatOffset * t;
+                    float scale = Mathf.Sin(t * Mathf.PI) * 0.10f;
+                    go.transform.localScale = new Vector3(scale, scale, 1f);
+                    if (sr != null)
+                    {
+                        sr.color = new Color(1f, 0.88f, 0.40f, Mathf.Sin(t * Mathf.PI));
+                    }
+                }
+                yield return null;
+            }
+
+            if (go != null) Destroy(go);
         }
 
         /// <summary>
@@ -299,22 +360,52 @@ namespace Willowstead.Farming
             if (_isHarvesting) return 0;
             _isHarvesting = true;
 
-            int count = Mathf.Max(1, _visualsCount) * _cropData.YieldCount;
-            string itemName = _cropData.YieldItemName;
+            int count = Mathf.Max(1, _visualsCount);
             
+            // Quality and Fertilizer Yield Calculation
+            // - If fertilized: 0% chance of rotten crop. 40% chance of bumper crop (+1 bonus yield per visual instance).
+            // - If NOT fertilized: 20% chance of rotten crop. 10% chance of bumper crop.
+            bool isRotten = false;
+            int bonusYieldPerInstance = 0;
+
+            if (IsFertilized)
+            {
+                isRotten = false;
+                if (Random.value < 0.40f)
+                {
+                    bonusYieldPerInstance = 1;
+                }
+            }
+            else
+            {
+                if (Random.value < 0.20f)
+                {
+                    isRotten = true;
+                }
+                else if (Random.value < 0.10f)
+                {
+                    bonusYieldPerInstance = 1;
+                }
+            }
+
+            string normalYield = _cropData.YieldItemName;
+            string rottenYield = _cropData.RottenYieldItemName;
+            string finalItemName = isRotten ? rottenYield : normalYield;
+            int totalYieldCount = count * (_cropData.YieldCount + bonusYieldPerInstance);
+
 #if UNITY_EDITOR
-            Debug.Log($"[Crop] Harvested {count}x {itemName}!");
+            Debug.Log($"[Crop] Harvested {totalYieldCount}x {finalItemName} (Fertilized: {IsFertilized}, Rotten: {isRotten}, Bonus: {bonusYieldPerInstance})!");
 #endif
 
             // Tell GridManager we are gone immediately so the cell space is cleared
             World.GridManager.Instance.RemoveCrop(_gridPosition);
 
-            StartCoroutine(PlayHarvestAnimationAndDestroy());
+            StartCoroutine(PlayHarvestAnimationAndDestroy(finalItemName, _cropData.YieldCount + bonusYieldPerInstance, isRotten));
 
-            return count;
+            return totalYieldCount;
         }
 
-        private System.Collections.IEnumerator PlayHarvestAnimationAndDestroy()
+        private System.Collections.IEnumerator PlayHarvestAnimationAndDestroy(string harvestedItemName, int yieldPerInstance, bool isRotten)
         {
             float popDuration = 0.16f; // How long each individual crop takes to jump and shrink
             float delayBetweenPops = 0.06f; // Delay before starting the next crop pop
@@ -326,7 +417,16 @@ namespace Willowstead.Farming
                 SpriteRenderer childSr = _childRenderers[i];
                 if (childSr == null) continue;
 
-                StartCoroutine(AnimateSingleCropHarvest(childSr, popDuration));
+                if (isRotten)
+                {
+                    childSr.color = new Color(0.65f, 0.55f, 0.45f, 0.85f); // Withered brown/grey tint for rotten crops
+                }
+                else if (IsFertilized)
+                {
+                    childSr.color = new Color(1.1f, 1.08f, 0.85f, 1f); // Golden shimmer for fertilized harvest
+                }
+
+                StartCoroutine(AnimateSingleCropHarvest(childSr, popDuration, harvestedItemName, yieldPerInstance));
                 yield return new WaitForSeconds(delayBetweenPops);
             }
 
@@ -336,7 +436,7 @@ namespace Willowstead.Farming
             Destroy(gameObject);
         }
 
-        private System.Collections.IEnumerator AnimateSingleCropHarvest(SpriteRenderer childSr, float duration)
+        private System.Collections.IEnumerator AnimateSingleCropHarvest(SpriteRenderer childSr, float duration, string yieldItemName, int singleYield)
         {
             float elapsed = 0f;
             Transform childTransform = childSr.transform;
@@ -373,12 +473,12 @@ namespace Willowstead.Farming
             }
 
             Player.HotbarUI hotbar = FindAnyObjectByType<Player.HotbarUI>();
-            string yieldItemName = _cropData.YieldItemName;
             RectTransform targetSlot = (hotbar != null) ? hotbar.GetSlotRectForItem(yieldItemName) : null;
-            int singleYield = _cropData.YieldCount;
             Player.InventoryManager inventory = FindAnyObjectByType<Player.InventoryManager>();
 
-            World.FlyingItemAnimation.Spawn(childSr.sprite, childSr.transform.position, targetSlot, () =>
+            Sprite flyingSprite = UIResourceHelper.GetItemIconSprite(yieldItemName) ?? childSr.sprite;
+
+            World.FlyingItemAnimation.Spawn(flyingSprite, childSr.transform.position, targetSlot, () =>
             {
                 if (inventory != null)
                 {

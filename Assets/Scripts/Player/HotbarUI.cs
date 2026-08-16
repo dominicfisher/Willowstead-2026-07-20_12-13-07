@@ -140,14 +140,25 @@ namespace Willowstead.Player
             float slotWidth = 52f;
             float slotHeight = 52f;
             float spacing = 6f;
-            float panelWidth = (8 * slotWidth) + (7 * spacing) + 24f;
-            float panelHeight = slotHeight + 16f;
+            float panelWidth = (8 * slotWidth) + (7 * spacing) + 20f;
+            float panelHeight = slotHeight + 14f;
             panelRect.sizeDelta = new Vector2(panelWidth, panelHeight);
 
+            // ── Outer Border & Cozy Slate ──
             Image panelBg = _hotbarGo.AddComponent<Image>();
             panelBg.sprite = UIResourceHelper.GetBackgroundSprite();
             panelBg.type = Image.Type.Sliced;
-            panelBg.color = new Color(0.12f, 0.10f, 0.08f, 0.92f);
+            panelBg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
+
+            GameObject innerSlateGo = new GameObject("InnerSlate", typeof(RectTransform), typeof(Image));
+            innerSlateGo.transform.SetParent(_hotbarGo.transform, false);
+            RectTransform innerSlateRt = (RectTransform)innerSlateGo.transform;
+            innerSlateRt.anchorMin = Vector2.zero; innerSlateRt.anchorMax = Vector2.one;
+            innerSlateRt.offsetMin = new Vector2(4f, 4f); innerSlateRt.offsetMax = new Vector2(-4f, -4f);
+            Image innerSlateBg = innerSlateGo.GetComponent<Image>();
+            innerSlateBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerSlateBg.type = Image.Type.Sliced;
+            innerSlateBg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             CanvasGroup cg = _hotbarGo.AddComponent<CanvasGroup>();
             if (UI.MainMenuUI.Instance != null && !UI.MainMenuUI.HasGameStarted)
@@ -162,7 +173,7 @@ namespace Willowstead.Player
 
             Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            float startX = -((panelWidth - 24f) * 0.5f) + (slotWidth * 0.5f);
+            float startX = -((panelWidth - 20f) * 0.5f) + (slotWidth * 0.5f);
 
             for (int i = 0; i < 8; i++)
             {
@@ -178,7 +189,7 @@ namespace Willowstead.Player
                 Image slotBg = slotGo.AddComponent<Image>();
                 slotBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 slotBg.type = Image.Type.Sliced;
-                slotBg.color = new Color(0.20f, 0.17f, 0.14f, 1.0f);
+                slotBg.color = new Color(0.96f, 0.90f, 0.82f, 1.0f); // Warm parchment slot
 
                 GameObject highlightGo = new GameObject("SlotHighlight");
                 highlightGo.transform.SetParent(slotGo.transform, false);
@@ -189,7 +200,7 @@ namespace Willowstead.Player
                 Image hlImage = highlightGo.AddComponent<Image>();
                 hlImage.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                 hlImage.type = Image.Type.Sliced;
-                hlImage.color = new Color(0f, 0f, 0f, 0.40f);
+                hlImage.color = new Color(0.85f, 0.65f, 0.48f, 0.25f);
                 hlImage.raycastTarget = false;
                 _slotHighlights[i] = hlImage;
 
@@ -215,13 +226,12 @@ namespace Willowstead.Player
                 countRect.sizeDelta = new Vector2(30f, 20f);
                 Text countText = countGo.AddComponent<Text>();
                 countText.font = legacyFont;
-                countText.fontSize = 14;
+                countText.fontSize = 13;
                 countText.fontStyle = FontStyle.Bold;
                 countText.alignment = TextAnchor.LowerRight;
-                countText.color = Color.white;
+                countText.color = new Color(0.25f, 0.16f, 0.10f, 1f);
                 countText.enabled = false;
                 countText.raycastTarget = false;
-                countGo.AddComponent<Outline>().effectColor = Color.black;
                 _slotCountTexts[i] = countText;
 
                 UIDragSlot dragSlot = slotGo.AddComponent<UIDragSlot>();

@@ -182,46 +182,70 @@ namespace Willowstead.Player
             float panelH = (2 * slotH) + (1 * spacingY) + 110f; // ~238px
             panelRect.sizeDelta = new Vector2(panelW, panelH);
 
+            // ── Outer Wooden Border & Cozy Mauve-Brown Slate ──
             Image panelBg = _panelGo.AddComponent<Image>();
             panelBg.sprite = UIResourceHelper.GetBackgroundSprite();
             panelBg.type = Image.Type.Sliced;
-            panelBg.color = new Color(0.10f, 0.08f, 0.06f, 0.96f);
+            panelBg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
+
+            GameObject innerGo = new GameObject("InnerSlate", typeof(RectTransform), typeof(Image));
+            innerGo.transform.SetParent(_panelGo.transform, false);
+            RectTransform innerRt = (RectTransform)innerGo.transform;
+            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
+            innerRt.offsetMin = new Vector2(8f, 8f); innerRt.offsetMax = new Vector2(-8f, -8f);
+            Image innerBg = innerGo.GetComponent<Image>();
+            innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            innerBg.type = Image.Type.Sliced;
+            innerBg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
+            // ── Parchment Header Banner ──
+            GameObject headerGo = new GameObject("InventoryHeader", typeof(RectTransform), typeof(Image));
+            headerGo.transform.SetParent(_panelGo.transform, false);
+            RectTransform headerRt = (RectTransform)headerGo.transform;
+            headerRt.anchorMin = new Vector2(0.5f, 1f);
+            headerRt.anchorMax = new Vector2(0.5f, 1f);
+            headerRt.pivot = new Vector2(0.5f, 1f);
+            headerRt.anchoredPosition = new Vector2(0f, -14f);
+            headerRt.sizeDelta = new Vector2(panelW - 32f, 32f);
+            Image headerBg = headerGo.GetComponent<Image>();
+            headerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            headerBg.type = Image.Type.Sliced;
+            headerBg.color = new Color(0.96f, 0.88f, 0.78f, 1f); // Creamy parchment header
+
             GameObject titleGo = new GameObject("InventoryTitle");
-            titleGo.transform.SetParent(_panelGo.transform, false);
+            titleGo.transform.SetParent(headerGo.transform, false);
             Text titleText = titleGo.AddComponent<Text>();
-            titleText.text = "INVENTORY";
+            titleText.text = "BACKPACK";
             titleText.font = legacyFont;
-            titleText.fontSize = 20;
+            titleText.fontSize = 15;
             titleText.fontStyle = FontStyle.Bold;
             titleText.alignment = TextAnchor.MiddleCenter;
-            titleText.color = new Color(1.0f, 0.82f, 0.0f, 1f); // Gold title
+            titleText.color = new Color(0.35f, 0.22f, 0.16f, 1f); // Rich dark roast text
 
             RectTransform titleRect = titleGo.GetComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0.5f, 1f);
-            titleRect.anchorMax = new Vector2(0.5f, 1f);
-            titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.anchoredPosition = new Vector2(0f, -14f);
-            titleRect.sizeDelta = new Vector2(200f, 30f);
+            titleRect.anchorMin = Vector2.zero;
+            titleRect.anchorMax = Vector2.one;
+            titleRect.offsetMin = Vector2.zero;
+            titleRect.offsetMax = Vector2.zero;
 
             GameObject goldGo = new GameObject("InventoryGoldText");
-            goldGo.transform.SetParent(_panelGo.transform, false);
+            goldGo.transform.SetParent(headerGo.transform, false);
             _goldText = goldGo.AddComponent<Text>();
-            _goldText.text = "Gold: 100";
+            _goldText.text = "100g";
             _goldText.font = legacyFont;
-            _goldText.fontSize = 15;
+            _goldText.fontSize = 13;
             _goldText.fontStyle = FontStyle.Bold;
             _goldText.alignment = TextAnchor.MiddleRight;
-            _goldText.color = new Color(0.95f, 0.88f, 0.55f, 1f);
+            _goldText.color = new Color(0.40f, 0.26f, 0.12f, 1f);
 
             RectTransform goldRect = goldGo.GetComponent<RectTransform>();
-            goldRect.anchorMin = new Vector2(1f, 1f);
+            goldRect.anchorMin = new Vector2(1f, 0f);
             goldRect.anchorMax = new Vector2(1f, 1f);
-            goldRect.pivot = new Vector2(1f, 1f);
-            goldRect.anchoredPosition = new Vector2(-18f, -14f);
-            goldRect.sizeDelta = new Vector2(150f, 30f);
+            goldRect.pivot = new Vector2(1f, 0.5f);
+            goldRect.anchoredPosition = new Vector2(-12f, 0f);
+            goldRect.sizeDelta = new Vector2(120f, 30f);
 
             GameObject gridGo = new GameObject("SlotsContainer");
             gridGo.transform.SetParent(_panelGo.transform, false);
@@ -229,7 +253,7 @@ namespace Willowstead.Player
             gridRect.anchorMin = new Vector2(0.5f, 0.5f);
             gridRect.anchorMax = new Vector2(0.5f, 0.5f);
             gridRect.pivot = new Vector2(0.5f, 0.5f);
-            gridRect.anchoredPosition = new Vector2(0f, -4f);
+            gridRect.anchoredPosition = new Vector2(0f, -6f);
             gridRect.sizeDelta = new Vector2((8 * slotW) + (7 * spacingX), (2 * slotH) + (1 * spacingY));
 
             _slotIcons = new Image[16];
@@ -255,7 +279,7 @@ namespace Willowstead.Player
                     Image slotBg = slotGo.AddComponent<Image>();
                     slotBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
                     slotBg.type = Image.Type.Sliced;
-                    slotBg.color = new Color(0.20f, 0.17f, 0.14f, 1.0f);
+                    slotBg.color = new Color(0.96f, 0.90f, 0.82f, 1f); // Warm parchment slot
 
                     GameObject iconGo = new GameObject("SlotIconImage");
                     iconGo.transform.SetParent(slotGo.transform, false);
@@ -279,13 +303,12 @@ namespace Willowstead.Player
                     countRect.sizeDelta = new Vector2(30f, 20f);
                     Text countText = countGo.AddComponent<Text>();
                     countText.font = legacyFont;
-                    countText.fontSize = 14;
+                    countText.fontSize = 13;
                     countText.fontStyle = FontStyle.Bold;
                     countText.alignment = TextAnchor.LowerRight;
-                    countText.color = Color.white;
+                    countText.color = new Color(0.25f, 0.16f, 0.10f, 1f);
                     countText.enabled = false;
                     countText.raycastTarget = false;
-                    countGo.AddComponent<Outline>().effectColor = Color.black;
                     _slotCountTexts[slotIdx] = countText;
 
                     UIDragSlot dragSlot = slotGo.AddComponent<UIDragSlot>();
@@ -300,8 +323,9 @@ namespace Willowstead.Player
             Text footerText = footerGo.AddComponent<Text>();
             footerText.text = "Press 'I' or 'Tab' to close";
             footerText.font = legacyFont;
-            footerText.fontSize = 13;
-            footerText.color = new Color(0.75f, 0.70f, 0.62f, 1.0f);
+            footerText.fontSize = 12;
+            footerText.fontStyle = FontStyle.Italic;
+            footerText.color = new Color(0.92f, 0.85f, 0.78f, 0.85f);
             footerText.alignment = TextAnchor.MiddleCenter;
 
             RectTransform footerRect = footerGo.GetComponent<RectTransform>();

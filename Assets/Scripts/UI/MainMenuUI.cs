@@ -275,7 +275,6 @@ namespace Willowstead.UI
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
-
             GameObject cardGo = new GameObject("MenuCard", typeof(RectTransform), typeof(Image));
             cardGo.transform.SetParent(_panelGo.transform, false);
             RectTransform cardRt = (RectTransform)cardGo.transform;
@@ -287,7 +286,7 @@ namespace Willowstead.UI
             Image cardBg = cardGo.GetComponent<Image>();
             cardBg.sprite = UIResourceHelper.GetBackgroundSprite();
             cardBg.type = Image.Type.Sliced;
-            cardBg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
+            cardBg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
             cardBg.raycastTarget = true;
 
             GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
@@ -295,12 +294,12 @@ namespace Willowstead.UI
             RectTransform innerRt = (RectTransform)innerGo.transform;
             innerRt.anchorMin = Vector2.zero;
             innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(10f, 10f);
-            innerRt.offsetMax = new Vector2(-10f, -10f);
+            innerRt.offsetMin = new Vector2(8f, 8f);
+            innerRt.offsetMax = new Vector2(-8f, -8f);
             Image innerBg = innerGo.GetComponent<Image>();
             innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerBg.type = Image.Type.Sliced;
-            innerBg.color = new Color(0.12f, 0.09f, 0.06f, 0.95f);
+            innerBg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             GameObject bannerGo = new GameObject("TitleBanner", typeof(RectTransform), typeof(Image));
             bannerGo.transform.SetParent(cardGo.transform, false);
@@ -308,12 +307,12 @@ namespace Willowstead.UI
             bannerRt.anchorMin = new Vector2(0.5f, 1f);
             bannerRt.anchorMax = new Vector2(0.5f, 1f);
             bannerRt.pivot = new Vector2(0.5f, 1f);
-            bannerRt.sizeDelta = new Vector2(360f, 50f);
+            bannerRt.sizeDelta = new Vector2(360f, 44f);
             bannerRt.anchoredPosition = new Vector2(0f, -20f);
             Image bannerBg = bannerGo.GetComponent<Image>();
-            bannerBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            bannerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             bannerBg.type = Image.Type.Sliced;
-            bannerBg.color = new Color(0.35f, 0.24f, 0.15f, 1f);
+            bannerBg.color = new Color(0.96f, 0.88f, 0.78f, 1f); // Creamy parchment header
 
             GameObject titleTextGo = new GameObject("TitleText", typeof(RectTransform));
             titleTextGo.transform.SetParent(bannerGo.transform, false);
@@ -321,7 +320,7 @@ namespace Willowstead.UI
             titleTextRt.anchorMin = Vector2.zero; titleTextRt.anchorMax = Vector2.one;
             titleTextRt.offsetMin = Vector2.zero; titleTextRt.offsetMax = Vector2.zero;
             BuildText(titleTextGo, "WILLOWSTEAD",
-                new Color(1f, 0.88f, 0.45f, 1f), fontSize: 26, style: FontStyles.Bold);
+                new Color(0.35f, 0.22f, 0.16f, 1f), fontSize: 24, style: FontStyles.Bold);
 
             GameObject subGo = new GameObject("Subtitle", typeof(RectTransform));
             subGo.transform.SetParent(cardGo.transform, false);
@@ -330,9 +329,9 @@ namespace Willowstead.UI
             subRt.anchorMax = new Vector2(0.5f, 1f);
             subRt.pivot = new Vector2(0.5f, 1f);
             subRt.sizeDelta = new Vector2(440f, 24f);
-            subRt.anchoredPosition = new Vector2(0f, -76f);
+            subRt.anchoredPosition = new Vector2(0f, -72f);
             BuildText(subGo, "a cozy farm in a deterministic world",
-                new Color(0.92f, 0.86f, 0.74f, 1f), fontSize: 13, style: FontStyles.Italic);
+                new Color(0.96f, 0.90f, 0.82f, 0.90f), fontSize: 13, style: FontStyles.Italic);
 
             _continueButton = BuildMenuButton(cardGo.transform, "Continue (Most Recent)",
                 new Vector2(0f, -110f), OnContinueClicked);
@@ -359,7 +358,7 @@ namespace Willowstead.UI
             hintRt.sizeDelta = new Vector2(440f, 26f);
             hintRt.anchoredPosition = new Vector2(0f, 14f);
             BuildText(hintGo, "Tip: press Enter in-game to open chat with friends.",
-                new Color(0.78f, 0.72f, 0.62f, 0.85f), fontSize: 12, style: FontStyles.Italic);
+                new Color(0.92f, 0.85f, 0.78f, 0.85f), fontSize: 12, style: FontStyles.Italic);
         }
 
         private void OnCharacterProfileClicked()
@@ -369,14 +368,16 @@ namespace Willowstead.UI
             Hide();
         }
 
-        private static void BuildText(GameObject parent, string text, Color color, float fontSize, FontStyles style)
+        private static void BuildText(GameObject go, string text, Color color,
+            float fontSize = 16, FontStyles style = FontStyles.Normal)
         {
-            var t = parent.AddComponent<TextMeshProUGUI>();
+            var t = go.AddComponent<TextMeshProUGUI>();
             t.text = text;
-            t.fontSize = fontSize;
             t.color = color;
+            t.fontSize = fontSize;
             t.fontStyle = style;
             t.alignment = TextAlignmentOptions.Center;
+            t.raycastTarget = false;
             t.richText = false;
 
             if (t.font == null || t.font.material == null)
@@ -388,28 +389,28 @@ namespace Willowstead.UI
 
         private static Button BuildMenuButton(Transform parent, string label, Vector2 anchoredPos, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image));
+            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Player.UIHoverScale));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0.5f, 1f);
             rt.anchorMax = new Vector2(0.5f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
-            rt.sizeDelta = new Vector2(380f, 52f);
+            rt.sizeDelta = new Vector2(380f, 48f);
             rt.anchoredPosition = anchoredPos;
             Image img = go.GetComponent<Image>();
-            img.sprite = UIResourceHelper.GetBackgroundSprite();
+            img.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             img.type = Image.Type.Sliced;
-            img.color = new Color(0.38f, 0.26f, 0.16f, 1f); // Warm wood button
+            img.color = new Color(0.96f, 0.90f, 0.82f, 1f); // Warm parchment card button
             img.raycastTarget = true;
 
             Button btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
-            cb.normalColor = new Color(0.38f, 0.26f, 0.16f, 1f);
-            cb.highlightedColor = new Color(0.54f, 0.38f, 0.24f, 1f);
-            cb.pressedColor = new Color(0.24f, 0.16f, 0.10f, 1f);
+            cb.normalColor = new Color(0.96f, 0.90f, 0.82f, 1f);
+            cb.highlightedColor = new Color(1.0f, 0.96f, 0.90f, 1f);
+            cb.pressedColor = new Color(0.88f, 0.80f, 0.70f, 1f);
             cb.selectedColor = cb.highlightedColor;
-            cb.disabledColor = new Color(0.20f, 0.18f, 0.14f, 0.6f);
+            cb.disabledColor = new Color(0.70f, 0.65f, 0.60f, 0.6f);
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
@@ -422,9 +423,9 @@ namespace Willowstead.UI
             Text legacyTxt = lblGo.AddComponent<Text>();
             legacyTxt.text = label;
             legacyTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            legacyTxt.fontSize = 18;
+            legacyTxt.fontSize = 16;
             legacyTxt.fontStyle = UnityEngine.FontStyle.Bold;
-            legacyTxt.color = new Color(1f, 0.94f, 0.82f, 1f);
+            legacyTxt.color = new Color(0.32f, 0.22f, 0.16f, 1f); // Rich dark roast text
             legacyTxt.alignment = TextAnchor.MiddleCenter;
             legacyTxt.raycastTarget = false;
 

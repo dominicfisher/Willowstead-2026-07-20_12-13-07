@@ -47,6 +47,7 @@ namespace Willowstead.Persistence
         // Grid state (player-modified cells).
         public List<Vector3IntRecord> tilledCells = new List<Vector3IntRecord>();
         public List<Vector3IntRecord> wateredCells = new List<Vector3IntRecord>();
+        public List<Vector3IntRecord> fertilizedCells = new List<Vector3IntRecord>();
         public List<SavedMoisture> moistureLevels = new List<SavedMoisture>();
 
         // Crops alive in the world.
@@ -102,6 +103,7 @@ namespace Willowstead.Persistence
         public int currentStage;
         public int daysInCurrentStage;
         public int visualsCount;
+        public bool isFertilized;
     }
 
     /// <summary>

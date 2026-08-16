@@ -238,6 +238,9 @@ namespace Willowstead.Player
             if (itemName == "Hoe") mainColor = new Color(0.7f, 0.45f, 0.25f, 1f);
             else if (itemName == "Watering Can") mainColor = new Color(0.2f, 0.55f, 0.9f, 1f);
             else if (itemName == "Axe") mainColor = new Color(0.6f, 0.65f, 0.7f, 1f);
+            else if (itemName == "Fertilizer") mainColor = new Color(0.35f, 0.85f, 0.35f, 1f); // Vibrant emerald fertilizer
+            else if (itemName.StartsWith("Rotten", System.StringComparison.OrdinalIgnoreCase) || itemName.Contains("Bad"))
+                mainColor = new Color(0.45f, 0.38f, 0.28f, 1f); // Dark withered brown
             else if (itemName.Contains("Seed")) mainColor = new Color(0.35f, 0.75f, 0.35f, 1f);
             else if (itemName == "Carrot") mainColor = new Color(1.0f, 0.5f, 0.1f, 1f);
             else if (itemName == "Wood" || itemName == "Log") mainColor = new Color(0.55f, 0.35f, 0.2f, 1f);

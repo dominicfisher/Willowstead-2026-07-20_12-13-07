@@ -234,7 +234,7 @@ namespace Willowstead.UI
             Image winWoodImg = winWoodGo.GetComponent<Image>();
             winWoodImg.sprite = UIResourceHelper.GetBackgroundSprite();
             winWoodImg.type = Image.Type.Sliced;
-            winWoodImg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
+            winWoodImg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
 
             GameObject winTrimGo = new GameObject("GoldTrim", typeof(RectTransform), typeof(Image));
             winTrimGo.transform.SetParent(winWoodGo.transform, false);
@@ -245,18 +245,18 @@ namespace Willowstead.UI
             Image winTrimImg = winTrimGo.GetComponent<Image>();
             winTrimImg.sprite = UIResourceHelper.GetBackgroundSprite();
             winTrimImg.type = Image.Type.Sliced;
-            winTrimImg.color = new Color(0.72f, 0.58f, 0.32f, 0.65f);
+            winTrimImg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
 
             GameObject winInnerGo = new GameObject("InnerBacking", typeof(RectTransform), typeof(Image));
             winInnerGo.transform.SetParent(winTrimGo.transform, false);
             RectTransform winInnerRt = (RectTransform)winInnerGo.transform;
             winInnerRt.anchorMin = Vector2.zero; winInnerRt.anchorMax = Vector2.one;
-            winInnerRt.offsetMin = new Vector2(3f, 3f);
-            winInnerRt.offsetMax = new Vector2(-3f, -3f);
+            winInnerRt.offsetMin = new Vector2(4f, 4f);
+            winInnerRt.offsetMax = new Vector2(-4f, -4f);
             Image winInnerImg = winInnerGo.GetComponent<Image>();
             winInnerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             winInnerImg.type = Image.Type.Sliced;
-            winInnerImg.color = new Color(0.10f, 0.09f, 0.08f, 0.98f);
+            winInnerImg.color = new Color(0.32f, 0.22f, 0.20f, 0.98f);
 
             GameObject headerGo = new GameObject("Header", typeof(RectTransform), typeof(Image));
             headerGo.transform.SetParent(winInnerGo.transform, false);
@@ -268,9 +268,9 @@ namespace Willowstead.UI
             headRect.sizeDelta = new Vector2(0f, 52f);
 
             Image headBg = headerGo.GetComponent<Image>();
-            headBg.sprite = UIResourceHelper.GetBackgroundSprite();
+            headBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             headBg.type = Image.Type.Sliced;
-            headBg.color = new Color(0.18f, 0.13f, 0.09f, 1f);
+            headBg.color = new Color(0.96f, 0.88f, 0.78f, 1f); // Creamy parchment header
 
             GameObject titleGo = new GameObject("TitleText", typeof(RectTransform));
             titleGo.transform.SetParent(headerGo.transform, false);
@@ -282,10 +282,10 @@ namespace Willowstead.UI
 
             var titleTxt = titleGo.AddComponent<TextMeshProUGUI>();
             if (font != null) titleTxt.font = font;
-            titleTxt.fontSize = 20;
+            titleTxt.fontSize = 18;
             titleTxt.fontStyle = FontStyles.Bold;
             titleTxt.alignment = TextAlignmentOptions.MidlineLeft;
-            titleTxt.color = new Color(1f, 0.88f, 0.52f, 1f);
+            titleTxt.color = new Color(0.35f, 0.22f, 0.16f, 1f); // Rich roast text
             titleTxt.text = "✦ WORLD MAP";
 
             GameObject pCoordsGo = new GameObject("PlayerCoords", typeof(RectTransform));

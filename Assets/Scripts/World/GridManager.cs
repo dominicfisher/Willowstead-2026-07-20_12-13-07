@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using Willowstead.Player;
 
 namespace Willowstead.World
 {
@@ -44,6 +45,7 @@ namespace Willowstead.World
 
         private HashSet<Vector3Int> _tilledCells = new HashSet<Vector3Int>();
         private HashSet<Vector3Int> _wateredCells = new HashSet<Vector3Int>();
+        private HashSet<Vector3Int> _fertilizedCells = new HashSet<Vector3Int>();
         private Dictionary<Vector3Int, int> _moistureLevels = new Dictionary<Vector3Int, int>();
 
         [Header("Farmland Edges")]
@@ -71,6 +73,13 @@ namespace Willowstead.World
         {
             var list = new List<Willowstead.Persistence.Vector3IntRecord>(_wateredCells.Count);
             foreach (var c in _wateredCells) list.Add(new Willowstead.Persistence.Vector3IntRecord(c));
+            return list;
+        }
+
+        public List<Willowstead.Persistence.Vector3IntRecord> CaptureFertilizedCells()
+        {
+            var list = new List<Willowstead.Persistence.Vector3IntRecord>(_fertilizedCells.Count);
+            foreach (var c in _fertilizedCells) list.Add(new Willowstead.Persistence.Vector3IntRecord(c));
             return list;
         }
 
@@ -102,6 +111,7 @@ namespace Willowstead.World
                     currentStage = crop.CurrentStage,
                     daysInCurrentStage = 0,
                     visualsCount = crop.VisualsCount,
+                    isFertilized = crop.IsFertilized,
                 });
             }
             return list;
@@ -150,6 +160,12 @@ namespace Willowstead.World
 
             foreach (var cell in _tilledCells) UpdateEdgeFringesAround(cell);
 
+            for (int i = 0; i < data.fertilizedCells.Count; i++)
+            {
+                Vector3Int cell = data.fertilizedCells[i].ToVector3Int();
+                _fertilizedCells.Add(cell);
+            }
+
             for (int i = 0; i < data.crops.Count; i++)
             {
                 var sc = data.crops[i];
@@ -157,7 +173,7 @@ namespace Willowstead.World
                 Vector3Int cell = sc.cell.ToVector3Int();
                 Farming.CropData data2 = FindCropDataByName(sc.cropDataName);
                 if (data2 == null) continue;
-                PlantCropFromSave(cell, data2, sc.currentStage, sc.visualsCount);
+                PlantCropFromSave(cell, data2, sc.currentStage, sc.visualsCount, sc.isFertilized);
             }
         }
 
@@ -177,13 +193,14 @@ namespace Willowstead.World
         /// retriggering growth pop-ups. Synthesizes a fresh GameObject if
         /// no prefab reference exists, so a save always loads cleanly.
         /// </summary>
-        private void PlantCropFromSave(Vector3Int cell, Farming.CropData cropData, int currentStage, int visualsCount)
+        private void PlantCropFromSave(Vector3Int cell, Farming.CropData cropData, int currentStage, int visualsCount, bool isFertilized = false)
         {
             if (HasCrop(cell)) return;
             GameObject cropGo = new GameObject($"Crop_{cell.x}_{cell.y}");
             cropGo.transform.position = CellToWorldCenter(cell);
             Farming.Crop crop = cropGo.AddComponent<Farming.Crop>();
             crop.Initialize(cropData, cell);
+            crop.IsFertilized = isFertilized || _fertilizedCells.Contains(cell);
             _activeCrops.Add(cell, crop);
             crop.ForceStage(currentStage, visualsCount);
         }
@@ -570,6 +587,101 @@ namespace Willowstead.World
         }
 
         /// <summary>
+        /// Enriches the specified tilled soil or growing crop with fertilizer.
+        /// </summary>
+        public bool FertilizeCell(Vector3Int cellPosition)
+        {
+            if (!_tilledCells.Contains(cellPosition))
+            {
+#if UNITY_EDITOR
+                Debug.LogWarning($"[GridManager] Cannot fertilize cell at {cellPosition}: must be tilled first.");
+#endif
+                return false;
+            }
+
+            if (_fertilizedCells.Contains(cellPosition))
+            {
+                return false; // Already fertilized
+            }
+
+            _fertilizedCells.Add(cellPosition);
+
+            if (_activeCrops.TryGetValue(cellPosition, out Farming.Crop activeCrop) && activeCrop != null)
+            {
+                activeCrop.IsFertilized = true;
+            }
+
+            SpawnFertilizerSparkle(cellPosition);
+
+#if UNITY_EDITOR
+            Debug.Log($"[GridManager] Fertilized cell at {cellPosition}.");
+#endif
+            return true;
+        }
+
+        public bool IsCellFertilized(Vector3Int cellPosition)
+        {
+            return _fertilizedCells.Contains(cellPosition);
+        }
+
+        private void SpawnFertilizerSparkle(Vector3Int cell)
+        {
+            Vector3 worldPos = CellToWorldCenter(cell);
+            GameObject sparkleGo = new GameObject($"FertilizerSparkle_{cell.x}_{cell.y}");
+            sparkleGo.transform.position = worldPos;
+            StartCoroutine(AnimateFertilizerSparkle(sparkleGo));
+        }
+
+        private System.Collections.IEnumerator AnimateFertilizerSparkle(GameObject sparkleGo)
+        {
+            int sparkCount = 8;
+            List<GameObject> sparks = new List<GameObject>();
+            for (int i = 0; i < sparkCount; i++)
+            {
+                GameObject s = new GameObject("Spark");
+                s.transform.SetParent(sparkleGo.transform, false);
+                SpriteRenderer sr = s.AddComponent<SpriteRenderer>();
+                sr.sprite = _dirtParticleSprite != null ? _dirtParticleSprite : UIResourceHelper.GetBackgroundSprite();
+                // Rich golden sparkle burst
+                sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, 0.95f) : new Color(1f, 0.96f, 0.65f, 0.95f);
+                sr.sortingLayerName = "Foreground";
+                sr.sortingOrder = 500;
+                s.transform.localScale = Vector3.one * 0.14f;
+                sparks.Add(s);
+            }
+
+            float duration = 0.55f;
+            float elapsed = 0f;
+            Vector3[] directions = new Vector3[sparkCount];
+            for (int i = 0; i < sparkCount; i++)
+            {
+                float angle = i * (360f / sparkCount) * Mathf.Deg2Rad;
+                directions[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(0.30f, 0.55f);
+            }
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                for (int i = 0; i < sparkCount; i++)
+                {
+                    if (sparks[i] == null) continue;
+                    sparks[i].transform.localPosition = Vector3.Lerp(Vector3.zero, directions[i], t) + new Vector3(0f, Mathf.Sin(t * Mathf.PI) * 0.18f, 0f);
+                    SpriteRenderer sr = sparks[i].GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        float alpha = Mathf.Sin(t * Mathf.PI);
+                        sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, alpha) : new Color(1f, 0.96f, 0.65f, alpha);
+                    }
+                }
+                yield return null;
+            }
+
+            Destroy(sparkleGo);
+        }
+
+        /// <summary>
         /// Plants a crop on a tilled cell.
         /// </summary>
         public bool PlantCrop(Vector3Int cellPosition, Farming.CropData cropData, GameObject cropPrefab)
@@ -600,10 +712,11 @@ namespace Willowstead.World
             }
 
             cropComponent.Initialize(cropData, cellPosition);
+            cropComponent.IsFertilized = _fertilizedCells.Contains(cellPosition);
             _activeCrops.Add(cellPosition, cropComponent);
 
 #if UNITY_EDITOR
-            Debug.Log($"[GridManager] Planted {cropData.CropName} at: {cellPosition}. Total individual crops growing in the world: {GetTotalCropsPlanted()}");
+            Debug.Log($"[GridManager] Planted {cropData.CropName} at: {cellPosition} (Fertilized: {cropComponent.IsFertilized}). Total individual crops growing in the world: {GetTotalCropsPlanted()}");
 #endif
             return true;
         }

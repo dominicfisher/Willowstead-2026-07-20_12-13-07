@@ -315,7 +315,7 @@ namespace Willowstead.World
 
         private void Update()
         {
-            float ceiling = _maxAmbienceVolume;
+            float ceiling = _maxAmbienceVolume * Willowstead.Audio.AudioManager.WeatherVolume;
             float outdoorRainTarget = _isIndoors ? 0f : _currentIntensity * ceiling;
             float indoorRainTarget = _isIndoors ? _currentIntensity * ceiling : 0f;
 
@@ -454,7 +454,7 @@ namespace Willowstead.World
             AudioClip clip = _thunderClips[Random.Range(0, _thunderClips.Length)];
             if (clip != null)
             {
-                _thunder.PlayOneShot(clip, _maxThunderVolume);
+                _thunder.PlayOneShot(clip, _maxThunderVolume * Willowstead.Audio.AudioManager.WeatherVolume);
             }
         }
 

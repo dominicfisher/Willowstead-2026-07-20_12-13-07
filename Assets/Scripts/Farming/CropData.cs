@@ -32,6 +32,9 @@ namespace Willowstead.Farming
         [Tooltip("Item identifier of the crop produced when harvested.")]
         [SerializeField] private string _yieldItemName = "Turnip Item";
 
+        [Tooltip("Item identifier of the rotten/bad crop produced if unfertilized crop spoils.")]
+        [SerializeField] private string _rottenYieldItemName = string.Empty;
+
         [Tooltip("Quantity of items produced when harvested.")]
         [SerializeField] private int _yieldCount = 1;
 
@@ -65,6 +68,7 @@ namespace Willowstead.Farming
         public Sprite[] GrowthStageSprites => _growthStageSprites;
         public Sprite SeedIcon => _seedIcon;
         public string YieldItemName => _yieldItemName;
+        public string RottenYieldItemName => !string.IsNullOrEmpty(_rottenYieldItemName) ? _rottenYieldItemName : $"Rotten {_cropName}";
         public int YieldCount => _yieldCount;
 
         public CropLayoutMode LayoutMode => _layoutMode;

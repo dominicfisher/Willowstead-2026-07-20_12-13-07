@@ -362,6 +362,7 @@ namespace Willowstead.Persistence
                 d.currentDay = GridManager.Instance.CurrentDay;
                 d.tilledCells.AddRange(GridManager.Instance.CaptureTilledCells());
                 d.wateredCells.AddRange(GridManager.Instance.CaptureWateredCells());
+                d.fertilizedCells.AddRange(GridManager.Instance.CaptureFertilizedCells());
                 d.moistureLevels.AddRange(GridManager.Instance.CaptureMoistureLevels());
                 d.crops.AddRange(GridManager.Instance.CaptureCrops());
             }

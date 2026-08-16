@@ -56,21 +56,16 @@ namespace Willowstead.UI
         private void Update()
         {
             var kb = UnityEngine.InputSystem.Keyboard.current;
-            bool tPressed = false;
+            bool tPressed = Input.KeyRebindingManager.WasPressedThisFrame(Input.KeyAction.Chat);
             bool enterPressed = false;
             bool escapePressed = false;
 
             if (kb != null)
             {
-                if (kb.tKey.wasPressedThisFrame) tPressed = true;
                 if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame) enterPressed = true;
                 if (kb.escapeKey.wasPressedThisFrame) escapePressed = true;
             }
 
-            if (!tPressed)
-            {
-                try { if (UnityEngine.Input.GetKeyDown(KeyCode.T)) tPressed = true; } catch { }
-            }
             if (!enterPressed)
             {
                 try { if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter)) enterPressed = true; } catch { }
@@ -78,17 +73,6 @@ namespace Willowstead.UI
             if (!escapePressed)
             {
                 try { if (UnityEngine.Input.GetKeyDown(KeyCode.Escape)) escapePressed = true; } catch { }
-            }
-
-            if (tPressed || enterPressed)
-            {
-                string keyName = tPressed ? "T" : "Enter";
-                Debug.Log($"[ChatDebug] '{keyName}' pressed. IsOpen: {IsOpen}, " +
-                          $"MainMenuVisible: {MainMenuUI.Instance != null && MainMenuUI.Instance.IsVisible}, " +
-                          $"WorldSetupVisible: {WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible}, " +
-                          $"CharCreationVisible: {CharacterCreationUI.Instance != null && CharacterCreationUI.Instance.IsVisible}, " +
-                          $"PauseOpen: {PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen}, " +
-                          $"DevConsoleOpen: {Debugging.DevConsole.Instance != null && Debugging.DevConsole.Instance.IsOpen}");
             }
 
             // Only handle chat hotkey when main menu / modals are not covering
@@ -105,7 +89,6 @@ namespace Willowstead.UI
             {
                 if (openPressed)
                 {
-                    Debug.Log("[ChatDebug] Opening chat window!");
                     OpenChat();
                 }
             }
@@ -113,7 +96,6 @@ namespace Willowstead.UI
             {
                 if (closePressed)
                 {
-                    Debug.Log("[ChatDebug] Closing chat window via Escape.");
                     CloseChat();
                 }
             }
@@ -132,11 +114,7 @@ namespace Willowstead.UI
 
         public void OpenChat()
         {
-            if (_chatRoot == null || _inputField == null)
-            {
-                Debug.LogWarning($"[ChatDebug] Cannot OpenChat! _chatRoot: {_chatRoot != null}, _inputField: {_inputField != null}");
-                return;
-            }
+            if (_chatRoot == null || _inputField == null) return;
             _chatRoot.SetActive(true);
             _inputField.gameObject.SetActive(true);
             _inputField.text = string.Empty;
@@ -146,7 +124,6 @@ namespace Willowstead.UI
             InputReader.BlockGameplayInput = true;
             ShowChatLogs(true);
             SetLocalTyping(true);
-            Debug.Log("[ChatDebug] Chat successfully opened and activated.");
         }
 
         private IEnumerator FocusChatFieldNextFrame()
@@ -191,21 +168,28 @@ namespace Willowstead.UI
 
             ShowChatLogs(true);
 
-            GameObject msgGo = new GameObject("ChatMsg", typeof(RectTransform));
+            GameObject msgGo = new GameObject("ChatMsg", typeof(RectTransform), typeof(ContentSizeFitter));
             msgGo.transform.SetParent(_logContainer.transform, false);
             RectTransform rt = (RectTransform)msgGo.transform;
             rt.anchorMin = new Vector2(0f, 0f);
             rt.anchorMax = new Vector2(1f, 0f);
             rt.pivot = new Vector2(0f, 0f);
-            rt.sizeDelta = new Vector2(0f, 26f);
+            rt.sizeDelta = new Vector2(0f, 30f);
+
+            var csf = msgGo.GetComponent<ContentSizeFitter>();
+            csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             var t = msgGo.AddComponent<TextMeshProUGUI>();
-            string colorHex = isLocal ? "#FFD670" : "#80D27F";
+            string colorHex = isLocal ? "#FFDF85" : "#8CE88B";
             t.text = $"<color={colorHex}><b>{sender}:</b></color> {message}";
-            t.fontSize = 15f;
-            t.color = new Color(0.96f, 0.94f, 0.90f, 1f);
-            t.outlineWidth = 0.2f;
-            t.outlineColor = Color.black;
+            t.fontSize = 15.5f;
+            t.color = new Color(0.98f, 0.96f, 0.92f, 1f);
+            t.outlineWidth = 0.22f;
+            t.outlineColor = new Color32(10, 10, 12, 255);
+            t.alignment = TextAlignmentOptions.MidlineLeft;
+            t.textWrappingMode = TextWrappingModes.Normal;
+            t.overflowMode = TextOverflowModes.Overflow;
 
             _messageEntries.Add(msgGo);
             if (_messageEntries.Count > 25)
@@ -257,7 +241,7 @@ namespace Willowstead.UI
 
         private IEnumerator FadeOutChatRoutine()
         {
-            yield return new WaitForSecondsRealtime(5.0f);
+            yield return new WaitForSecondsRealtime(6.0f);
             float elapsed = 0f;
             float dur = 0.8f;
             while (elapsed < dur)
@@ -278,26 +262,55 @@ namespace Willowstead.UI
             rt.anchorMax = new Vector2(0f, 0f);
             rt.pivot = new Vector2(0f, 0f);
             rt.anchoredPosition = new Vector2(24f, 118f);
-            rt.sizeDelta = new Vector2(380f, 180f);
+            rt.sizeDelta = new Vector2(520f, 240f);
 
             _canvasGroup = _chatRoot.GetComponent<CanvasGroup>();
             _canvasGroup.alpha = 0f; // Start hidden till message sent/received
 
-            // Log Scroll / Container
-            GameObject logScroll = new GameObject("LogContainer", typeof(RectTransform), typeof(VerticalLayoutGroup));
-            logScroll.transform.SetParent(_chatRoot.transform, false);
+            // Chat Backing Plate (Rich, semi-opaque dark slate backing with slight border)
+            GameObject bgPlate = new GameObject("LogBacking", typeof(RectTransform), typeof(Image));
+            bgPlate.transform.SetParent(_chatRoot.transform, false);
+            RectTransform bgRt = (RectTransform)bgPlate.transform;
+            bgRt.anchorMin = Vector2.zero;
+            bgRt.anchorMax = Vector2.one;
+            bgRt.offsetMin = new Vector2(-6f, -4f);
+            bgRt.offsetMax = new Vector2(6f, 6f);
+            Image bgImg = bgPlate.GetComponent<Image>();
+            bgImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            bgImg.type = Image.Type.Sliced;
+            bgImg.color = new Color(0.06f, 0.05f, 0.04f, 0.88f); // Solid rich dark backing
+
+            // Viewport Mask (Clips messages so they never escape or bleed outside the chat window)
+            GameObject viewportGo = new GameObject("LogViewport", typeof(RectTransform), typeof(RectMask2D));
+            viewportGo.transform.SetParent(_chatRoot.transform, false);
+            RectTransform vpRt = (RectTransform)viewportGo.transform;
+            vpRt.anchorMin = new Vector2(0f, 0f);
+            vpRt.anchorMax = new Vector2(1f, 1f);
+            vpRt.pivot = new Vector2(0f, 0f);
+            vpRt.offsetMin = new Vector2(10f, 48f);
+            vpRt.offsetMax = new Vector2(-10f, -8f);
+
+            // Log Container (Child of Viewport, anchored to bottom so recent messages sit near the input bar)
+            GameObject logScroll = new GameObject("LogContainer", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            logScroll.transform.SetParent(viewportGo.transform, false);
             RectTransform lsRt = (RectTransform)logScroll.transform;
             lsRt.anchorMin = new Vector2(0f, 0f);
-            lsRt.anchorMax = new Vector2(1f, 1f);
+            lsRt.anchorMax = new Vector2(1f, 0f);
             lsRt.pivot = new Vector2(0f, 0f);
-            lsRt.offsetMin = new Vector2(0f, 44f);
-            lsRt.offsetMax = new Vector2(0f, 0f);
+            lsRt.anchoredPosition = Vector2.zero;
+            lsRt.sizeDelta = Vector2.zero;
+
+            var logCsf = logScroll.GetComponent<ContentSizeFitter>();
+            logCsf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            logCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             var vlg = logScroll.GetComponent<VerticalLayoutGroup>();
             vlg.childAlignment = TextAnchor.LowerLeft;
+            vlg.childControlHeight = true;
+            vlg.childControlWidth = true;
             vlg.childForceExpandHeight = false;
             vlg.childForceExpandWidth = true;
-            vlg.spacing = 3f;
+            vlg.spacing = 6f; // Clean spacing between messages
             _logContainer = logScroll;
 
             // Typing Status Label
@@ -306,11 +319,11 @@ namespace Willowstead.UI
             RectTransform typRt = (RectTransform)typingGo.transform;
             typRt.anchorMin = new Vector2(0f, 0f); typRt.anchorMax = new Vector2(1f, 0f);
             typRt.pivot = new Vector2(0f, 0f);
-            typRt.anchoredPosition = new Vector2(0f, 44f);
-            typRt.sizeDelta = new Vector2(0f, 20f);
+            typRt.anchoredPosition = new Vector2(8f, 44f);
+            typRt.sizeDelta = new Vector2(0f, 22f);
             _typingStatusText = typingGo.AddComponent<TextMeshProUGUI>();
-            _typingStatusText.fontSize = 13f;
-            _typingStatusText.color = new Color(0.9f, 0.9f, 0.6f, 0.9f);
+            _typingStatusText.fontSize = 13.5f;
+            _typingStatusText.color = new Color(0.95f, 0.92f, 0.65f, 0.95f);
             typingGo.SetActive(false);
 
             // Chat Input Row
@@ -320,13 +333,13 @@ namespace Willowstead.UI
             inRt.anchorMin = new Vector2(0f, 0f);
             inRt.anchorMax = new Vector2(1f, 0f);
             inRt.pivot = new Vector2(0f, 0f);
-            inRt.anchoredPosition = Vector2.zero;
-            inRt.sizeDelta = new Vector2(0f, 38f);
+            inRt.anchoredPosition = new Vector2(4f, 4f);
+            inRt.sizeDelta = new Vector2(-8f, 38f);
 
             Image inBg = inRow.GetComponent<Image>();
             inBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             inBg.type = Image.Type.Sliced;
-            inBg.color = new Color(0.08f, 0.06f, 0.04f, 0.95f);
+            inBg.color = new Color(0.12f, 0.09f, 0.07f, 0.98f); // Crisp distinct input line
 
             GameObject textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
             textArea.transform.SetParent(inRow.transform, false);
@@ -353,7 +366,7 @@ namespace Willowstead.UI
             ph.text = "Press Enter to chat (Esc to close)...";
             ph.fontSize = 14f;
             ph.fontStyle = FontStyles.Italic;
-            ph.color = new Color(0.6f, 0.58f, 0.52f, 0.5f);
+            ph.color = new Color(0.7f, 0.68f, 0.60f, 0.6f);
             ph.alignment = TextAlignmentOptions.MidlineLeft;
 
             _inputField = inRow.AddComponent<TMP_InputField>();

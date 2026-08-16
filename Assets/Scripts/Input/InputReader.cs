@@ -56,6 +56,18 @@ namespace Willowstead.Input
         public Vector2 GetMoveInput()
         {
             if (BlockGameplayInput) return Vector2.zero;
+
+            Vector2 dir = Vector2.zero;
+            if (KeyRebindingManager.IsPressed(KeyAction.MoveUp))    dir.y += 1f;
+            if (KeyRebindingManager.IsPressed(KeyAction.MoveDown))  dir.y -= 1f;
+            if (KeyRebindingManager.IsPressed(KeyAction.MoveLeft))  dir.x -= 1f;
+            if (KeyRebindingManager.IsPressed(KeyAction.MoveRight)) dir.x += 1f;
+
+            if (dir.sqrMagnitude > 0.01f)
+            {
+                return dir.normalized;
+            }
+
             if (_inputActions == null) EnableGameplayInput();
             if (_inputActions != null && _inputActions.Player.enabled)
             {

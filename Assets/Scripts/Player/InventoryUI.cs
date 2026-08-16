@@ -50,16 +50,18 @@ namespace Willowstead.Player
 
         private void Update()
         {
-            if (Keyboard.current != null &&
-                (Keyboard.current.iKey.wasPressedThisFrame || Keyboard.current.tabKey.wasPressedThisFrame))
+            bool inventoryPressed = Input.KeyRebindingManager.WasPressedThisFrame(Input.KeyAction.Inventory) ||
+                                   (Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame));
+
+            if (inventoryPressed)
             {
                 if (InputReader.BlockGameplayInput)
                 {
-                    Debug.Log("[InputDebug] Tab/I key pressed, but BlockGameplayInput is TRUE (blocked by UI/Console).");
+                    Debug.Log("[InputDebug] Inventory key pressed, but BlockGameplayInput is TRUE (blocked by UI/Console).");
                 }
                 else
                 {
-                    Debug.Log("[InputDebug] Tab/I key pressed -> Toggling Inventory UI.");
+                    Debug.Log("[InputDebug] Inventory key pressed -> Toggling Inventory UI.");
                     ToggleUI();
                 }
             }

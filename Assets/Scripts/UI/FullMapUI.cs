@@ -121,22 +121,22 @@ namespace Willowstead.UI
 
         private void Update()
         {
-            if (UnityEngine.InputSystem.Keyboard.current != null)
+            bool mapPressed = Input.KeyRebindingManager.WasPressedThisFrame(Input.KeyAction.Map) ||
+                              (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.mKey.wasPressedThisFrame);
+
+            if (mapPressed)
             {
-                if (UnityEngine.InputSystem.Keyboard.current.mKey.wasPressedThisFrame)
+                bool blockByOtherModals = Input.InputReader.BlockGameplayInput ||
+                                          (PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen) ||
+                                          (WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible);
+                if (!blockByOtherModals)
                 {
-                    bool blockByOtherModals = Input.InputReader.BlockGameplayInput ||
-                                              (PauseMenuUI.Instance != null && PauseMenuUI.Instance.IsOpen) ||
-                                              (WorldSetupUI.Instance != null && WorldSetupUI.Instance.IsVisible);
-                    if (!blockByOtherModals)
-                    {
-                        ToggleMap();
-                    }
+                    ToggleMap();
                 }
-                else if (IsMapOpen && UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
-                {
-                    CloseMap();
-                }
+            }
+            else if (IsMapOpen && UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                CloseMap();
             }
 
             if (!IsMapOpen) return;

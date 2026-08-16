@@ -484,5 +484,104 @@ namespace Willowstead.Debugging.Commands
             ctx.PrintOk($"Restored {amt} stamina. Stamina: {stats.CurrentStamina}/{stats.MaxStamina}");
         }
     }
+
+    public sealed class FreezeTimeCommand : DevConsoleCommand
+    {
+        public override string Id => "freezetime";
+        public override string Help => "freezetime / dodaylightcycle [true/false] - Toggles or sets daylight cycle progression";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var day = Object.FindAnyObjectByType<Willowstead.World.DayNightCycle>();
+            if (day == null) { ctx.PrintError("No DayNightCycle found in scene."); return; }
+
+            if (args.Length > 0)
+            {
+                if (bool.TryParse(args[0], out bool enableProgress))
+                {
+                    day.IsPaused = !enableProgress;
+                }
+                else if (args[0].Equals("on", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("stop", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("freeze", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    day.IsPaused = true;
+                }
+                else if (args[0].Equals("off", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("resume", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("play", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    day.IsPaused = false;
+                }
+            }
+            else
+            {
+                day.IsPaused = !day.IsPaused;
+            }
+
+            ctx.PrintOk($"Day/Night progression is now {(day.IsPaused ? "FROZEN / STOPPED" : "ACTIVE / RUNNING")}.");
+        }
+    }
+
+    public sealed class FreezeWeatherCommand : DevConsoleCommand
+    {
+        public override string Id => "freezeweather";
+        public override string Help => "freezeweather / doweathercycle [true/false] - Toggles or sets automatic weather cycle changes";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var weather = Object.FindAnyObjectByType<Willowstead.World.WeatherCycle>();
+            if (weather == null) { ctx.PrintError("No WeatherCycle found in scene."); return; }
+
+            if (args.Length > 0)
+            {
+                if (bool.TryParse(args[0], out bool enableProgress))
+                {
+                    weather.IsPaused = !enableProgress;
+                }
+                else if (args[0].Equals("on", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("stop", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("freeze", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    weather.IsPaused = true;
+                }
+                else if (args[0].Equals("off", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("resume", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("play", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    weather.IsPaused = false;
+                }
+            }
+            else
+            {
+                weather.IsPaused = !weather.IsPaused;
+            }
+
+            ctx.PrintOk($"Weather cycle progression is now {(weather.IsPaused ? "FROZEN / STOPPED" : "ACTIVE / RUNNING")}. (Current Weather: {weather.CurrentWeather})");
+        }
+    }
+
+    public sealed class FreezeAllCommand : DevConsoleCommand
+    {
+        public override string Id => "freezeall";
+        public override string Help => "freezeall [true/false] - Freezes or unfreezes BOTH daylight progression and weather cycle";
+        public override void Run(DevConsole ctx, string[] args)
+        {
+            var day = Object.FindAnyObjectByType<Willowstead.World.DayNightCycle>();
+            var weather = Object.FindAnyObjectByType<Willowstead.World.WeatherCycle>();
+
+            bool targetPause = true;
+            if (args.Length > 0)
+            {
+                if (bool.TryParse(args[0], out bool enableProgress))
+                {
+                    targetPause = !enableProgress;
+                }
+                else if (args[0].Equals("off", System.StringComparison.OrdinalIgnoreCase) || args[0].Equals("resume", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    targetPause = false;
+                }
+            }
+            else if (day != null)
+            {
+                targetPause = !day.IsPaused;
+            }
+
+            if (day != null) day.IsPaused = targetPause;
+            if (weather != null) weather.IsPaused = targetPause;
+
+            ctx.PrintOk($"Day/Night & Weather cycles are now {(targetPause ? "FROZEN / STOPPED" : "ACTIVE / RUNNING")}.");
+        }
+    }
 }
 #endif

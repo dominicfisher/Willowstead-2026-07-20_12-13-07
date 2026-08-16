@@ -162,6 +162,8 @@ namespace Willowstead.World
 
         public WindDirection CurrentWindDirection => _windDirection;
 
+        public bool IsPaused { get; set; } = false;
+
         /// <summary>
         /// Target 0..1 rain intensity based on current state settings.
         /// </summary>
@@ -221,7 +223,10 @@ namespace Willowstead.World
 
         private void Update()
         {
-            CheckForWeatherTransition();
+            if (!IsPaused)
+            {
+                CheckForWeatherTransition();
+            }
             UpdateIntensityTransition();
             UpdateWindVisuals();
             TickLightning();

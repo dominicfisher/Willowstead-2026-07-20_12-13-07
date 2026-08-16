@@ -389,7 +389,7 @@ namespace Willowstead.Player
 
         private void MovePlayer()
         {
-            bool wantsToSprint = _isSprinting && _moveInput.sqrMagnitude > 0.01f;
+            bool wantsToSprint = (_isSprinting || Input.KeyRebindingManager.IsPressed(Input.KeyAction.Sprint)) && _moveInput.sqrMagnitude > 0.01f;
             bool canSprint = false;
 
             if (wantsToSprint)

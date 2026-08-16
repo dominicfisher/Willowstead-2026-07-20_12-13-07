@@ -179,11 +179,12 @@ namespace Willowstead.Player
         private void Update()
         {
             // below runs unconditionally so the gold readout stays current.
-            if (!InputReader.BlockGameplayInput &&
-                Keyboard.current != null &&
-                (Keyboard.current.pKey.wasPressedThisFrame || Keyboard.current.bKey.wasPressedThisFrame))
+            bool shopPressed = Input.KeyRebindingManager.WasPressedThisFrame(Input.KeyAction.Shop) ||
+                               (Keyboard.current != null && (Keyboard.current.pKey.wasPressedThisFrame || Keyboard.current.bKey.wasPressedThisFrame));
+
+            if (!InputReader.BlockGameplayInput && shopPressed)
             {
-                Debug.Log("[InputDebug] P/B key pressed -> Toggling Shop UI.");
+                Debug.Log("[InputDebug] Shop key pressed -> Toggling Shop UI.");
                 ToggleUI();
             }
 

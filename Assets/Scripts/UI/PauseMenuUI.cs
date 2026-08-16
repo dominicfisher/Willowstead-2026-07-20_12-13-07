@@ -34,8 +34,13 @@ namespace Willowstead.UI
         private GameObject _mainPanel;
         private GameObject _optionsPanel;
         private GameObject _gameplayPanel;
+        private GameObject _controlsPanel;
 
         private readonly Stack<GameObject> _panelBackstack = new Stack<GameObject>();
+
+        // Rebinding state
+        private KeyAction? _listeningAction = null;
+        private readonly Dictionary<KeyAction, TextMeshProUGUI> _keyButtonLabels = new Dictionary<KeyAction, TextMeshProUGUI>();
 
         // slow-mo effect (cinematics, weather reveal) can restore to 0.5 not 1.
         private float _priorTimeScale = 1f;
@@ -147,6 +152,14 @@ namespace Willowstead.UI
             RefreshPresetHighlights();
         }
 
+        public void EnterControlsPanel()
+        {
+            _panelBackstack.Push(_optionsPanel);
+            SwitchPanel(_controlsPanel);
+            CancelRebinding();
+            RefreshKeyLabels();
+        }
+
         public void EnterGameplayPanel()
         {
             _panelBackstack.Push(_mainPanel);
@@ -156,6 +169,7 @@ namespace Willowstead.UI
 
         public void Back()
         {
+            CancelRebinding();
             if (_panelBackstack.Count == 0) { Hide(); return; }
             SwitchPanel(_panelBackstack.Pop());
         }
@@ -164,6 +178,7 @@ namespace Willowstead.UI
         {
             if (_mainPanel     != null) _mainPanel.SetActive(panel == _mainPanel);
             if (_optionsPanel  != null) _optionsPanel.SetActive(panel == _optionsPanel);
+            if (_controlsPanel != null) _controlsPanel.SetActive(panel == _controlsPanel);
             if (_gameplayPanel != null) _gameplayPanel.SetActive(panel == _gameplayPanel);
         }
 
@@ -179,11 +194,38 @@ namespace Willowstead.UI
             Keyboard kb = Keyboard.current;
             if (kb == null) return;
 
+            // Handle live key rebinding if a key slot is currently waiting for input
+            if (_listeningAction.HasValue)
+            {
+                if (kb.escapeKey.wasPressedThisFrame)
+                {
+                    CancelRebinding();
+                    return;
+                }
+
+                foreach (var keyControl in kb.allControls)
+                {
+                    if (keyControl is UnityEngine.InputSystem.Controls.KeyControl kCtrl && kCtrl.wasPressedThisFrame)
+                    {
+                        Key pressedKey = kCtrl.keyCode;
+                        if (pressedKey != Key.None && pressedKey != Key.Escape && pressedKey != Key.Backquote)
+                        {
+                            KeyAction act = _listeningAction.Value;
+                            KeyRebindingManager.SetKey(act, pressedKey);
+                            CancelRebinding();
+                            RefreshKeyLabels();
+                            return;
+                        }
+                    }
+                }
+                return;
+            }
+
             if (kb.escapeKey.wasPressedThisFrame)
             {
                 if (_panelBackstack.Count > 0)
                 {
-                    // Inside Options or Gameplay: first Esc backs out instead of closing.
+                    // Inside Options, Controls, or Gameplay: first Esc backs out instead of closing.
                     Back();
                 }
                 else if (IsOpen)
@@ -202,7 +244,6 @@ namespace Willowstead.UI
                 Hide();
             }
         }
-
 
         private void SaveCurrentWorld()
         {
@@ -233,17 +274,18 @@ namespace Willowstead.UI
 #endif
         }
 
-
         private void BuildHierarchy(Canvas canvas)
         {
             _rootGo = NewFullScreen("PauseMenuRoot", canvas.transform, new Color(0f, 0f, 0f, 0.55f));
 
             _mainPanel     = NewCenteredPanel(_rootGo.transform, "MainPanel",     new Vector2(500f, 460f));
-            _optionsPanel  = NewCenteredPanel(_rootGo.transform, "OptionsPanel",  new Vector2(560f, 520f));
+            _optionsPanel  = NewCenteredPanel(_rootGo.transform, "OptionsPanel",  new Vector2(560f, 420f));
+            _controlsPanel = NewCenteredPanel(_rootGo.transform, "ControlsPanel", new Vector2(600f, 560f));
             _gameplayPanel = NewCenteredPanel(_rootGo.transform, "GameplayPanel", new Vector2(560f, 480f));
 
             BuildMainPanel(_mainPanel.transform);
             BuildOptionsPanel(_optionsPanel.transform);
+            BuildControlsPanel(_controlsPanel.transform);
             BuildGameplayPanel(_gameplayPanel.transform);
 
             SwitchPanel(_mainPanel);
@@ -434,39 +476,152 @@ namespace Willowstead.UI
             });
             BuildSliderVisuals(slider);
 
-            // ── Controls list (read-only — matches the project's InputSystem_Actions) ──
-            GameObject ctrlHeader = NewChild(parent, "ControlsHeader");
-            RectTransform cRt = SetAnchoredTopBand(ctrlHeader.transform, 200f, 230f);
-            TextMeshProUGUI cTxt = ctrlHeader.AddComponent<TextMeshProUGUI>();
-            cTxt.text = "Controls";
-            cTxt.fontSize = 18f;
-            cTxt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
-            cTxt.alignment = TextAlignmentOptions.Center;
-            cTxt.richText = false;
+            BuildMenuButton(parent, "Customize Controls", new Vector2(0f, -220f), new Vector2(300f, 52f), EnterControlsPanel);
+            BuildMenuButton(parent, "Back", new Vector2(0f, -310f), new Vector2(220f, 50f), Back);
+        }
 
-            GameObject ctrlList = NewChild(parent, "ControlsList");
-            RectTransform clRt = (RectTransform)ctrlList.transform;
-            clRt.anchorMin = new Vector2(0f, 0f);
-            clRt.anchorMax = new Vector2(1f, 1f);
-            clRt.pivot = new Vector2(0.5f, 0.5f);
-            clRt.offsetMin = new Vector2(36f, 80f);
-            clRt.offsetMax = new Vector2(-36f, -200f);
-            TextMeshProUGUI clTxt = ctrlList.AddComponent<TextMeshProUGUI>();
-            clTxt.text = "Move — WASD / Arrow Keys\n" +
-                         "Sprint — Left Shift\n" +
-                         "Interact / Tool — Left Mouse\n" +
-                         "Inventory — I\n" +
-                         "Shop — P\n" +
-                         "Toggle Hotbar — Tab\n" +
-                         "Pause — Esc\n" +
-                         "Console — `  (developer builds)";
-            clTxt.fontSize = 16f;
-            clTxt.color = new Color(0.86f, 0.84f, 0.78f, 1f);
-            clTxt.alignment = TextAlignmentOptions.Center;
-            clTxt.richText = false;
-            clTxt.textWrappingMode = TextWrappingModes.Normal;
+        private void BuildControlsPanel(Transform parent)
+        {
+            BuildHeader(parent, "Customize Controls");
 
-            BuildMenuButton(parent, "Back", new Vector2(0f, -440f), new Vector2(220f, 50f), Back);
+            // Subtitle hint
+            GameObject sub = NewChild(parent, "ControlsSub");
+            RectTransform sRt = SetAnchoredTopBand(sub.transform, 56f, 82f);
+            TextMeshProUGUI sTxt = sub.AddComponent<TextMeshProUGUI>();
+            sTxt.text = "Click a key to remap. Press Esc to cancel.";
+            sTxt.fontSize = 13.5f;
+            sTxt.fontStyle = FontStyles.Italic;
+            sTxt.color = new Color(0.85f, 0.80f, 0.65f, 0.90f);
+            sTxt.alignment = TextAlignmentOptions.Center;
+
+            // Scroll / List Area
+            GameObject listContainer = new GameObject("ControlsScrollArea", typeof(RectTransform));
+            listContainer.transform.SetParent(parent, false);
+            RectTransform lcRt = (RectTransform)listContainer.transform;
+            lcRt.anchorMin = new Vector2(0f, 0f);
+            lcRt.anchorMax = new Vector2(1f, 1f);
+            lcRt.pivot = new Vector2(0.5f, 0.5f);
+            lcRt.offsetMin = new Vector2(30f, 84f);
+            lcRt.offsetMax = new Vector2(-30f, -90f);
+
+            _keyButtonLabels.Clear();
+            var actions = (KeyAction[])System.Enum.GetValues(typeof(KeyAction));
+
+            float rowHeight = 36f;
+            float rowSpacing = 6f;
+
+            for (int i = 0; i < actions.Length; i++)
+            {
+                KeyAction act = actions[i];
+                float yOffset = -i * (rowHeight + rowSpacing);
+
+                GameObject rowGo = new GameObject($"Row_{act}", typeof(RectTransform), typeof(Image));
+                rowGo.transform.SetParent(listContainer.transform, false);
+                RectTransform rRt = (RectTransform)rowGo.transform;
+                rRt.anchorMin = new Vector2(0f, 1f);
+                rRt.anchorMax = new Vector2(1f, 1f);
+                rRt.pivot = new Vector2(0.5f, 1f);
+                rRt.anchoredPosition = new Vector2(0f, yOffset);
+                rRt.sizeDelta = new Vector2(0f, rowHeight);
+
+                Image rowImg = rowGo.GetComponent<Image>();
+                rowImg.color = (i % 2 == 0) ? new Color(0.12f, 0.10f, 0.08f, 0.55f) : new Color(0.16f, 0.13f, 0.10f, 0.35f);
+
+                // Action Label
+                GameObject labelGo = new GameObject("ActionLabel", typeof(RectTransform));
+                labelGo.transform.SetParent(rowGo.transform, false);
+                RectTransform lRt = (RectTransform)labelGo.transform;
+                lRt.anchorMin = new Vector2(0f, 0f);
+                lRt.anchorMax = new Vector2(0.55f, 1f);
+                lRt.offsetMin = new Vector2(12f, 0f);
+                lRt.offsetMax = Vector2.zero;
+
+                TextMeshProUGUI lTxt = labelGo.AddComponent<TextMeshProUGUI>();
+                lTxt.text = KeyRebindingManager.GetActionLabel(act);
+                lTxt.fontSize = 15f;
+                lTxt.fontStyle = FontStyles.Bold;
+                lTxt.color = new Color(0.95f, 0.92f, 0.85f, 1f);
+                lTxt.alignment = TextAlignmentOptions.MidlineLeft;
+
+                // Key Button
+                GameObject keyBtnGo = new GameObject("KeyButton", typeof(RectTransform), typeof(Image), typeof(Button));
+                keyBtnGo.transform.SetParent(rowGo.transform, false);
+                RectTransform kbRt = (RectTransform)keyBtnGo.transform;
+                kbRt.anchorMin = new Vector2(0.60f, 0.12f);
+                kbRt.anchorMax = new Vector2(0.98f, 0.88f);
+                kbRt.offsetMin = Vector2.zero;
+                kbRt.offsetMax = Vector2.zero;
+
+                Image btnImg = keyBtnGo.GetComponent<Image>();
+                btnImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+                btnImg.type = Image.Type.Sliced;
+                btnImg.color = new Color(0.24f, 0.18f, 0.12f, 0.95f);
+
+                Button btn = keyBtnGo.GetComponent<Button>();
+                ColorBlock cb = btn.colors;
+                cb.normalColor = Color.white;
+                cb.highlightedColor = new Color(1.2f, 1.15f, 1.05f, 1f);
+                cb.pressedColor = new Color(0.8f, 0.75f, 0.65f, 1f);
+                btn.colors = cb;
+
+                // Key Text inside button
+                GameObject btnTxtGo = new GameObject("KeyText", typeof(RectTransform));
+                btnTxtGo.transform.SetParent(keyBtnGo.transform, false);
+                RectTransform btRt = (RectTransform)btnTxtGo.transform;
+                btRt.anchorMin = Vector2.zero;
+                btRt.anchorMax = Vector2.one;
+                btRt.offsetMin = Vector2.zero;
+                btRt.offsetMax = Vector2.zero;
+
+                TextMeshProUGUI bTxt = btnTxtGo.AddComponent<TextMeshProUGUI>();
+                bTxt.fontSize = 14f;
+                bTxt.fontStyle = FontStyles.Bold;
+                bTxt.color = new Color(1f, 0.88f, 0.45f, 1f);
+                bTxt.alignment = TextAlignmentOptions.Center;
+
+                _keyButtonLabels[act] = bTxt;
+
+                KeyAction capturedAct = act;
+                btn.onClick.AddListener(() => StartRebinding(capturedAct));
+            }
+
+            // Bottom Buttons (Reset Defaults / Back)
+            BuildMenuButton(parent, "Reset Defaults", new Vector2(-120f, -485f), new Vector2(180f, 44f), () =>
+            {
+                KeyRebindingManager.ResetToDefaults();
+                CancelRebinding();
+                RefreshKeyLabels();
+            });
+
+            BuildMenuButton(parent, "Back", new Vector2(120f, -485f), new Vector2(180f, 44f), Back);
+        }
+
+        private void StartRebinding(KeyAction action)
+        {
+            _listeningAction = action;
+            RefreshKeyLabels();
+        }
+
+        private void CancelRebinding()
+        {
+            _listeningAction = null;
+            RefreshKeyLabels();
+        }
+
+        private void RefreshKeyLabels()
+        {
+            foreach (var kvp in _keyButtonLabels)
+            {
+                if (kvp.Value == null) continue;
+                if (_listeningAction.HasValue && _listeningAction.Value == kvp.Key)
+                {
+                    kvp.Value.text = "<color=#FF6E6E><b>[PRESS KEY]</b></color>";
+                }
+                else
+                {
+                    kvp.Value.text = $"<b>{KeyRebindingManager.GetKeyDisplayName(kvp.Key)}</b>";
+                }
+            }
         }
 
         private void BuildGameplayPanel(Transform parent)

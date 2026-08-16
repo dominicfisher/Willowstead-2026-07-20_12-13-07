@@ -71,6 +71,13 @@ namespace Willowstead.Debugging
             Register(new Commands.SavesCommand());
             Register(new Commands.DeleteSaveCommand());
             Register(new Commands.SeedCommand());
+            Register(new Commands.GodCommand());
+            Register(new Commands.HealCommand());
+            Register(new Commands.DamageCommand());
+            Register(new Commands.StaminaCommand());
+            Register(new Commands.FreezeTimeCommand());
+            Register(new Commands.FreezeWeatherCommand());
+            Register(new Commands.FreezeAllCommand());
         }
 
         private GameObject _panelGo;

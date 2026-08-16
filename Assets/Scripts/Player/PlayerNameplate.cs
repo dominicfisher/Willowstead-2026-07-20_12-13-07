@@ -24,14 +24,14 @@ namespace Willowstead.Player
         {
             _nameplateRoot = new GameObject("WorldNameplate");
             _nameplateRoot.transform.SetParent(transform, false);
-            _nameplateRoot.transform.localPosition = new Vector3(0f, 0.95f, 0f);
+            _nameplateRoot.transform.localPosition = new Vector3(0f, 1.25f, 0f);
 
             // Name Label
             GameObject nameGo = new GameObject("NameText");
             nameGo.transform.SetParent(_nameplateRoot.transform, false);
             nameGo.transform.localPosition = Vector3.zero;
             _nameText = nameGo.AddComponent<TextMeshPro>();
-            _nameText.fontSize = 2.8f;
+            _nameText.fontSize = 3.8f;
             _nameText.fontStyle = FontStyles.Bold;
             _nameText.alignment = TextAlignmentOptions.Center;
             _nameText.color = new Color(1f, 0.95f, 0.82f, 1f);

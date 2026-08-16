@@ -102,6 +102,7 @@ namespace Willowstead.World
         public float Time01 => _time01; // [0,1)
         public float SecondsPerDay { get => _dayLengthSeconds; set => _dayLengthSeconds = Mathf.Max(1f, value); }
         public float TimeScale { get => _timeScale; set => _timeScale = Mathf.Max(0f, value); }
+        public bool IsPaused { get; set; } = false;
 
 
         private void Start()
@@ -114,6 +115,12 @@ namespace Willowstead.World
 
         private void Update()
         {
+            if (IsPaused)
+            {
+                UpdateVisuals();
+                return;
+            }
+
             if (_dayLengthSeconds <= 0.01f) return;
             float prev = _time01;
             _time01 = Mathf.Repeat(_time01 + (Time.deltaTime * _timeScale) / _dayLengthSeconds, 1f);

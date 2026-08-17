@@ -201,6 +201,60 @@ namespace Willowstead.Player
             return _cachedSparkleStarSprite;
         }
 
+        private static AudioClip _cachedMenuSoundClip;
+        private static AudioSource _uiAudioSource;
+
+        public static AudioClip GetMenuSoundClip()
+        {
+            if (_cachedMenuSoundClip != null) return _cachedMenuSoundClip;
+#if UNITY_EDITOR
+            _cachedMenuSoundClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Menu/menu.mp3");
+            if (_cachedMenuSoundClip != null) return _cachedMenuSoundClip;
+#endif
+            _cachedMenuSoundClip = Resources.Load<AudioClip>("Audio/Menu/menu");
+            return _cachedMenuSoundClip;
+        }
+
+        public static void PlayMenuHoverSound()
+        {
+            PlayMenuSound(0.35f, 1.25f);
+        }
+
+        public static void PlayMenuClickSound()
+        {
+            PlayMenuSound(0.70f, 1.0f);
+        }
+
+        public static void PlayMenuSound(float volume = 0.5f, float pitch = 1.0f)
+        {
+            AudioClip clip = GetMenuSoundClip();
+            if (clip == null) return;
+
+            if (_uiAudioSource == null)
+            {
+                GameObject sGo = GameObject.Find("[UIAudioPlayer]");
+                if (sGo == null)
+                {
+                    sGo = new GameObject("[UIAudioPlayer]");
+                    Object.DontDestroyOnLoad(sGo);
+                }
+                
+                _uiAudioSource = sGo.GetComponent<AudioSource>();
+                if (_uiAudioSource == null)
+                {
+                    _uiAudioSource = sGo.AddComponent<AudioSource>();
+                }
+                _uiAudioSource.playOnAwake = false;
+                _uiAudioSource.spatialBlend = 0f; // 2D flat sound
+            }
+
+            if (_uiAudioSource != null)
+            {
+                _uiAudioSource.pitch = pitch;
+                _uiAudioSource.PlayOneShot(clip, volume);
+            }
+        }
+
         private static Sprite _cachedHpBarSprite;
         private static Sprite _cachedHpBgSprite;
         private static Sprite _cachedManaBarSprite;
@@ -441,7 +495,7 @@ namespace Willowstead.Player
         /// block world interaction when the pointer is over them.
         /// Extend this list when a new modal-style panel ships.
         /// </summary>
-        private static readonly string[] KnownUIPanelNames = { "ShopPanel", "InventoryPanel", "BuildMenuPanel", "SkillsJournalPanel", "WorldSetupPanel" };
+        private static readonly string[] KnownUIPanelNames = { "ShopPanel", "InventoryPanel", "SkillsJournalPanel", "WorldSetupPanel" };
 
         /// <summary>
         /// Finds the HUD canvas by searching for any of <paramref name="searchNames"/>.

@@ -168,14 +168,18 @@ namespace Willowstead.Building
             if (_isDemolishMode)
             {
                 _previewSr.sprite = UIResourceHelper.GetBackgroundSprite();
+                _blueprintPreviewGo.transform.localScale = Vector3.one * 16f; // Full 1x1 tile size
                 bool hasTarget = BuildingManager.Instance != null && BuildingManager.Instance.HasStructureAt(cell);
                 _previewSr.color = hasTarget ? new Color(1f, 0.2f, 0.2f, 0.65f) : new Color(0.5f, 0.5f, 0.5f, 0.35f);
             }
             else
             {
+                Sprite tileSprite = BuildingManager.GetSpriteForType(_selectedBlueprint);
+                _previewSr.sprite = tileSprite != null ? tileSprite : UIResourceHelper.GetBackgroundSprite();
+                _blueprintPreviewGo.transform.localScale = Vector3.one; // Native 16 PPU = 1 Unity Unit
+
                 bool canBuild = BuildingManager.Instance != null && BuildingManager.Instance.CanPlaceStructure(cell, _selectedBlueprint);
-                _previewSr.sprite = UIResourceHelper.GetBackgroundSprite();
-                _previewSr.color = canBuild ? new Color(0.2f, 1f, 0.4f, 0.65f) : new Color(1f, 0.2f, 0.2f, 0.65f);
+                _previewSr.color = canBuild ? new Color(0.4f, 1f, 0.5f, 0.70f) : new Color(1f, 0.3f, 0.3f, 0.70f);
             }
         }
 
@@ -183,10 +187,19 @@ namespace Willowstead.Building
         {
             if (!_isOpen) return;
             if (_selectedBlueprint == StructureType.None && !_isDemolishMode) return;
-            if (UIResourceHelper.IsPointerOverAnyUI()) return;
 
             var mouse = UnityEngine.InputSystem.Mouse.current;
             if (mouse == null) return;
+
+            // Check if mouse is hovering over the architect bar UI itself
+            if (_barGo != null)
+            {
+                RectTransform barRt = (RectTransform)_barGo.transform;
+                if (RectTransformUtility.RectangleContainsScreenPoint(barRt, mouse.position.ReadValue(), null))
+                {
+                    return;
+                }
+            }
 
             if (mouse.leftButton.wasPressedThisFrame)
             {
@@ -206,11 +219,15 @@ namespace Willowstead.Building
                     if (BuildingManager.Instance != null)
                     {
                         bool built = BuildingManager.Instance.BuildStructure(cell, _selectedBlueprint);
-                        if (!built && BuildingManager.Instance.GetMaterialCost(_selectedBlueprint, out string req) > 0)
+                        if (!built)
                         {
-                            if (ItemNotificationManager.Instance != null && InventoryManager.Instance != null && InventoryManager.Instance.GetItemCount(req) < BuildingManager.Instance.GetMaterialCost(_selectedBlueprint, out _))
+                            int cost = BuildingManager.Instance.GetMaterialCost(_selectedBlueprint, out string req);
+                            if (cost > 0 && InventoryManager.Instance != null && InventoryManager.Instance.GetItemCount(req) < cost)
                             {
-                                ItemNotificationManager.Instance.TriggerNotification($"Need {BuildingManager.Instance.GetMaterialCost(_selectedBlueprint, out _)}x {req}!", UIResourceHelper.GetBackgroundSprite(), new Color(1f, 0.4f, 0.4f));
+                                if (ItemNotificationManager.Instance != null)
+                                {
+                                    ItemNotificationManager.Instance.TriggerNotification($"Need {cost}x {req} to build!", UIResourceHelper.GetBackgroundSprite(), new Color(1f, 0.4f, 0.4f));
+                                }
                             }
                         }
                     }

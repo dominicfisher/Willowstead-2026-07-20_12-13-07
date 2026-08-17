@@ -46,13 +46,22 @@ namespace Willowstead.Building
         private static Sprite _stoneWallSprite;
         private static Sprite _stoneFloorSprite;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void Bootstrap()
+        {
+            if (Instance != null) return;
+            GameObject go = new GameObject("[BuildingManager]");
+            DontDestroyOnLoad(go);
+            Instance = go.AddComponent<BuildingManager>();
+        }
+
         private void Awake()
         {
-            if (Instance == null)
+            if (Instance == null || Instance == this)
             {
                 Instance = this;
             }
-            else if (Instance != this)
+            else
             {
                 Destroy(gameObject);
                 return;
@@ -287,18 +296,23 @@ namespace Willowstead.Building
             if (bc != null) bc.isTrigger = structure.isOpen;
         }
 
-        private Sprite GetSpriteFor(PlacedStructure s)
+        public static Sprite GetSpriteForType(StructureType structureType, bool isOpen = false)
         {
-            GeneratePlaceholderSprites();
-            switch (s.structureType)
+            if (Instance != null) Instance.GeneratePlaceholderSprites();
+            switch (structureType)
             {
                 case StructureType.WoodWall: return _woodWallSprite;
                 case StructureType.WoodFloor: return _woodFloorSprite;
-                case StructureType.WoodDoor: return s.isOpen ? _woodDoorOpenSprite : _woodDoorClosedSprite;
+                case StructureType.WoodDoor: return isOpen ? _woodDoorOpenSprite : _woodDoorClosedSprite;
                 case StructureType.StoneWall: return _stoneWallSprite;
                 case StructureType.StoneFloor: return _stoneFloorSprite;
                 default: return _woodWallSprite;
             }
+        }
+
+        private Sprite GetSpriteFor(PlacedStructure s)
+        {
+            return GetSpriteForType(s.structureType, s.isOpen);
         }
 
         public void ClearAllStructures()

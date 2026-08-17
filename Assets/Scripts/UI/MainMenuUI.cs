@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -112,7 +114,7 @@ namespace Willowstead.UI
                 Transform hotbar = canvas.transform.Find("HotbarPanel");
                 if (hotbar != null)
                 {
-                    var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(hotbar.gameObject);
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
@@ -120,7 +122,7 @@ namespace Willowstead.UI
                 Transform compass = canvas.transform.Find("CompassPanel");
                 if (compass != null)
                 {
-                    var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(compass.gameObject);
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
@@ -128,7 +130,7 @@ namespace Willowstead.UI
                 Transform gold = canvas.transform.Find("GoldHUD");
                 if (gold != null)
                 {
-                    var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(gold.gameObject);
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
@@ -136,7 +138,7 @@ namespace Willowstead.UI
                 Transform status = canvas.transform.Find("PlayerStatusHUD");
                 if (status != null)
                 {
-                    var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(status.gameObject);
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
@@ -144,11 +146,22 @@ namespace Willowstead.UI
                 Transform objectives = canvas.transform.Find("ObjectiveTrackerHUD");
                 if (objectives != null)
                 {
-                    var cg = objectives.GetComponent<CanvasGroup>() ?? objectives.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(objectives.gameObject);
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
             }
+        }
+
+        private static CanvasGroup GetOrAddCanvasGroup(GameObject go)
+        {
+            if (go == null) return null;
+            var cg = go.GetComponent<CanvasGroup>();
+            if (cg == null)
+            {
+                cg = go.AddComponent<CanvasGroup>();
+            }
+            return cg;
         }
 
         /// <summary>
@@ -168,7 +181,7 @@ namespace Willowstead.UI
             if (Instance != null)
             {
                 if (Instance._fadeCoroutine != null) Instance.StopCoroutine(Instance._fadeCoroutine);
-                Instance._fadeCoroutine = Instance.StartCoroutine(Instance.PlayHudFadeInAnimation());
+                Instance._fadeCoroutine = Instance.StartCoroutine(Instance.FadeInGameplayHUDs());
             }
             else
             {
@@ -176,18 +189,17 @@ namespace Willowstead.UI
             }
         }
 
-        private System.Collections.IEnumerator PlayHudFadeInAnimation()
+        private IEnumerator FadeInGameplayHUDs()
         {
-            // Collect all gameplay HUD elements (Hotbar, Compass, GoldHUD, PlayerStatusHUD)
-            var groups = new System.Collections.Generic.List<CanvasGroup>();
-
             Canvas canvas = UIResourceHelper.GetOrCreateHUDCanvas();
+            List<CanvasGroup> groups = new List<CanvasGroup>();
+
             if (canvas != null)
             {
                 Transform hotbar = canvas.transform.Find("HotbarPanel");
                 if (hotbar != null)
                 {
-                    var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(hotbar.gameObject);
                     cg.alpha = 0f;
                     groups.Add(cg);
                 }
@@ -195,7 +207,7 @@ namespace Willowstead.UI
                 Transform compass = canvas.transform.Find("CompassPanel");
                 if (compass != null)
                 {
-                    var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(compass.gameObject);
                     cg.alpha = 0f;
                     groups.Add(cg);
                 }
@@ -203,7 +215,7 @@ namespace Willowstead.UI
                 Transform gold = canvas.transform.Find("GoldHUD");
                 if (gold != null)
                 {
-                    var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(gold.gameObject);
                     cg.alpha = 0f;
                     groups.Add(cg);
                 }
@@ -211,7 +223,15 @@ namespace Willowstead.UI
                 Transform status = canvas.transform.Find("PlayerStatusHUD");
                 if (status != null)
                 {
-                    var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                    var cg = GetOrAddCanvasGroup(status.gameObject);
+                    cg.alpha = 0f;
+                    groups.Add(cg);
+                }
+
+                Transform objectives = canvas.transform.Find("ObjectiveTrackerHUD");
+                if (objectives != null)
+                {
+                    var cg = GetOrAddCanvasGroup(objectives.gameObject);
                     cg.alpha = 0f;
                     groups.Add(cg);
                 }
@@ -231,25 +251,31 @@ namespace Willowstead.UI
                     Transform hotbar = canvas.transform.Find("HotbarPanel");
                     if (hotbar != null)
                     {
-                        var cg = hotbar.GetComponent<CanvasGroup>() ?? hotbar.gameObject.AddComponent<CanvasGroup>();
+                        var cg = GetOrAddCanvasGroup(hotbar.gameObject);
                         if (!groups.Contains(cg)) groups.Add(cg);
                     }
                     Transform compass = canvas.transform.Find("CompassPanel");
                     if (compass != null)
                     {
-                        var cg = compass.GetComponent<CanvasGroup>() ?? compass.gameObject.AddComponent<CanvasGroup>();
+                        var cg = GetOrAddCanvasGroup(compass.gameObject);
                         if (!groups.Contains(cg)) groups.Add(cg);
                     }
                     Transform gold = canvas.transform.Find("GoldHUD");
                     if (gold != null)
                     {
-                        var cg = gold.GetComponent<CanvasGroup>() ?? gold.gameObject.AddComponent<CanvasGroup>();
+                        var cg = GetOrAddCanvasGroup(gold.gameObject);
                         if (!groups.Contains(cg)) groups.Add(cg);
                     }
                     Transform status = canvas.transform.Find("PlayerStatusHUD");
                     if (status != null)
                     {
-                        var cg = status.GetComponent<CanvasGroup>() ?? status.gameObject.AddComponent<CanvasGroup>();
+                        var cg = GetOrAddCanvasGroup(status.gameObject);
+                        if (!groups.Contains(cg)) groups.Add(cg);
+                    }
+                    Transform objectives = canvas.transform.Find("ObjectiveTrackerHUD");
+                    if (objectives != null)
+                    {
+                        var cg = GetOrAddCanvasGroup(objectives.gameObject);
                         if (!groups.Contains(cg)) groups.Add(cg);
                     }
                 }

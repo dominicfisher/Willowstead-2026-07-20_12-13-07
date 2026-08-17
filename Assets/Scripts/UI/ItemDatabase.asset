@@ -18,7 +18,7 @@ MonoBehaviour:
   - itemName: Carrot
     icon: {fileID: -1676167664862477823, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
   - itemName: Potato Seeds
-    icon: {fileID: 194035269617077776, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+    icon: {fileID: -8740812437999632262, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
   - itemName: Potato
     icon: {fileID: -4013514139513567718, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
   - itemName: Straw Seeds
@@ -43,3 +43,15 @@ MonoBehaviour:
     icon: {fileID: -720151078975379389, guid: 7f7f5dd5cd0a50446991df86eb8be977, type: 3}
   - itemName: Axe
     icon: {fileID: 21300000, guid: dcee98bd87f9fb746b21372cb7b2bc89, type: 3}
+  - itemName: Rotten Carrot
+    icon: {fileID: -306490933112452958, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Rotten Potato
+    icon: {fileID: 7760189579198482944, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Rotten Straw
+    icon: {fileID: 3377855673948457248, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Rotten tomato
+    icon: {fileID: 1021903045287824856, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Rotten Corn
+    icon: {fileID: -4125596465952830588, guid: 1d085069d3c68a94b9234e76a51a5f87, type: 3}
+  - itemName: Fertilizer
+    icon: {fileID: 6014967698776965722, guid: 75c682590a8513749b1a3425362460fb, type: 3}

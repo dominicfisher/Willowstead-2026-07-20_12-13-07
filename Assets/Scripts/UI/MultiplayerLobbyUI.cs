@@ -298,7 +298,7 @@ namespace Willowstead.UI
 
         private static Button BuildButton(Transform parent, string label, Vector2 anchoredPos, Vector2 size, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Btn_{label}", typeof(RectTransform), typeof(Image));
+            GameObject go = new GameObject($"Btn_{label}", typeof(RectTransform), typeof(Image), typeof(Player.UIHoverScale));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0.5f, 0.5f);

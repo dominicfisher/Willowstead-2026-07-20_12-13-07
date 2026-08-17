@@ -43,8 +43,9 @@ namespace Willowstead.Player
         [Tooltip("Configure additional starting items. Hoe, Watering Can, and Axe are force-equipped in hotbar slots 0, 1, and 2 automatically.")]
         [SerializeField] private List<StartingItem> _startingItems = new List<StartingItem>
         {
-            // "prefer main inventory" path can't accidentally bury it.
             new StartingItem { itemName = "Carrot Seeds", quantity = 10 },
+            new StartingItem { itemName = "Log", quantity = 25 },
+            new StartingItem { itemName = "Stone", quantity = 20 },
             new StartingItem { itemName = "Gold", quantity = 100 }
         };
 

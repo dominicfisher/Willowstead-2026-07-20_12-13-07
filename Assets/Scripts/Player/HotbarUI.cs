@@ -171,7 +171,7 @@ namespace Willowstead.Player
             _slotIconImages = new Image[8];
             _slotCountTexts = new Text[8];
 
-            Font legacyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Font legacyFont = UIResourceHelper.GetPixelFont();
 
             float startX = -((panelWidth - 20f) * 0.5f) + (slotWidth * 0.5f);
 
@@ -216,20 +216,27 @@ namespace Willowstead.Player
                 iconImg.raycastTarget = false;
                 _slotIconImages[i] = iconImg;
 
-                GameObject countGo = new GameObject("SlotCountText");
+                GameObject countGo = new GameObject("SlotCountText", typeof(RectTransform));
                 countGo.transform.SetParent(slotGo.transform, false);
-                RectTransform countRect = countGo.AddComponent<RectTransform>();
+                RectTransform countRect = (RectTransform)countGo.transform;
                 countRect.anchorMin = new Vector2(1f, 0f);
                 countRect.anchorMax = new Vector2(1f, 0f);
                 countRect.pivot = new Vector2(1f, 0f);
-                countRect.anchoredPosition = new Vector2(-4f, 4f);
-                countRect.sizeDelta = new Vector2(30f, 20f);
+                countRect.anchoredPosition = new Vector2(-4f, 2f);
+                countRect.sizeDelta = new Vector2(36f, 22f);
                 Text countText = countGo.AddComponent<Text>();
                 countText.font = legacyFont;
-                countText.fontSize = 13;
+                countText.fontSize = 16;
                 countText.fontStyle = FontStyle.Bold;
+                countText.horizontalOverflow = HorizontalWrapMode.Overflow;
+                countText.verticalOverflow = VerticalWrapMode.Overflow;
                 countText.alignment = TextAnchor.LowerRight;
-                countText.color = new Color(0.25f, 0.16f, 0.10f, 1f);
+                countText.color = new Color(1f, 0.96f, 0.88f, 1f); // Crisp ivory text
+
+                var outline = countGo.AddComponent<Outline>();
+                outline.effectColor = new Color(0.18f, 0.10f, 0.05f, 0.95f); // Dark rich wood-brown border
+                outline.effectDistance = new Vector2(1.2f, -1.2f);
+
                 countText.enabled = false;
                 countText.raycastTarget = false;
                 _slotCountTexts[i] = countText;

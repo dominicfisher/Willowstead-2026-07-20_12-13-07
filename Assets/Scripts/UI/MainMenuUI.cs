@@ -422,7 +422,7 @@ namespace Willowstead.UI
 
             Text legacyTxt = lblGo.AddComponent<Text>();
             legacyTxt.text = label;
-            legacyTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            legacyTxt.font = UIResourceHelper.GetPixelFont();
             legacyTxt.fontSize = 16;
             legacyTxt.fontStyle = UnityEngine.FontStyle.Bold;
             legacyTxt.color = new Color(0.32f, 0.22f, 0.16f, 1f); // Rich dark roast text

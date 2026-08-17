@@ -16,6 +16,26 @@ namespace Willowstead.Player
     /// </summary>
     public static class UIResourceHelper
     {
+        private static Font _cachedPixelFont;
+
+        /// <summary>
+        /// Loads the Minecraftia pixel font (Assets/Fonts/Minecraftia-Regular.ttf) with graceful fallbacks.
+        /// </summary>
+        public static Font GetPixelFont()
+        {
+            if (_cachedPixelFont != null) return _cachedPixelFont;
+
+#if UNITY_EDITOR
+            _cachedPixelFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/Minecraftia-Regular.ttf");
+            if (_cachedPixelFont != null) return _cachedPixelFont;
+
+            _cachedPixelFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/upheavtt.ttf");
+            if (_cachedPixelFont != null) return _cachedPixelFont;
+#endif
+            _cachedPixelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (_cachedPixelFont == null) _cachedPixelFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            return _cachedPixelFont;
+        }
 
         public static Sprite GetBackgroundSprite()
         {
@@ -126,6 +146,142 @@ namespace Willowstead.Player
             tex.Apply();
             _cachedCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
             return _cachedCircleSprite;
+        }
+
+        private static Sprite _cachedSparkleStarSprite;
+
+        public static Sprite GetSparkleStarSprite()
+        {
+            if (_cachedSparkleStarSprite != null) return _cachedSparkleStarSprite;
+
+            int size = 16;
+            Texture2D tex = new Texture2D(size, size);
+            tex.filterMode = FilterMode.Point;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color transparent = new Color(0, 0, 0, 0);
+            Color white = Color.white;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    tex.SetPixel(x, y, transparent);
+                }
+            }
+
+            // Beautiful 4-pointed radiant sparkle star
+            // Center core
+            tex.SetPixel(7, 7, white);
+            tex.SetPixel(8, 7, white);
+            tex.SetPixel(7, 8, white);
+            tex.SetPixel(8, 8, white);
+
+            // Vertical rays
+            for (int y = 2; y <= 13; y++)
+            {
+                tex.SetPixel(7, y, white);
+                tex.SetPixel(8, y, white);
+            }
+            // Horizontal rays
+            for (int x = 2; x <= 13; x++)
+            {
+                tex.SetPixel(x, 7, white);
+                tex.SetPixel(x, 8, white);
+            }
+
+            // Diagonal inner glints
+            tex.SetPixel(6, 6, new Color(1f, 1f, 1f, 0.75f));
+            tex.SetPixel(9, 6, new Color(1f, 1f, 1f, 0.75f));
+            tex.SetPixel(6, 9, new Color(1f, 1f, 1f, 0.75f));
+            tex.SetPixel(9, 9, new Color(1f, 1f, 1f, 0.75f));
+
+            tex.Apply();
+            _cachedSparkleStarSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 16f);
+            return _cachedSparkleStarSprite;
+        }
+
+        private static Sprite _cachedHpBarSprite;
+        private static Sprite _cachedHpBgSprite;
+        private static Sprite _cachedManaBarSprite;
+        private static Sprite _cachedManaBgSprite;
+        private static Sprite _cachedExpBarSprite;
+        private static Sprite _cachedExpBgSprite;
+
+        public static Sprite GetHealthBarSprite()
+        {
+            if (_cachedHpBarSprite != null) return _cachedHpBarSprite;
+#if UNITY_EDITOR
+            _cachedHpBarSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Bars/2/hp.png");
+            if (_cachedHpBarSprite != null) return _cachedHpBarSprite;
+#endif
+            return GetBackgroundSprite();
+        }
+
+        public static Sprite GetHealthBarBackgroundSprite()
+        {
+            if (_cachedHpBgSprite != null) return _cachedHpBgSprite;
+#if UNITY_EDITOR
+            _cachedHpBgSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Bars/2/hp  background.png");
+            if (_cachedHpBgSprite != null) return _cachedHpBgSprite;
+#endif
+            return GetInputFieldBackgroundSprite();
+        }
+
+        public static Sprite GetStaminaBarSprite()
+        {
+            if (_cachedExpBarSprite != null) return _cachedExpBarSprite;
+#if UNITY_EDITOR
+            // exp.png is green/gold pixel bar or mana.png is blue
+            _cachedExpBarSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Bars/2/exp.png");
+            if (_cachedExpBarSprite != null) return _cachedExpBarSprite;
+#endif
+            return GetBackgroundSprite();
+        }
+
+        public static Sprite GetStaminaBarBackgroundSprite()
+        {
+            if (_cachedExpBgSprite != null) return _cachedExpBgSprite;
+#if UNITY_EDITOR
+            _cachedExpBgSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Bars/2/exp background.png");
+            if (_cachedExpBgSprite != null) return _cachedExpBgSprite;
+#endif
+            return GetInputFieldBackgroundSprite();
+        }
+
+        private static Sprite[] _cachedQuestBookSprites = new Sprite[5];
+
+        public static Sprite GetQuestBookSprite() => GetItemOrQuestBookSprite(1);
+
+        public static Sprite GetItemOrQuestBookSprite(int bookIndex = 1)
+        {
+            bookIndex = Mathf.Clamp(bookIndex, 1, 4);
+            if (_cachedQuestBookSprites[bookIndex] != null) return _cachedQuestBookSprites[bookIndex];
+
+#if UNITY_EDITOR
+            string path = $"Assets/Sprites/Book/Item or quest book{bookIndex}.png";
+            Object[] subAssets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+            if (subAssets != null)
+            {
+                foreach (var obj in subAssets)
+                {
+                    if (obj is Sprite s && (s.name == $"Item or quest book{bookIndex}_0" || s.name == $"Item or quest book{bookIndex}"))
+                    {
+                        _cachedQuestBookSprites[bookIndex] = s;
+                        return s;
+                    }
+                }
+            }
+
+            Sprite single = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (single != null)
+            {
+                _cachedQuestBookSprites[bookIndex] = single;
+                return single;
+            }
+#endif
+            _cachedQuestBookSprites[bookIndex] = GetBackgroundSprite();
+            return _cachedQuestBookSprites[bookIndex];
         }
 
         private static System.Collections.Generic.Dictionary<string, Sprite> _iconCache = new System.Collections.Generic.Dictionary<string, Sprite>();

@@ -121,63 +121,101 @@ namespace Willowstead.Farming
             _spriteRenderer = GetComponent<SpriteRenderer>();
         }
 
+        private Coroutine _sparkleCoroutine;
+        private readonly System.Collections.Generic.List<GameObject> _activeSparkles = new System.Collections.Generic.List<GameObject>();
+
         private void Start()
         {
-            StartCoroutine(FertilizedGoldSparkleLoop());
+            _sparkleCoroutine = StartCoroutine(FertilizedGoldSparkleLoop());
         }
 
         private System.Collections.IEnumerator FertilizedGoldSparkleLoop()
         {
+            // Initial slight random desync so all crops don't sparkle on the exact same frame
+            yield return new WaitForSeconds(Random.Range(0.05f, 0.4f));
+
             while (true)
             {
-                yield return new WaitForSeconds(Random.Range(1.8f, 3.5f));
-
-                if (IsFertilized && gameObject.activeInHierarchy && _cropData != null)
+                if (IsFertilized && gameObject != null && gameObject.activeInHierarchy && _cropData != null)
                 {
-                    SpawnGoldSparkle();
+                    int burst = Random.value < 0.60f ? 2 : 1;
+                    for (int b = 0; b < burst; b++)
+                    {
+                        SpawnGoldSparkle();
+                    }
                 }
+
+                yield return new WaitForSeconds(Random.Range(0.45f, 0.90f));
             }
         }
 
         private void SpawnGoldSparkle()
         {
+            if (this == null || gameObject == null || !gameObject.activeInHierarchy) return;
+
             GameObject sparkGo = new GameObject("FertilizerGoldSpark");
-            sparkGo.transform.position = transform.position + new Vector3(Random.Range(-0.18f, 0.18f), Random.Range(-0.10f, 0.22f), 0f);
+            sparkGo.transform.SetParent(transform, true);
+            sparkGo.transform.position = transform.position + new Vector3(Random.Range(-0.28f, 0.28f), Random.Range(-0.16f, 0.32f), 0f);
             SpriteRenderer sr = sparkGo.AddComponent<SpriteRenderer>();
-            sr.sprite = UIResourceHelper.GetBackgroundSprite();
-            sr.color = new Color(1f, 0.88f, 0.40f, 0.95f); // Rich golden sparkle
+            sr.sprite = UIResourceHelper.GetSparkleStarSprite();
+            // Radiant golden-yellow & warm sunlight shimmer
+            sr.color = (Random.value > 0.5f) ? new Color(1f, 0.88f, 0.30f, 1f) : new Color(1f, 0.98f, 0.55f, 1f);
             sr.sortingLayerName = "Foreground";
-            sr.sortingOrder = 600;
-            sparkGo.transform.localScale = Vector3.one * 0.08f;
+            sr.sortingOrder = 650;
+            sparkGo.transform.localScale = Vector3.zero;
+            _activeSparkles.Add(sparkGo);
             StartCoroutine(AnimateSingleSparkle(sparkGo, sr));
         }
 
         private System.Collections.IEnumerator AnimateSingleSparkle(GameObject go, SpriteRenderer sr)
         {
-            float duration = Random.Range(0.6f, 0.9f);
+            float duration = Random.Range(0.85f, 1.35f);
             float elapsed = 0f;
             Vector3 startPos = go.transform.position;
-            Vector3 floatOffset = new Vector3(Random.Range(-0.06f, 0.06f), Random.Range(0.12f, 0.24f), 0f);
+            Vector3 floatOffset = new Vector3(Random.Range(-0.12f, 0.12f), Random.Range(0.22f, 0.48f), 0f);
+            float maxScale = Random.Range(0.35f, 0.55f); // Substantially bigger, radiant star
 
             while (elapsed < duration)
             {
+                if (this == null || go == null) yield break;
+
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
 
-                if (go != null)
+                go.transform.position = startPos + floatOffset * t;
+                float scaleCurve = Mathf.Sin(t * Mathf.PI);
+                float scale = scaleCurve * maxScale;
+                go.transform.localScale = new Vector3(scale, scale, 1f);
+                go.transform.Rotate(0f, 0f, 45f * Time.deltaTime);
+
+                if (sr != null)
                 {
-                    go.transform.position = startPos + floatOffset * t;
-                    float scale = Mathf.Sin(t * Mathf.PI) * 0.10f;
-                    go.transform.localScale = new Vector3(scale, scale, 1f);
-                    if (sr != null)
-                    {
-                        sr.color = new Color(1f, 0.88f, 0.40f, Mathf.Sin(t * Mathf.PI));
-                    }
+                    sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, Mathf.Pow(scaleCurve, 0.7f));
                 }
+
                 yield return null;
             }
 
-            if (go != null) Destroy(go);
+            if (go != null)
+            {
+                _activeSparkles.Remove(go);
+                Destroy(go);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_sparkleCoroutine != null)
+            {
+                StopCoroutine(_sparkleCoroutine);
+                _sparkleCoroutine = null;
+            }
+
+            foreach (var spark in _activeSparkles)
+            {
+                if (spark != null) Destroy(spark);
+            }
+            _activeSparkles.Clear();
         }
 
         /// <summary>
@@ -399,6 +437,12 @@ namespace Willowstead.Farming
 
             // Tell GridManager we are gone immediately so the cell space is cleared
             World.GridManager.Instance.RemoveCrop(_gridPosition);
+
+            if (Player.SkillsManager.Instance != null)
+            {
+                int xpReward = (IsFertilized ? 35 : 25) * count;
+                Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, xpReward);
+            }
 
             StartCoroutine(PlayHarvestAnimationAndDestroy(finalItemName, _cropData.YieldCount + bonusYieldPerInstance, isRotten));
 

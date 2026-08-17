@@ -159,7 +159,7 @@ namespace Willowstead.UI
             RectTransform innerRt = (RectTransform)innerBgGo.transform;
             innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
             innerRt.offsetMin = new Vector2(3f, 3f);
-            innerRt.offsetMax = new Vector2(-56f, -3f); // Leaves space on right for map button
+            innerRt.offsetMax = new Vector2(-104f, -3f); // Leaves space on right for Skills + Map buttons
             Image innerImg = innerBgGo.GetComponent<Image>();
             innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             innerImg.type = Image.Type.Sliced;
@@ -280,7 +280,7 @@ namespace Willowstead.UI
             degRect.anchorMin = new Vector2(0.5f, 0f);
             degRect.anchorMax = new Vector2(0.5f, 0f);
             degRect.pivot = new Vector2(0.5f, 1f);
-            degRect.anchoredPosition = new Vector2(-28f, -2f);
+            degRect.anchoredPosition = new Vector2(-48f, -2f);
             degRect.sizeDelta = new Vector2(100f, 18f);
 
             _headingDegreeText = degGo.AddComponent<TextMeshProUGUI>();
@@ -291,7 +291,57 @@ namespace Willowstead.UI
             _headingDegreeText.color = new Color(0.92f, 0.80f, 0.55f, 0.95f);
             _headingDegreeText.text = "0° N";
 
-            GameObject mapBtnGo = new GameObject("OpenMapButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            // ── 1. SKILLS BUTTON [K] ──────────────────────────────────────────
+            GameObject skillsBtnGo = new GameObject("OpenSkillsButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(Player.UIHoverScale));
+            skillsBtnGo.transform.SetParent(_compassRootGo.transform, false);
+            RectTransform sBtnRect = (RectTransform)skillsBtnGo.transform;
+            sBtnRect.anchorMin = new Vector2(1f, 0.5f);
+            sBtnRect.anchorMax = new Vector2(1f, 0.5f);
+            sBtnRect.pivot = new Vector2(1f, 0.5f);
+            sBtnRect.anchoredPosition = new Vector2(-54f, 0f);
+            sBtnRect.sizeDelta = new Vector2(46f, 36f);
+
+            Image sBtnImg = skillsBtnGo.GetComponent<Image>();
+            sBtnImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
+            sBtnImg.type = Image.Type.Sliced;
+            sBtnImg.color = new Color(0.96f, 0.90f, 0.82f, 1f); // Warm parchment
+
+            Button sBtn = skillsBtnGo.GetComponent<Button>();
+            ColorBlock scb = sBtn.colors;
+            scb.normalColor = new Color(0.96f, 0.90f, 0.82f, 1f);
+            scb.highlightedColor = new Color(1.0f, 0.96f, 0.90f, 1f);
+            scb.pressedColor = new Color(0.85f, 0.78f, 0.68f, 1f);
+            sBtn.colors = scb;
+
+            sBtn.onClick.AddListener(() =>
+            {
+                if (Player.SkillsUI.Instance != null)
+                {
+                    Player.SkillsUI.Instance.ToggleUI();
+                }
+                else
+                {
+                    var skillsUI = Object.FindAnyObjectByType<Player.SkillsUI>();
+                    if (skillsUI != null) skillsUI.ToggleUI();
+                }
+            });
+
+            GameObject sBtnTxtGo = new GameObject("SkillsText", typeof(RectTransform));
+            sBtnTxtGo.transform.SetParent(skillsBtnGo.transform, false);
+            RectTransform sBtnTxtRt = (RectTransform)sBtnTxtGo.transform;
+            sBtnTxtRt.anchorMin = Vector2.zero; sBtnTxtRt.anchorMax = Vector2.one;
+            sBtnTxtRt.offsetMin = Vector2.zero; sBtnTxtRt.offsetMax = Vector2.zero;
+
+            var sBtnTxt = sBtnTxtGo.AddComponent<TextMeshProUGUI>();
+            if (font != null) sBtnTxt.font = font;
+            sBtnTxt.fontSize = 9.5f;
+            sBtnTxt.fontStyle = FontStyles.Bold;
+            sBtnTxt.alignment = TextAlignmentOptions.Center;
+            sBtnTxt.color = new Color(0.32f, 0.22f, 0.16f, 1f);
+            sBtnTxt.text = "BOOK\n<size=7.5>[K]</size>";
+
+            // ── 2. MAP BUTTON [M] ─────────────────────────────────────────────
+            GameObject mapBtnGo = new GameObject("OpenMapButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(Player.UIHoverScale));
             mapBtnGo.transform.SetParent(_compassRootGo.transform, false);
             RectTransform btnRect = (RectTransform)mapBtnGo.transform;
             btnRect.anchorMin = new Vector2(1f, 0.5f);
@@ -301,15 +351,15 @@ namespace Willowstead.UI
             btnRect.sizeDelta = new Vector2(46f, 36f);
 
             Image btnImg = mapBtnGo.GetComponent<Image>();
-            btnImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            btnImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             btnImg.type = Image.Type.Sliced;
-            btnImg.color = new Color(0.32f, 0.22f, 0.14f, 1f);
+            btnImg.color = new Color(0.96f, 0.90f, 0.82f, 1f); // Warm parchment
 
             _mapButton = mapBtnGo.GetComponent<Button>();
             ColorBlock cb = _mapButton.colors;
-            cb.normalColor = new Color(0.32f, 0.22f, 0.14f, 1f);
-            cb.highlightedColor = new Color(0.48f, 0.34f, 0.22f, 1f);
-            cb.pressedColor = new Color(0.20f, 0.14f, 0.08f, 1f);
+            cb.normalColor = new Color(0.96f, 0.90f, 0.82f, 1f);
+            cb.highlightedColor = new Color(1.0f, 0.96f, 0.90f, 1f);
+            cb.pressedColor = new Color(0.85f, 0.78f, 0.68f, 1f);
             _mapButton.colors = cb;
 
             _mapButton.onClick.AddListener(() =>
@@ -328,11 +378,11 @@ namespace Willowstead.UI
 
             var btnTxt = btnTxtGo.AddComponent<TextMeshProUGUI>();
             if (font != null) btnTxt.font = font;
-            btnTxt.fontSize = 10;
+            btnTxt.fontSize = 9.5f;
             btnTxt.fontStyle = FontStyles.Bold;
             btnTxt.alignment = TextAlignmentOptions.Center;
-            btnTxt.color = new Color(1f, 0.92f, 0.75f, 1f);
-            btnTxt.text = "MAP\n<size=8>[M]</size>";
+            btnTxt.color = new Color(0.32f, 0.22f, 0.16f, 1f);
+            btnTxt.text = "MAP\n<size=7.5>[M]</size>";
         }
 
         private void InitializeDefaultPOIs()

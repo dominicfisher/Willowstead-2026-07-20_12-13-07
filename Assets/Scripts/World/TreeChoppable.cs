@@ -109,6 +109,11 @@ namespace Willowstead.World
 
             StartShake();
 
+            if (Player.SkillsManager.Instance != null)
+            {
+                Player.SkillsManager.Instance.AddXP(Player.SkillType.Woodcutting, 5);
+            }
+
             _chopsRemaining--;
             if (_chopsRemaining > 0) return;
 
@@ -143,6 +148,11 @@ namespace Willowstead.World
         {
             _felled = true;
             s_felledTiles.Add(_tileGridCoord);
+
+            if (Player.SkillsManager.Instance != null)
+            {
+                Player.SkillsManager.Instance.AddXP(Player.SkillType.Woodcutting, 25);
+            }
 
             int logs = Random.Range(_minLogsDropped, _maxLogsDropped + 1);
 

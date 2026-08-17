@@ -130,7 +130,7 @@ namespace Willowstead.UI
 
         private void BuildPanel(Canvas canvas)
         {
-            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+            Font font = UIResourceHelper.GetPixelFont();
 
             _panelGo = new GameObject("WorldSetupPanel", typeof(RectTransform), typeof(Image));
             _panelGo.transform.SetParent(canvas.transform, false);
@@ -146,67 +146,37 @@ namespace Willowstead.UI
             rootDim.color = new Color(0.04f, 0.04f, 0.05f, 0.85f);
             rootDim.raycastTarget = true;
 
-            GameObject windowGo = new GameObject("WindowCard", typeof(RectTransform));
+            GameObject windowGo = new GameObject("WindowCard", typeof(RectTransform), typeof(Image));
             windowGo.transform.SetParent(_panelGo.transform, false);
             RectTransform winRt = (RectTransform)windowGo.transform;
             winRt.anchorMin = new Vector2(0.5f, 0.5f);
             winRt.anchorMax = new Vector2(0.5f, 0.5f);
             winRt.pivot = new Vector2(0.5f, 0.5f);
-            winRt.sizeDelta = new Vector2(640f, 490f);
+            winRt.sizeDelta = new Vector2(580f, 440f);
             winRt.anchoredPosition = Vector2.zero;
 
-            GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
-            shadowGo.transform.SetParent(windowGo.transform, false);
-            RectTransform shadowRt = (RectTransform)shadowGo.transform;
-            shadowRt.anchorMin = Vector2.zero; shadowRt.anchorMax = Vector2.one;
-            shadowRt.offsetMin = new Vector2(-10f, -10f); shadowRt.offsetMax = new Vector2(10f, 10f);
-            Image shadowImg = shadowGo.GetComponent<Image>();
-            shadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            shadowImg.type = Image.Type.Sliced;
-            shadowImg.color = new Color(0f, 0f, 0f, 0.6f);
+            Image winBg = windowGo.GetComponent<Image>();
+            winBg.sprite = UIResourceHelper.GetQuestBookSprite();
+            winBg.type = Image.Type.Sliced;
+            winBg.color = Color.white;
+            winBg.raycastTarget = true;
 
-            GameObject woodGo = new GameObject("WoodBoard", typeof(RectTransform), typeof(Image));
-            woodGo.transform.SetParent(windowGo.transform, false);
-            RectTransform woodRt = (RectTransform)woodGo.transform;
-            woodRt.anchorMin = Vector2.zero; woodRt.anchorMax = Vector2.one;
-            woodRt.offsetMin = Vector2.zero; woodRt.offsetMax = Vector2.zero;
-            Image woodImg = woodGo.GetComponent<Image>();
-            woodImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            woodImg.type = Image.Type.Sliced;
-            woodImg.color = new Color(0.22f, 0.16f, 0.11f, 0.98f);
-
-            GameObject trimGo = new GameObject("GoldTrim", typeof(RectTransform), typeof(Image));
-            trimGo.transform.SetParent(woodGo.transform, false);
-            RectTransform trimRt = (RectTransform)trimGo.transform;
-            trimRt.anchorMin = Vector2.zero; trimRt.anchorMax = Vector2.one;
-            trimRt.offsetMin = new Vector2(4f, 4f); trimRt.offsetMax = new Vector2(-4f, -4f);
-            Image trimImg = trimGo.GetComponent<Image>();
-            trimImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            trimImg.type = Image.Type.Sliced;
-            trimImg.color = new Color(0.76f, 0.62f, 0.34f, 0.65f);
-
-            GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
-            innerGo.transform.SetParent(trimGo.transform, false);
+            // Content container on top of book/card
+            GameObject innerGo = new GameObject("InnerContainer", typeof(RectTransform));
+            innerGo.transform.SetParent(windowGo.transform, false);
             RectTransform innerRt = (RectTransform)innerGo.transform;
             innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(3f, 3f); innerRt.offsetMax = new Vector2(-3f, -3f);
-            Image innerBg = innerGo.GetComponent<Image>();
-            innerBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
-            innerBg.type = Image.Type.Sliced;
-            innerBg.color = new Color(0.11f, 0.09f, 0.07f, 0.98f);
+            innerRt.offsetMin = new Vector2(36f, 32f); innerRt.offsetMax = new Vector2(-36f, -32f);
 
-            GameObject bannerGo = new GameObject("TitleBanner", typeof(RectTransform), typeof(Image));
+            // Title Banner
+            GameObject bannerGo = new GameObject("TitleBanner", typeof(RectTransform));
             bannerGo.transform.SetParent(innerGo.transform, false);
             RectTransform bannerRt = (RectTransform)bannerGo.transform;
             bannerRt.anchorMin = new Vector2(0.5f, 1f);
             bannerRt.anchorMax = new Vector2(0.5f, 1f);
             bannerRt.pivot = new Vector2(0.5f, 1f);
-            bannerRt.sizeDelta = new Vector2(360f, 46f);
-            bannerRt.anchoredPosition = new Vector2(0f, -16f);
-            Image bannerImg = bannerGo.GetComponent<Image>();
-            bannerImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            bannerImg.type = Image.Type.Sliced;
-            bannerImg.color = new Color(0.32f, 0.22f, 0.14f, 1f);
+            bannerRt.sizeDelta = new Vector2(400f, 34f);
+            bannerRt.anchoredPosition = new Vector2(0f, -4f);
 
             GameObject titleGo = new GameObject("TitleText", typeof(RectTransform));
             titleGo.transform.SetParent(bannerGo.transform, false);
@@ -214,35 +184,32 @@ namespace Willowstead.UI
             titleRt.anchorMin = Vector2.zero; titleRt.anchorMax = Vector2.one;
             titleRt.offsetMin = Vector2.zero; titleRt.offsetMax = Vector2.zero;
 
-            TextMeshProUGUI title = titleGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) title.font = font;
-            title.text = "CREATE NEW WORLD";
-            title.fontSize = 20f;
-            title.fontStyle = FontStyles.Bold;
-            title.color = new Color(1f, 0.88f, 0.48f, 1f);
-            title.alignment = TextAlignmentOptions.Center;
+            Text title = titleGo.AddComponent<Text>();
+            title.font = font;
+            title.text = "CREATE NEW REALM";
+            title.fontSize = 20;
+            title.fontStyle = FontStyle.Bold;
+            title.color = new Color(0.35f, 0.22f, 0.16f, 1f);
+            title.alignment = TextAnchor.MiddleCenter;
+            title.raycastTarget = false;
 
-            GameObject closeGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            // Close 'X' Button
+            GameObject closeGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(UIHoverScale));
             closeGo.transform.SetParent(innerGo.transform, false);
             RectTransform closeRt = (RectTransform)closeGo.transform;
             closeRt.anchorMin = new Vector2(1f, 1f);
             closeRt.anchorMax = new Vector2(1f, 1f);
             closeRt.pivot = new Vector2(1f, 1f);
-            closeRt.anchoredPosition = new Vector2(-12f, -12f);
-            closeRt.sizeDelta = new Vector2(32f, 32f);
+            closeRt.anchoredPosition = new Vector2(4f, 4f);
+            closeRt.sizeDelta = new Vector2(30f, 30f);
 
             Image closeImg = closeGo.GetComponent<Image>();
-            closeImg.sprite = UIResourceHelper.GetBackgroundSprite();
+            closeImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             closeImg.type = Image.Type.Sliced;
-            closeImg.color = new Color(0.48f, 0.18f, 0.18f, 0.95f);
+            closeImg.color = new Color(0.85f, 0.40f, 0.35f, 1f);
 
             _closeButton = closeGo.GetComponent<Button>();
             _closeButton.targetGraphic = closeImg;
-            ColorBlock closeCb = _closeButton.colors;
-            closeCb.normalColor = new Color(0.48f, 0.18f, 0.18f, 0.95f);
-            closeCb.highlightedColor = new Color(0.68f, 0.24f, 0.24f, 1f);
-            closeCb.pressedColor = new Color(0.30f, 0.12f, 0.12f, 1f);
-            _closeButton.colors = closeCb;
             _closeButton.onClick.AddListener(OnCloseClicked);
 
             GameObject closeTxtGo = new GameObject("X", typeof(RectTransform));
@@ -250,65 +217,69 @@ namespace Willowstead.UI
             RectTransform closeTxtRt = (RectTransform)closeTxtGo.transform;
             closeTxtRt.anchorMin = Vector2.zero; closeTxtRt.anchorMax = Vector2.one;
             closeTxtRt.offsetMin = Vector2.zero; closeTxtRt.offsetMax = Vector2.zero;
-            var closeTxt = closeTxtGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) closeTxt.font = font;
+            var closeTxt = closeTxtGo.AddComponent<Text>();
+            closeTxt.font = font;
             closeTxt.fontSize = 15;
-            closeTxt.fontStyle = FontStyles.Bold;
-            closeTxt.alignment = TextAlignmentOptions.Center;
+            closeTxt.fontStyle = FontStyle.Bold;
+            closeTxt.alignment = TextAnchor.MiddleCenter;
             closeTxt.color = Color.white;
-            closeTxt.text = "X";
+            closeTxt.text = "✕";
+            closeTxt.raycastTarget = false;
 
+            // Subtitle
             GameObject subGo = new GameObject("Subtitle", typeof(RectTransform));
             subGo.transform.SetParent(innerGo.transform, false);
             RectTransform subRt = (RectTransform)subGo.transform;
             subRt.anchorMin = new Vector2(0.5f, 1f);
             subRt.anchorMax = new Vector2(0.5f, 1f);
             subRt.pivot = new Vector2(0.5f, 1f);
-            subRt.anchoredPosition = new Vector2(0f, -72f);
-            subRt.sizeDelta = new Vector2(540f, 40f);
+            subRt.anchoredPosition = new Vector2(0f, -44f);
+            subRt.sizeDelta = new Vector2(460f, 32f);
 
-            TextMeshProUGUI sub = subGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) sub.font = font;
-            sub.text = "Name your world and enter a seed to forge a deterministic realm.";
-            sub.fontSize = 14f;
-            sub.color = new Color(0.85f, 0.82f, 0.75f, 0.95f);
-            sub.alignment = TextAlignmentOptions.Top;
-            sub.textWrappingMode = TextWrappingModes.Normal;
+            Text sub = subGo.AddComponent<Text>();
+            sub.font = font;
+            sub.text = "Name your world & choose a seed to shape your homestead.";
+            sub.fontSize = 12;
+            sub.fontStyle = FontStyle.Normal;
+            sub.color = new Color(0.48f, 0.38f, 0.30f, 1f);
+            sub.alignment = TextAnchor.MiddleCenter;
+            sub.raycastTarget = false;
 
             // Row 1: World Name Input
-            _nameInput = BuildInputRow(innerGo.transform, "World Name:", "My Willowstead", -125f, font);
+            _nameInput = BuildInputRow(innerGo.transform, "World Name:", "My Willowstead", -90f, font);
 
             // Row 2: World Seed Input
-            _seedInput = BuildInputRow(innerGo.transform, "World Seed:", "1337", -190f, font);
+            _seedInput = BuildInputRow(innerGo.transform, "World Seed:", "1337", -156f, font);
 
+            // Status Text
             GameObject stGo = new GameObject("Status", typeof(RectTransform));
             stGo.transform.SetParent(innerGo.transform, false);
             RectTransform stRt = (RectTransform)stGo.transform;
             stRt.anchorMin = new Vector2(0.5f, 0f);
             stRt.anchorMax = new Vector2(0.5f, 0f);
             stRt.pivot = new Vector2(0.5f, 0f);
-            stRt.anchoredPosition = new Vector2(0f, 92f);
-            stRt.sizeDelta = new Vector2(500f, 26f);
+            stRt.anchoredPosition = new Vector2(0f, 76f);
+            stRt.sizeDelta = new Vector2(460f, 22f);
 
             _statusLabel = stGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) _statusLabel.font = font;
             _statusLabel.text = string.Empty;
-            _statusLabel.fontSize = 13f;
-            _statusLabel.color = new Color(0.92f, 0.80f, 0.52f, 1f);
+            _statusLabel.fontSize = 12f;
+            _statusLabel.color = new Color(0.45f, 0.35f, 0.25f, 1f);
             _statusLabel.alignment = TextAlignmentOptions.Center;
 
-            _randomButton = BuildButton(innerGo.transform, "Randomize ⚄",
-                new Vector2(-130f, 32f), new Vector2(210f, 48f), font,
-                new Color(0.30f, 0.22f, 0.15f, 1f), OnRandomizeClicked);
+            // Buttons
+            _randomButton = BuildButton(innerGo.transform, "🎲 Randomize",
+                new Vector2(-120f, 16f), new Vector2(190f, 44f), font,
+                new Color(0.96f, 0.90f, 0.82f, 1f), new Color(0.35f, 0.25f, 0.18f, 1f), OnRandomizeClicked);
 
-            _createButton = BuildButton(innerGo.transform, "Embark World ✦",
-                new Vector2(130f, 32f), new Vector2(210f, 48f), font,
-                new Color(0.24f, 0.42f, 0.22f, 1f), OnCreateClicked);
+            _createButton = BuildButton(innerGo.transform, "✦ Embark World",
+                new Vector2(120f, 16f), new Vector2(190f, 44f), font,
+                new Color(0.45f, 0.68f, 0.38f, 1f), Color.white, OnCreateClicked);
 
             _panelGo.SetActive(false);
         }
 
-        private TMP_InputField BuildInputRow(Transform parent, string labelText, string placeholderText, float yPos, TMP_FontAsset font)
+        private TMP_InputField BuildInputRow(Transform parent, string labelText, string placeholderText, float yPos, Font font)
         {
             GameObject rowGo = new GameObject($"Row_{labelText}", typeof(RectTransform), typeof(Image));
             rowGo.transform.SetParent(parent, false);
@@ -317,22 +288,12 @@ namespace Willowstead.UI
             rowRt.anchorMax = new Vector2(0.5f, 1f);
             rowRt.pivot = new Vector2(0.5f, 1f);
             rowRt.anchoredPosition = new Vector2(0f, yPos);
-            rowRt.sizeDelta = new Vector2(520f, 48f);
+            rowRt.sizeDelta = new Vector2(460f, 48f);
 
             Image rowBg = rowGo.GetComponent<Image>();
             rowBg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             rowBg.type = Image.Type.Sliced;
-            rowBg.color = new Color(0.06f, 0.05f, 0.05f, 0.98f);
-
-            GameObject borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
-            borderGo.transform.SetParent(rowGo.transform, false);
-            RectTransform borderRt = (RectTransform)borderGo.transform;
-            borderRt.anchorMin = Vector2.zero; borderRt.anchorMax = Vector2.one;
-            borderRt.offsetMin = Vector2.zero; borderRt.offsetMax = Vector2.zero;
-            Image borderImg = borderGo.GetComponent<Image>();
-            borderImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            borderImg.type = Image.Type.Sliced;
-            borderImg.color = new Color(0.72f, 0.58f, 0.32f, 0.55f);
+            rowBg.color = new Color(0.96f, 0.90f, 0.82f, 0.95f);
 
             GameObject lblGo = new GameObject("Label", typeof(RectTransform));
             lblGo.transform.SetParent(rowGo.transform, false);
@@ -340,16 +301,17 @@ namespace Willowstead.UI
             lblRt.anchorMin = new Vector2(0f, 0f);
             lblRt.anchorMax = new Vector2(0f, 1f);
             lblRt.pivot = new Vector2(0f, 0.5f);
-            lblRt.offsetMin = new Vector2(16f, 0f);
-            lblRt.offsetMax = new Vector2(120f, 0f);
+            lblRt.offsetMin = new Vector2(14f, 0f);
+            lblRt.offsetMax = new Vector2(130f, 0f);
 
-            TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) lbl.font = font;
+            Text lbl = lblGo.AddComponent<Text>();
+            lbl.font = font;
             lbl.text = labelText;
-            lbl.fontSize = 15f;
-            lbl.fontStyle = FontStyles.Bold;
-            lbl.color = new Color(1f, 0.88f, 0.52f, 1f);
-            lbl.alignment = TextAlignmentOptions.MidlineLeft;
+            lbl.fontSize = 13;
+            lbl.fontStyle = FontStyle.Bold;
+            lbl.color = new Color(0.35f, 0.22f, 0.16f, 1f);
+            lbl.alignment = TextAnchor.MiddleLeft;
+            lbl.raycastTarget = false;
 
             GameObject textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
             textArea.transform.SetParent(rowGo.transform, false);
@@ -357,8 +319,8 @@ namespace Willowstead.UI
             textAreaRt.anchorMin = new Vector2(0f, 0f);
             textAreaRt.anchorMax = new Vector2(1f, 1f);
             textAreaRt.pivot = new Vector2(0.5f, 0.5f);
-            textAreaRt.offsetMin = new Vector2(130f, 4f);
-            textAreaRt.offsetMax = new Vector2(-16f, -4f);
+            textAreaRt.offsetMin = new Vector2(134f, 4f);
+            textAreaRt.offsetMax = new Vector2(-12f, -4f);
 
             GameObject inputTextGo = new GameObject("Text", typeof(RectTransform));
             inputTextGo.transform.SetParent(textArea.transform, false);
@@ -367,10 +329,9 @@ namespace Willowstead.UI
             itRt.offsetMin = Vector2.zero; itRt.offsetMax = Vector2.zero;
 
             TextMeshProUGUI itText = inputTextGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) itText.font = font;
-            itText.fontSize = 17f;
+            itText.fontSize = 14f;
             itText.fontStyle = FontStyles.Bold;
-            itText.color = new Color(0.96f, 0.94f, 0.88f, 1f);
+            itText.color = new Color(0.25f, 0.16f, 0.10f, 1f);
             itText.alignment = TextAlignmentOptions.MidlineLeft;
 
             GameObject phGo = new GameObject("Placeholder", typeof(RectTransform));
@@ -380,11 +341,10 @@ namespace Willowstead.UI
             phRt.offsetMin = Vector2.zero; phRt.offsetMax = Vector2.zero;
 
             TextMeshProUGUI phText = phGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) phText.font = font;
             phText.text = placeholderText;
-            phText.fontSize = 16f;
+            phText.fontSize = 13f;
             phText.fontStyle = FontStyles.Italic;
-            phText.color = new Color(0.6f, 0.58f, 0.52f, 0.5f);
+            phText.color = new Color(0.60f, 0.50f, 0.42f, 0.7f);
             phText.alignment = TextAlignmentOptions.MidlineLeft;
 
             TMP_InputField field = rowGo.AddComponent<TMP_InputField>();
@@ -401,9 +361,9 @@ namespace Willowstead.UI
             return field;
         }
 
-        private Button BuildButton(Transform parent, string label, Vector2 centerPos, Vector2 size, TMP_FontAsset font, Color btnColor, UnityEngine.Events.UnityAction onClick)
+        private Button BuildButton(Transform parent, string label, Vector2 centerPos, Vector2 size, Font font, Color btnColor, Color textColor, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject go = new GameObject($"Button_{label}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(UIHoverScale));
             go.transform.SetParent(parent, false);
             RectTransform rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0.5f, 0f);
@@ -413,7 +373,7 @@ namespace Willowstead.UI
             rt.sizeDelta = size;
 
             Image img = go.GetComponent<Image>();
-            img.sprite = UIResourceHelper.GetBackgroundSprite();
+            img.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
             img.type = Image.Type.Sliced;
             img.color = btnColor;
             img.raycastTarget = true;
@@ -423,8 +383,8 @@ namespace Willowstead.UI
             btn.targetGraphic = img;
             ColorBlock cb = btn.colors;
             cb.normalColor = btnColor;
-            cb.highlightedColor = btnColor * 1.35f;
-            cb.pressedColor = btnColor * 0.75f;
+            cb.highlightedColor = Color.Lerp(btnColor, Color.white, 0.25f);
+            cb.pressedColor = Color.Lerp(btnColor, Color.black, 0.20f);
             cb.selectedColor = cb.highlightedColor;
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
@@ -435,13 +395,14 @@ namespace Willowstead.UI
             lblRt.anchorMin = Vector2.zero; lblRt.anchorMax = Vector2.one;
             lblRt.offsetMin = Vector2.zero; lblRt.offsetMax = Vector2.zero;
 
-            TextMeshProUGUI lbl = lblGo.AddComponent<TextMeshProUGUI>();
-            if (font != null) lbl.font = font;
+            Text lbl = lblGo.AddComponent<Text>();
+            lbl.font = font;
             lbl.text = label;
-            lbl.fontSize = 17f;
-            lbl.fontStyle = FontStyles.Bold;
-            lbl.color = new Color(1f, 0.94f, 0.82f, 1f);
-            lbl.alignment = TextAlignmentOptions.Center;
+            lbl.fontSize = 14;
+            lbl.fontStyle = FontStyle.Bold;
+            lbl.color = textColor;
+            lbl.alignment = TextAnchor.MiddleCenter;
+            lbl.raycastTarget = false;
 
             return btn;
         }

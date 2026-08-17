@@ -123,8 +123,9 @@ namespace Willowstead.Player
                     {
                         InventoryManager.Instance.SwapSlots(slotIndex, targetSlot.slotIndex);
 
-                        FindAnyObjectByType<InventoryUI>()?.RefreshUI();
-                        FindAnyObjectByType<HotbarUI>()?.RefreshUI();
+                        Object.FindAnyObjectByType<InventoryUI>()?.RefreshUI();
+                        Object.FindAnyObjectByType<HotbarUI>()?.RefreshUI();
+                        Object.FindAnyObjectByType<ShopUI>()?.RefreshLeftInventoryPage();
                     }
                     break;
                 }

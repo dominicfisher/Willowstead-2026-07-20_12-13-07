@@ -294,18 +294,18 @@ namespace Willowstead.World
         }
 
         /// <summary>
-        /// Hoes the ground at the specified cell, turning it into tilled dirt.
+        /// Hoes the ground at the specified cell, turning it into tilled dirt. Returns true if newly tilled.
         /// </summary>
-        public void HoeTile(Vector3Int cellPosition)
+        public bool HoeTile(Vector3Int cellPosition)
         {
-            if (_tilledCells.Contains(cellPosition)) return;
+            if (_tilledCells.Contains(cellPosition)) return false;
 
             if (ProceduralGridGenerator.Instance != null && ProceduralGridGenerator.Instance.HasPuddleAt(cellPosition))
             {
 #if UNITY_EDITOR
                 Debug.Log($"[GridManager] Cannot hoe here: water/puddle occupies this tile at {cellPosition}.");
 #endif
-                return;
+                return false;
             }
 
             if (ProceduralGridGenerator.Instance != null)
@@ -359,6 +359,7 @@ namespace Willowstead.World
 #if UNITY_EDITOR
             Debug.Log($"[GridManager] Tilled tile at: {cellPosition}");
 #endif
+            return true;
         }
 
         private void UpdateEdgeFringesAround(Vector3Int cell)
@@ -634,29 +635,29 @@ namespace Willowstead.World
 
         private System.Collections.IEnumerator AnimateFertilizerSparkle(GameObject sparkleGo)
         {
-            int sparkCount = 8;
+            int sparkCount = 10;
             List<GameObject> sparks = new List<GameObject>();
             for (int i = 0; i < sparkCount; i++)
             {
                 GameObject s = new GameObject("Spark");
                 s.transform.SetParent(sparkleGo.transform, false);
                 SpriteRenderer sr = s.AddComponent<SpriteRenderer>();
-                sr.sprite = _dirtParticleSprite != null ? _dirtParticleSprite : UIResourceHelper.GetBackgroundSprite();
+                sr.sprite = UIResourceHelper.GetSparkleStarSprite();
                 // Rich golden sparkle burst
-                sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, 0.95f) : new Color(1f, 0.96f, 0.65f, 0.95f);
+                sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(1f, 0.98f, 0.65f, 1f);
                 sr.sortingLayerName = "Foreground";
-                sr.sortingOrder = 500;
-                s.transform.localScale = Vector3.one * 0.14f;
+                sr.sortingOrder = 650;
+                s.transform.localScale = Vector3.zero;
                 sparks.Add(s);
             }
 
-            float duration = 0.55f;
+            float duration = 0.75f;
             float elapsed = 0f;
             Vector3[] directions = new Vector3[sparkCount];
             for (int i = 0; i < sparkCount; i++)
             {
                 float angle = i * (360f / sparkCount) * Mathf.Deg2Rad;
-                directions[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(0.30f, 0.55f);
+                directions[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(0.45f, 0.85f);
             }
 
             while (elapsed < duration)
@@ -667,12 +668,16 @@ namespace Willowstead.World
                 for (int i = 0; i < sparkCount; i++)
                 {
                     if (sparks[i] == null) continue;
-                    sparks[i].transform.localPosition = Vector3.Lerp(Vector3.zero, directions[i], t) + new Vector3(0f, Mathf.Sin(t * Mathf.PI) * 0.18f, 0f);
+                    sparks[i].transform.localPosition = Vector3.Lerp(Vector3.zero, directions[i], t) + new Vector3(0f, Mathf.Sin(t * Mathf.PI) * 0.28f, 0f);
+                    float scale = Mathf.Sin(t * Mathf.PI) * 0.45f;
+                    sparks[i].transform.localScale = new Vector3(scale, scale, 1f);
+                    sparks[i].transform.Rotate(0f, 0f, 60f * Time.deltaTime);
+
                     SpriteRenderer sr = sparks[i].GetComponent<SpriteRenderer>();
                     if (sr != null)
                     {
                         float alpha = Mathf.Sin(t * Mathf.PI);
-                        sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, alpha) : new Color(1f, 0.96f, 0.65f, alpha);
+                        sr.color = (i % 2 == 0) ? new Color(1f, 0.88f, 0.35f, alpha) : new Color(1f, 0.98f, 0.65f, alpha);
                     }
                 }
                 yield return null;
@@ -810,6 +815,7 @@ namespace Willowstead.World
             if (_activeCrops.ContainsKey(cellPosition))
             {
                 _activeCrops.Remove(cellPosition);
+                _fertilizedCells.Remove(cellPosition);
 #if UNITY_EDITOR
                 Debug.Log($"[GridManager] Crop harvested from: {cellPosition}. Total individual crops remaining in the world: {GetTotalCropsPlanted()}");
 #endif

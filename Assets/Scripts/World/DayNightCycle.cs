@@ -367,7 +367,7 @@ namespace Willowstead.World
                 _clockText = clockGo.AddComponent<Text>();
                 _clockText.raycastTarget = false;
                 _clockText.alignment     = TextAnchor.UpperLeft;
-                _clockText.font          = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                _clockText.font          = Player.UIResourceHelper.GetPixelFont();
                 _clockText.fontSize      = 20;
                 _clockText.color         = new Color(1f, 1f, 1f, 0.85f);
                 var ct = _clockText.rectTransform;

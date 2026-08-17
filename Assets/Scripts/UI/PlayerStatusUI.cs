@@ -223,7 +223,7 @@ namespace Willowstead.UI
             Transform existing = canvas.transform.Find("PlayerStatusHUD");
             if (existing != null) DestroyImmediate(existing.gameObject);
 
-            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+            Font font = UIResourceHelper.GetPixelFont();
 
             // ── Root Bottom-Left Container ───────────────────────────────────────
             _hudRootGo = new GameObject("PlayerStatusHUD", typeof(RectTransform));
@@ -240,53 +240,16 @@ namespace Willowstead.UI
             rootRt.anchorMax = new Vector2(0f, 0f);
             rootRt.pivot = new Vector2(0f, 0f);
             rootRt.anchoredPosition = new Vector2(24f, 24f);
-            rootRt.sizeDelta = new Vector2(210f, 80f);
-
-            // ── Drop Shadow ─────────────────────────────────────────────────────
-            GameObject shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
-            shadowGo.transform.SetParent(_hudRootGo.transform, false);
-            RectTransform shadowRt = (RectTransform)shadowGo.transform;
-            shadowRt.anchorMin = Vector2.zero; shadowRt.anchorMax = Vector2.one;
-            shadowRt.offsetMin = new Vector2(-4f, -4f); shadowRt.offsetMax = new Vector2(4f, 3f);
-            Image shadowImg = shadowGo.GetComponent<Image>();
-            shadowImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            shadowImg.type = Image.Type.Sliced;
-            shadowImg.color = new Color(0f, 0f, 0f, 0.50f);
-
-            // ── Outer Timber Frame & Cozy Mauve Slate ─────────────────────────
-            GameObject woodGo = new GameObject("WoodFrame", typeof(RectTransform), typeof(Image));
-            woodGo.transform.SetParent(_hudRootGo.transform, false);
-            RectTransform woodRt = (RectTransform)woodGo.transform;
-            woodRt.anchorMin = Vector2.zero; woodRt.anchorMax = Vector2.one;
-            woodRt.offsetMin = Vector2.zero; woodRt.offsetMax = Vector2.zero;
-            Image woodImg = woodGo.GetComponent<Image>();
-            woodImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            woodImg.type = Image.Type.Sliced;
-            woodImg.color = new Color(0.85f, 0.65f, 0.48f, 1f); // Warm peach-gold framing outline
-
-            // ── Inner Parchment / Slate Board ───────────────────────────────────
-            GameObject innerGo = new GameObject("InnerBoard", typeof(RectTransform), typeof(Image));
-            innerGo.transform.SetParent(woodGo.transform, false);
-            RectTransform innerRt = (RectTransform)innerGo.transform;
-            innerRt.anchorMin = Vector2.zero; innerRt.anchorMax = Vector2.one;
-            innerRt.offsetMin = new Vector2(4f, 4f); innerRt.offsetMax = new Vector2(-4f, -4f);
-            Image innerImg = innerGo.GetComponent<Image>();
-            innerImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
-            innerImg.type = Image.Type.Sliced;
-            innerImg.color = new Color(0.48f, 0.35f, 0.32f, 0.98f); // Soft cozy mauve-brown slate
+            rootRt.sizeDelta = new Vector2(220f, 68f);
 
             // ── 1. HEALTH BAR ROW (Top) ─────────────────────────────────────────
-            BuildGaugeRow(
-                parent: innerGo.transform,
+            BuildPixelGaugeRow(
+                parent: _hudRootGo.transform,
                 rowName: "HealthRow",
                 yPos: 18f,
-                badgeLabel: "❤",
-                badgeColor: new Color(0.95f, 0.25f, 0.28f, 1f),
-                badgeGlowColor: new Color(0.85f, 0.15f, 0.20f, 0.35f),
-                barFillColor: new Color(0.88f, 0.18f, 0.22f, 1f),       // Ruby crimson
-                ghostFillColor: new Color(0.98f, 0.65f, 0.45f, 0.85f),   // Warm amber ghost
-                trackColor: new Color(0.25f, 0.08f, 0.08f, 0.95f),
-                font: font,
+                bgSprite: UIResourceHelper.GetHealthBarBackgroundSprite(),
+                fillSprite: UIResourceHelper.GetHealthBarSprite(),
+                ghostColor: new Color(1f, 0.7f, 0.4f, 0.85f),
                 outFill: out _healthFillImage,
                 outGhost: out _healthGhostImage,
                 outValueText: out _healthValueText,
@@ -294,17 +257,13 @@ namespace Willowstead.UI
             );
 
             // ── 2. STAMINA BAR ROW (Bottom) ──────────────────────────────────────
-            BuildGaugeRow(
-                parent: innerGo.transform,
+            BuildPixelGaugeRow(
+                parent: _hudRootGo.transform,
                 rowName: "StaminaRow",
                 yPos: -18f,
-                badgeLabel: "⚡",
-                badgeColor: new Color(0.35f, 0.92f, 0.45f, 1f),
-                badgeGlowColor: new Color(0.30f, 0.85f, 0.40f, 0.30f),
-                barFillColor: new Color(0.22f, 0.78f, 0.38f, 1f),       // Emerald stamina
-                ghostFillColor: new Color(0.88f, 0.90f, 0.40f, 0.85f),   // Soft lime-yellow ghost
-                trackColor: new Color(0.08f, 0.22f, 0.10f, 0.95f),
-                font: font,
+                bgSprite: UIResourceHelper.GetStaminaBarBackgroundSprite(),
+                fillSprite: UIResourceHelper.GetStaminaBarSprite(),
+                ghostColor: new Color(0.9f, 0.95f, 0.4f, 0.85f),
                 outFill: out _staminaFillImage,
                 outGhost: out _staminaGhostImage,
                 outValueText: out _staminaValueText,
@@ -312,17 +271,13 @@ namespace Willowstead.UI
             );
         }
 
-        private void BuildGaugeRow(
+        private void BuildPixelGaugeRow(
             Transform parent,
             string rowName,
             float yPos,
-            string badgeLabel,
-            Color badgeColor,
-            Color badgeGlowColor,
-            Color barFillColor,
-            Color ghostFillColor,
-            Color trackColor,
-            TMP_FontAsset font,
+            Sprite bgSprite,
+            Sprite fillSprite,
+            Color ghostColor,
             out Image outFill,
             out Image outGhost,
             out TextMeshProUGUI outValueText,
@@ -332,114 +287,77 @@ namespace Willowstead.UI
             rowGo.transform.SetParent(parent, false);
             RectTransform rowRt = (RectTransform)rowGo.transform;
             rowRt.anchorMin = new Vector2(0f, 0.5f);
-            rowRt.anchorMax = new Vector2(1f, 0.5f);
-            rowRt.pivot = new Vector2(0.5f, 0.5f);
+            rowRt.anchorMax = new Vector2(0f, 0.5f);
+            rowRt.pivot = new Vector2(0f, 0.5f);
             rowRt.anchoredPosition = new Vector2(0f, yPos);
-            rowRt.sizeDelta = new Vector2(0f, 26f);
+            rowRt.sizeDelta = new Vector2(220f, 32f);
 
-            // Badge Container (Left Icon)
-            GameObject badgeGo = new GameObject("Badge", typeof(RectTransform), typeof(Image));
-            badgeGo.transform.SetParent(rowGo.transform, false);
-            RectTransform badgeRt = (RectTransform)badgeGo.transform;
-            badgeRt.anchorMin = new Vector2(0f, 0.5f);
-            badgeRt.anchorMax = new Vector2(0f, 0.5f);
-            badgeRt.pivot = new Vector2(0f, 0.5f);
-            badgeRt.anchoredPosition = new Vector2(6f, 0f);
-            badgeRt.sizeDelta = new Vector2(22f, 22f);
-            Image badgeBg = badgeGo.GetComponent<Image>();
-            badgeBg.sprite = UIResourceHelper.GetBackgroundSprite();
-            badgeBg.type = Image.Type.Sliced;
-            badgeBg.color = new Color(0.18f, 0.13f, 0.08f, 1f);
-
-            GameObject badgeGlowGo = new GameObject("Glow", typeof(RectTransform), typeof(Image));
-            badgeGlowGo.transform.SetParent(badgeGo.transform, false);
-            RectTransform glowRt = (RectTransform)badgeGlowGo.transform;
-            glowRt.anchorMin = Vector2.zero; glowRt.anchorMax = Vector2.one;
-            glowRt.offsetMin = new Vector2(-2f, -2f); glowRt.offsetMax = new Vector2(2f, 2f);
-            outGlow = badgeGlowGo.GetComponent<Image>();
-            outGlow.sprite = UIResourceHelper.GetBackgroundSprite();
-            outGlow.type = Image.Type.Sliced;
-            outGlow.color = badgeGlowColor;
-
-            GameObject iconTextGo = new GameObject("Icon", typeof(RectTransform));
-            iconTextGo.transform.SetParent(badgeGo.transform, false);
-            RectTransform itRt = (RectTransform)iconTextGo.transform;
-            itRt.anchorMin = Vector2.zero; itRt.anchorMax = Vector2.one;
-            itRt.offsetMin = Vector2.zero; itRt.offsetMax = Vector2.zero;
-            var it = iconTextGo.AddComponent<TextMeshProUGUI>();
-            it.text = badgeLabel;
-            it.font = font;
-            it.fontSize = 13f;
-            it.alignment = TextAlignmentOptions.Center;
-            it.color = badgeColor;
-
-            // Bar Track (Container)
+            // Bar Background Frame
             GameObject trackGo = new GameObject("Track", typeof(RectTransform), typeof(Image));
             trackGo.transform.SetParent(rowGo.transform, false);
             RectTransform trackRt = (RectTransform)trackGo.transform;
-            trackRt.anchorMin = new Vector2(0f, 0.5f);
-            trackRt.anchorMax = new Vector2(1f, 0.5f);
-            trackRt.pivot = new Vector2(0f, 0.5f);
-            trackRt.offsetMin = new Vector2(34f, -9f);
-            trackRt.offsetMax = new Vector2(-8f, 9f);
+            trackRt.anchorMin = Vector2.zero;
+            trackRt.anchorMax = Vector2.one;
+            trackRt.offsetMin = Vector2.zero;
+            trackRt.offsetMax = Vector2.zero;
             Image trackImg = trackGo.GetComponent<Image>();
-            trackImg.sprite = UIResourceHelper.GetInputFieldBackgroundSprite();
-            trackImg.type = Image.Type.Sliced;
-            trackImg.color = trackColor;
+            trackImg.sprite = bgSprite;
+            trackImg.type = Image.Type.Simple;
+            trackImg.preserveAspect = false;
+
+            outGlow = trackImg; // Reference for warning pulses if exhausted
+
+            // Fill & Ghost Container positioned inside the bar frame
+            // The pixel frame has an inner bar active region (starts after icon ~38px from left to -8px right, 6px top/bottom)
+            GameObject fillContainerGo = new GameObject("FillContainer", typeof(RectTransform), typeof(RectMask2D));
+            fillContainerGo.transform.SetParent(rowGo.transform, false);
+            RectTransform fillContRt = (RectTransform)fillContainerGo.transform;
+            fillContRt.anchorMin = Vector2.zero;
+            fillContRt.anchorMax = Vector2.one;
+            fillContRt.offsetMin = new Vector2(40f, 6f);
+            fillContRt.offsetMax = new Vector2(-8f, -6f);
 
             // Ghost Trailing Bar Fill
             GameObject ghostGo = new GameObject("GhostFill", typeof(RectTransform), typeof(Image));
-            ghostGo.transform.SetParent(trackGo.transform, false);
+            ghostGo.transform.SetParent(fillContainerGo.transform, false);
             RectTransform ghostRt = (RectTransform)ghostGo.transform;
             ghostRt.anchorMin = Vector2.zero; ghostRt.anchorMax = Vector2.one;
-            ghostRt.offsetMin = new Vector2(2f, 2f); ghostRt.offsetMax = new Vector2(-2f, -2f);
+            ghostRt.offsetMin = Vector2.zero; ghostRt.offsetMax = Vector2.zero;
             outGhost = ghostGo.GetComponent<Image>();
-            outGhost.sprite = UIResourceHelper.GetBackgroundSprite();
+            outGhost.sprite = fillSprite;
             outGhost.type = Image.Type.Filled;
             outGhost.fillMethod = Image.FillMethod.Horizontal;
             outGhost.fillOrigin = (int)Image.OriginHorizontal.Left;
             outGhost.fillAmount = 1f;
-            outGhost.color = ghostFillColor;
+            outGhost.color = ghostColor;
 
             // Active Bar Fill
             GameObject fillGo = new GameObject("ActiveFill", typeof(RectTransform), typeof(Image));
-            fillGo.transform.SetParent(trackGo.transform, false);
+            fillGo.transform.SetParent(fillContainerGo.transform, false);
             RectTransform fillRt = (RectTransform)fillGo.transform;
             fillRt.anchorMin = Vector2.zero; fillRt.anchorMax = Vector2.one;
-            fillRt.offsetMin = new Vector2(2f, 2f); fillRt.offsetMax = new Vector2(-2f, -2f);
+            fillRt.offsetMin = Vector2.zero; fillRt.offsetMax = Vector2.zero;
             outFill = fillGo.GetComponent<Image>();
-            outFill.sprite = UIResourceHelper.GetBackgroundSprite();
+            outFill.sprite = fillSprite;
             outFill.type = Image.Type.Filled;
             outFill.fillMethod = Image.FillMethod.Horizontal;
             outFill.fillOrigin = (int)Image.OriginHorizontal.Left;
             outFill.fillAmount = 1f;
-            outFill.color = barFillColor;
+            outFill.color = Color.white;
 
-            // Highlight Sheen (Top Gloss)
-            GameObject glossGo = new GameObject("Gloss", typeof(RectTransform), typeof(Image));
-            glossGo.transform.SetParent(fillGo.transform, false);
-            RectTransform glossRt = (RectTransform)glossGo.transform;
-            glossRt.anchorMin = new Vector2(0f, 0.5f); glossRt.anchorMax = new Vector2(1f, 1f);
-            glossRt.offsetMin = Vector2.zero; glossRt.offsetMax = Vector2.zero;
-            Image glossImg = glossGo.GetComponent<Image>();
-            glossImg.sprite = UIResourceHelper.GetBackgroundSprite();
-            glossImg.type = Image.Type.Sliced;
-            glossImg.color = new Color(1f, 1f, 1f, 0.20f);
-
-            // Value Text (Centered in bar)
+            // Value Text (Centered in the bar track)
             GameObject valGo = new GameObject("ValueText", typeof(RectTransform));
-            valGo.transform.SetParent(trackGo.transform, false);
+            valGo.transform.SetParent(rowGo.transform, false);
             RectTransform valRt = (RectTransform)valGo.transform;
             valRt.anchorMin = Vector2.zero; valRt.anchorMax = Vector2.one;
-            valRt.offsetMin = new Vector2(6f, 0f); valRt.offsetMax = new Vector2(-6f, 0f);
+            valRt.offsetMin = new Vector2(42f, 0f); valRt.offsetMax = new Vector2(-10f, 0f);
             outValueText = valGo.AddComponent<TextMeshProUGUI>();
-            outValueText.font = font;
-            outValueText.fontSize = 11.5f;
+            outValueText.fontSize = 11f;
             outValueText.fontStyle = FontStyles.Bold;
             outValueText.alignment = TextAlignmentOptions.Center;
-            outValueText.color = new Color(0.98f, 0.95f, 0.90f, 1f);
-            outValueText.outlineWidth = 0.25f;
-            outValueText.outlineColor = new Color(0.1f, 0.05f, 0.02f, 0.95f);
+            outValueText.color = new Color(1f, 0.98f, 0.92f, 1f);
+            outValueText.outlineWidth = 0.22f;
+            outValueText.outlineColor = new Color(0.12f, 0.08f, 0.04f, 0.95f);
             outValueText.text = "100<size=75%>/<color=#D4C2A5>100</color></size>";
         }
     }

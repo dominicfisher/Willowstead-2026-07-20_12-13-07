@@ -357,7 +357,7 @@ namespace Willowstead.UI
 
             Text txt = titleTextGo.AddComponent<Text>();
             txt.text = text.ToUpperInvariant();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = UIResourceHelper.GetPixelFont();
             txt.fontSize = 18;
             txt.fontStyle = UnityEngine.FontStyle.Bold;
             txt.color = new Color(0.35f, 0.22f, 0.16f, 1f);
@@ -403,7 +403,7 @@ namespace Willowstead.UI
 
             Text txt = lblGo.AddComponent<Text>();
             txt.text = label;
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = UIResourceHelper.GetPixelFont();
             txt.fontSize = 16;
             txt.fontStyle = UnityEngine.FontStyle.Bold;
             txt.color = new Color(0.32f, 0.22f, 0.16f, 1f); // Rich dark roast text

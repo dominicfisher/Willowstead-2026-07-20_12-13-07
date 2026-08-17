@@ -43,9 +43,10 @@ namespace Willowstead.Farming
         [SerializeField] private AudioClip _plantingAudioClip;
 
         [Range(0f, 1f)]
-        [SerializeField] private float _farmingAudioVolume = 0.85f;
+        [SerializeField] private float _farmingAudioVolume = 0.45f;
 
         private AudioSource _audioSource;
+        private float _lastTillingAudioTime;
 
         /// <summary>Resolved at equip-time from _seedMappings.</summary>
         private CropData _currentCropData;
@@ -150,7 +151,11 @@ namespace Willowstead.Farming
 #if UNITY_EDITOR
             if (_tillingAudioClip == null)
             {
-                _tillingAudioClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Farming/Tilling.mp3");
+                _tillingAudioClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Farming/Hoe.mp3");
+                if (_tillingAudioClip == null)
+                {
+                    _tillingAudioClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Farming/Tilling.mp3");
+                }
             }
 
             if (_plantingAudioClip == null)
@@ -426,6 +431,8 @@ namespace Willowstead.Farming
             {
                 case FarmTool.WateringCan:
                     World.GridManager.Instance.WaterTile(targetCell);
+                    if (Player.SkillsManager.Instance != null)
+                        Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 4);
                     break;
 
                 case FarmTool.Axe:
@@ -442,6 +449,8 @@ namespace Willowstead.Farming
                         {
                             _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
                             PlayPlantingAudio();
+                            if (Player.SkillsManager.Instance != null)
+                                Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 8);
                         }
                     }
                     break;
@@ -463,6 +472,8 @@ namespace Willowstead.Farming
                         {
                             _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
                             PlayPlantingAudio();
+                            if (Player.SkillsManager.Instance != null)
+                                Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 10);
                         }
                     }
                     else
@@ -497,18 +508,27 @@ namespace Willowstead.Farming
                 return;
             }
 
-            World.GridManager.Instance.HoeTile(cell);
-            PlayTillingAudio();
+            bool hoed = World.GridManager.Instance.HoeTile(cell);
+            if (hoed)
+            {
+                PlayTillingAudio();
+                if (Player.SkillsManager.Instance != null)
+                    Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 5);
+            }
         }
 
         private void PlayTillingAudio()
         {
             if (_tillingAudioClip == null) return;
-            float vol = _farmingAudioVolume * Audio.AudioManager.SfxVolume;
+            // Debounce rapid sounds during fast mouse drags so it doesn't sound harsh/overlapping
+            if (Time.time - _lastTillingAudioTime < 0.12f) return;
+            _lastTillingAudioTime = Time.time;
+
+            float vol = Mathf.Clamp01(_farmingAudioVolume * 0.7f * Audio.AudioManager.SfxVolume);
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_audioSource != null)
             {
-                _audioSource.pitch = Random.Range(0.92f, 1.08f);
+                _audioSource.pitch = Random.Range(0.95f, 1.05f);
                 _audioSource.PlayOneShot(_tillingAudioClip, vol);
             }
             else

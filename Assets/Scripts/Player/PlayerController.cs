@@ -136,6 +136,12 @@ namespace Willowstead.Player
             if (playerGo.GetComponent<ShopUI>() == null)
                 playerGo.AddComponent<ShopUI>();
 
+            if (playerGo.GetComponent<SkillsManager>() == null)
+                playerGo.AddComponent<SkillsManager>();
+
+            if (playerGo.GetComponent<SkillsUI>() == null)
+                playerGo.AddComponent<SkillsUI>();
+
             if (playerGo.GetComponent<UI.CompassUI>() == null)
                 playerGo.AddComponent<UI.CompassUI>();
 

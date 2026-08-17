@@ -154,6 +154,11 @@ namespace Willowstead.World
                 Player.SkillsManager.Instance.AddXP(Player.SkillType.Woodcutting, 25);
             }
 
+            if (ObjectiveManager.Instance != null)
+            {
+                ObjectiveManager.Instance.ReportProgress(ObjectiveId.ChopTree, 1);
+            }
+
             int logs = Random.Range(_minLogsDropped, _maxLogsDropped + 1);
 
             // InventoryManager.AddItem handles slot placement + ItemNotificationManager pickup cue.
@@ -185,10 +190,7 @@ namespace Willowstead.World
 
         /// <summary>
         /// Finds the nearest non-felled TreeChoppable within <paramref name="radius"/>
-        /// world units of <paramref name="worldPos"/>. Uses Physics2D.OverlapCircleAll so
-        /// each tree's BoxCollider2D trunk gates which trees can be hit from a click —
-        /// this lines up with how FarmingController's grid-cell click already uses the
-        /// grid for Watering Can and Seeds.
+        /// world units of <paramref name="worldPos"/>. Checks both physics colliders and visual sprite bounds.
         /// Returns null when none are in range.
         /// </summary>
         public static TreeChoppable FindNearest(Vector2 worldPos, float radius)
@@ -200,7 +202,7 @@ namespace Willowstead.World
             {
                 Collider2D hit = hits[i];
                 if (hit == null) continue;
-                TreeChoppable chop = hit.GetComponent<TreeChoppable>();
+                TreeChoppable chop = hit.GetComponent<TreeChoppable>() ?? hit.GetComponentInParent<TreeChoppable>();
                 if (chop == null || chop._felled) continue;
                 float sqr = ((Vector2)chop.transform.position - worldPos).sqrMagnitude;
                 if (sqr <= bestSqr)
@@ -209,6 +211,28 @@ namespace Willowstead.World
                     best = chop;
                 }
             }
+
+            // Fallback: check active TreeChoppable objects directly within bounds or generous radius
+            if (best == null)
+            {
+                var allChoppables = Object.FindObjectsByType<TreeChoppable>(FindObjectsSortMode.None);
+                for (int i = 0; i < allChoppables.Length; i++)
+                {
+                    var tree = allChoppables[i];
+                    if (tree == null || tree._felled) continue;
+                    if (tree._sr != null && tree._sr.bounds.Contains(worldPos))
+                    {
+                        return tree;
+                    }
+                    float sqr = ((Vector2)tree.transform.position - worldPos).sqrMagnitude;
+                    if (sqr <= (radius * 1.5f) * (radius * 1.5f) && sqr < bestSqr)
+                    {
+                        bestSqr = sqr;
+                        best = tree;
+                    }
+                }
+            }
+
             return best;
         }
 

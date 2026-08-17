@@ -140,6 +140,14 @@ namespace Willowstead.UI
                     if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
                     else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
                 }
+
+                Transform objectives = canvas.transform.Find("ObjectiveTrackerHUD");
+                if (objectives != null)
+                {
+                    var cg = objectives.GetComponent<CanvasGroup>() ?? objectives.gameObject.AddComponent<CanvasGroup>();
+                    if (!visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 0f;
+                    else if (visible && (Instance == null || Instance._fadeCoroutine == null)) cg.alpha = 1f;
+                }
             }
         }
 

@@ -117,6 +117,11 @@ namespace Willowstead.Player
 
                 RefreshSkillData();
 
+                if (Willowstead.World.ObjectiveManager.Instance != null)
+                {
+                    Willowstead.World.ObjectiveManager.Instance.ReportProgress(Willowstead.World.ObjectiveId.CheckSkills, 1);
+                }
+
                 if (_panelGo != null)
                 {
                     _panelGo.transform.SetAsLastSibling(); // Ensure on top of all other HUD elements
@@ -380,7 +385,9 @@ namespace Willowstead.Player
                 var emojiTxt = badgeTxtGo.AddComponent<Text>();
                 emojiTxt.font = font;
                 emojiTxt.text = skillIcons[i];
-                emojiTxt.fontSize = 20;
+                emojiTxt.fontSize = 18;
+                emojiTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                emojiTxt.verticalOverflow = VerticalWrapMode.Overflow;
                 emojiTxt.alignment = TextAnchor.MiddleCenter;
                 emojiTxt.raycastTarget = false;
 
@@ -390,13 +397,15 @@ namespace Willowstead.Player
                 RectTransform nRt = (RectTransform)nameGo.transform;
                 nRt.anchorMin = new Vector2(0f, 1f); nRt.anchorMax = new Vector2(0f, 1f);
                 nRt.pivot = new Vector2(0f, 1f);
-                nRt.sizeDelta = new Vector2(140f, 22f);
+                nRt.sizeDelta = new Vector2(140f, 24f);
                 nRt.anchoredPosition = new Vector2(48f, -6f);
                 var nTxt = nameGo.AddComponent<Text>();
                 nTxt.font = font;
                 nTxt.text = skill.ToString();
-                nTxt.fontSize = 17;
+                nTxt.fontSize = 14;
                 nTxt.fontStyle = FontStyle.Bold;
+                nTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                nTxt.verticalOverflow = VerticalWrapMode.Overflow;
                 nTxt.color = new Color(0.32f, 0.22f, 0.16f, 1f);
                 nTxt.alignment = TextAnchor.MiddleLeft;
                 nTxt.raycastTarget = false;
@@ -407,13 +416,15 @@ namespace Willowstead.Player
                 RectTransform lRt = (RectTransform)lvlGo.transform;
                 lRt.anchorMin = new Vector2(1f, 1f); lRt.anchorMax = new Vector2(1f, 1f);
                 lRt.pivot = new Vector2(1f, 1f);
-                lRt.sizeDelta = new Vector2(80f, 22f);
+                lRt.sizeDelta = new Vector2(80f, 24f);
                 lRt.anchoredPosition = new Vector2(-8f, -6f);
                 var lTxt = lvlGo.AddComponent<Text>();
                 lTxt.font = font;
                 lTxt.text = "Lvl 1";
-                lTxt.fontSize = 17;
+                lTxt.fontSize = 13;
                 lTxt.fontStyle = FontStyle.Bold;
+                lTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                lTxt.verticalOverflow = VerticalWrapMode.Overflow;
                 lTxt.color = new Color(0.65f, 0.42f, 0.18f, 1f);
                 lTxt.alignment = TextAnchor.MiddleRight;
                 lTxt.raycastTarget = false;
@@ -425,13 +436,14 @@ namespace Willowstead.Player
                 RectTransform dRt = (RectTransform)descGo.transform;
                 dRt.anchorMin = new Vector2(0f, 1f); dRt.anchorMax = new Vector2(1f, 1f);
                 dRt.pivot = new Vector2(0f, 1f);
-                dRt.sizeDelta = new Vector2(-56f, 16f);
+                dRt.sizeDelta = new Vector2(-56f, 20f);
                 dRt.anchoredPosition = new Vector2(48f, -25f);
                 var dTxt = descGo.AddComponent<Text>();
                 dTxt.font = font;
                 dTxt.text = skillDescriptions[i];
-                dTxt.fontSize = 13;
-                dTxt.fontStyle = FontStyle.Italic;
+                dTxt.fontSize = 10;
+                dTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+                dTxt.verticalOverflow = VerticalWrapMode.Overflow;
                 dTxt.color = new Color(0.50f, 0.40f, 0.35f, 1f);
                 dTxt.alignment = TextAnchor.MiddleLeft;
                 dTxt.raycastTarget = false;
@@ -473,8 +485,10 @@ namespace Willowstead.Player
                 var fracTxt = fracGo.AddComponent<Text>();
                 fracTxt.font = font;
                 fracTxt.text = "0 / 100 XP";
-                fracTxt.fontSize = 14;
+                fracTxt.fontSize = 11;
                 fracTxt.fontStyle = FontStyle.Bold;
+                fracTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                fracTxt.verticalOverflow = VerticalWrapMode.Overflow;
                 fracTxt.color = Color.white;
                 fracTxt.alignment = TextAnchor.MiddleCenter;
                 fracTxt.raycastTarget = false;

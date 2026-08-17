@@ -372,6 +372,11 @@ namespace Willowstead.Persistence
                 d.inventory.AddRange(InventoryManager.Instance.CaptureInventory());
             }
             d.felledTrees.AddRange(TreeChoppable.CaptureFelledTiles());
+
+            if (Building.BuildingManager.Instance != null)
+            {
+                d.structures.AddRange(Building.BuildingManager.Instance.CaptureStructures());
+            }
             return d;
         }
 
@@ -399,6 +404,9 @@ namespace Willowstead.Persistence
                 //    grass on top of the tile mid-load).
                 if (GridManager.Instance != null)
                     GridManager.Instance.RestoreGridState(data);
+
+                if (Building.BuildingManager.Instance != null)
+                    Building.BuildingManager.Instance.RestoreStructures(data.structures);
 
                 if (PlayerController.Instance != null)
                     PlayerController.Instance.RestorePosition(data.playerPosition);

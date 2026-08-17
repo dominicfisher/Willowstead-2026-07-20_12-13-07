@@ -441,7 +441,7 @@ namespace Willowstead.Player
         /// block world interaction when the pointer is over them.
         /// Extend this list when a new modal-style panel ships.
         /// </summary>
-        private static readonly string[] KnownUIPanelNames = { "ShopPanel", "InventoryPanel" };
+        private static readonly string[] KnownUIPanelNames = { "ShopPanel", "InventoryPanel", "BuildMenuPanel", "SkillsJournalPanel", "WorldSetupPanel" };
 
         /// <summary>
         /// Finds the HUD canvas by searching for any of <paramref name="searchNames"/>.

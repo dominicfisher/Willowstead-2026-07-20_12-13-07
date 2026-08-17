@@ -123,11 +123,11 @@ namespace Willowstead.World
         [Range(0,3)] [SerializeField] private int _minDecorDistanceFromPuddle = 1;
 
         [Header("Collider Tuning")]
-        [Range(0.05f, 1f)]   [SerializeField] private float _treeColliderWidthPct   = 0.32f;
-        [Range(0.05f, 0.5f)] [SerializeField] private float _treeColliderHeightPct  = 0.22f;
-        [SerializeField] private float _treeColliderUpOffset = 0.02f;
-        [Range(0.05f, 1f)]   [SerializeField] private float _objectColliderWidthPct  = 0.7f;
-        [Range(0.05f, 1f)]   [SerializeField] private float _objectColliderHeightPct = 0.4f;
+        [Range(0.05f, 1f)]   [SerializeField] private float _treeColliderWidthPct   = 0.28f;
+        [Range(0.05f, 0.5f)] [SerializeField] private float _treeColliderHeightPct  = 0.12f;
+        [SerializeField] private float _treeColliderUpOffset = 0.0f;
+        [Range(0.05f, 1f)]   [SerializeField] private float _objectColliderWidthPct  = 0.55f;
+        [Range(0.05f, 1f)]   [SerializeField] private float _objectColliderHeightPct = 0.25f;
 
         [Header("Spawn Rules")]
         [SerializeField] private bool _objectsOnlyOnGrass = false;
@@ -983,9 +983,9 @@ namespace Willowstead.World
 	            int treesSpawned = 0;
 	            int objectsSpawned = 0;
 
-	            // First pass: decide and spawn trees; also collect their world positions for separation
 	            System.Collections.Generic.List<Vector2> treePositions = new System.Collections.Generic.List<Vector2>();
 
+	            // Pass 1: Trees
 	            for (int x = startX; x < startX + _chunkSize; x++)
 	            {
 	                for (int y = startY; y < startY + _chunkSize; y++)
@@ -998,54 +998,30 @@ namespace Willowstead.World
 
 	                    if (_decorObjects.ContainsKey(tilePos) || IsPuddleAt(tilePos)) continue;
 
-                    if (GridManager.Instance != null && GridManager.Instance.IsCellTilled(cellPos))
-                        continue;
+	                    if (GridManager.Instance != null && GridManager.Instance.IsCellTilled(cellPos))
+	                        continue;
 
-                    // Double-check: trees/objects can NEVER land on a grass-edge transition tile.
-                    if (!IsInteriorGrassTile(tilePos)) continue;
+	                    // Double-check: trees can NEVER land on a grass-edge transition tile.
+	                    if (!IsInteriorGrassTile(tilePos)) continue;
 
-                    // Use already-sampled grass data for this chunk to avoid any mismatch
-                    bool isGrass = _grassData.TryGetValue(tilePos, out bool g) && g;
-                    bool allowedGrassSprite = !_restrictSpawnsToSpecificGrass || IsAllowedGrassSpriteAt(tilePos);                    // Trees: only on allowed grass tiles and not too close to puddles
-                    if (isGrass && allowedGrassSprite && _treeSprites != null && _treeSprites.Length > 0)
-                    {
-                        if (treePositions.Count >= _maxTreesPerChunk) continue;
-                        if (IsNearPuddle(tilePos, _minDecorDistanceFromPuddle)) continue;
-                        if (TreeChoppable.IsTileFelled(tilePos)) continue; // Player cut this tree already; stay empty
-                        float tChance = Deterministic01(x, y, 8617);
+	                    bool isGrass = _grassData.TryGetValue(tilePos, out bool g) && g;
+	                    if (isGrass && _treeSprites != null && _treeSprites.Length > 0 && treesSpawned < _maxTreesPerChunk)
+	                    {
+	                        if (IsNearPuddle(tilePos, _minDecorDistanceFromPuddle)) continue;
+	                        if (TreeChoppable.IsTileFelled(tilePos)) continue;
+
+	                        float tChance = Deterministic01(x, y, 8617);
 	                        if (tChance < _treeDensity)
 	                        {
 	                            Vector2 jitter = DeterministicJitter(x, y, 7331, _jitterRange);
 	                            Vector2 pos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
 	                            treePositions.Add(pos);
+
+	                            var go = SpawnTree(pos, x, y, decorContainer.transform);
+	                            _decorObjects[tilePos] = go;
+	                            treesSpawned++;
 	                        }
 	                    }
-	                }
-	            }
-
-	            // Now actually spawn trees (to keep deterministic separation predictable within chunk)
-	            int idx = 0;
-	            for (int x = startX; x < startX + _chunkSize; x++)
-	            {
-	                for (int y = startY; y < startY + _chunkSize; y++)
-	                {                    Vector2Int tilePos = new Vector2Int(x, y);
-                    if (_decorObjects.ContainsKey(tilePos) || IsPuddleAt(tilePos)) continue;
-                    if (!IsInteriorGrassTile(tilePos)) continue;
-
-                    bool isGrass = _grassData.TryGetValue(tilePos, out bool g) && g;
-                    bool allowedGrassSprite = !_restrictSpawnsToSpecificGrass || IsAllowedGrassSpriteAt(tilePos);                    if (!isGrass || !allowedGrassSprite) continue;
-                    if (IsNearPuddle(tilePos, _minDecorDistanceFromPuddle)) continue;
-                    if (TreeChoppable.IsTileFelled(tilePos)) continue; // Mirror the first-loop skip
-
-                    float tChance = Deterministic01(x, y, 8617);
-                    if (tChance < _treeDensity && treesSpawned < _maxTreesPerChunk)
-                    {
-                        if (idx >= treePositions.Count) break;
-                        Vector2 treePos = treePositions[idx++];
-                        var go = SpawnTree(treePos, x, y, decorContainer.transform);
-                        _decorObjects[tilePos] = go;
-                        treesSpawned++;
-                    }
 	                }
 	            }
 
@@ -1069,41 +1045,35 @@ namespace Willowstead.World
                     if (!IsInteriorGrassTile(tilePos)) continue;
 
                     bool isGrass = _grassData.TryGetValue(tilePos, out bool g) && g;
-                    bool allowedGrassSprite = !_restrictSpawnsToSpecificGrass || IsAllowedGrassSpriteAt(tilePos);
-                    // name whitelist still gates grass spawns; dirt has no sprite to compare
-                    // against so it bypasses the whitelist (intentional).
                     bool objectsPassTile = !_objectsOnlyOnGrass || isGrass;
-                    bool objectsPassSprite = isGrass
-                        ? allowedGrassSprite
-                        : !_restrictSpawnsToSpecificGrass;
 
-                    if (objectsPassTile && objectsPassSprite && _objectSprites != null && _objectSprites.Length > 0 && objectsSpawned < _maxObjectsPerChunk)
-	                    {
-	                        if (IsNearPuddle(tilePos, _minDecorDistanceFromPuddle)) continue;
-	                        float oChance = Deterministic01(x, y, 19211);
-	                        if (oChance < _objectDensity)
-	                        {
-	                            Vector2 jitter = DeterministicJitter(x, y, 1129, _jitterRange * 0.7f);
-	                            Vector2 objPos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
-	                            Vector2Int objCell = new Vector2Int(Mathf.FloorToInt(objPos.x), Mathf.FloorToInt(objPos.y));
-	                            if (IsPuddleAt(objCell) || IsNearPuddle(objCell, _minDecorDistanceFromPuddle)) continue;
-	                            bool tooClose = false;
-	                            for (int i = 0; i < treePositions.Count; i++)
-	                            {
-	                                if (Vector2.SqrMagnitude(objPos - treePositions[i]) < _minObjectTreeSeparation * _minObjectTreeSeparation)
-	                                {
-	                                    tooClose = true;
-	                                    break;
-	                                }
-	                            }
-	                            if (tooClose) continue;
-	                            var go = SpawnObject(objPos, x, y, decorContainer.transform);
-	                            _decorObjects[tilePos] = go;
-	                            objectsSpawned++;
-	                        }
-	                    }
-	                }
-	            }
+                    if (objectsPassTile && _objectSprites != null && _objectSprites.Length > 0 && objectsSpawned < _maxObjectsPerChunk)
+                    {
+                        if (IsNearPuddle(tilePos, _minDecorDistanceFromPuddle)) continue;
+                        float oChance = Deterministic01(x, y, 19211);
+                        if (oChance < _objectDensity)
+                        {
+                            Vector2 jitter = DeterministicJitter(x, y, 1129, _jitterRange * 0.7f);
+                            Vector2 objPos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
+                            Vector2Int objCell = new Vector2Int(Mathf.FloorToInt(objPos.x), Mathf.FloorToInt(objPos.y));
+                            if (IsPuddleAt(objCell) || IsNearPuddle(objCell, _minDecorDistanceFromPuddle)) continue;
+                            bool tooClose = false;
+                            for (int i = 0; i < treePositions.Count; i++)
+                            {
+                                if (Vector2.SqrMagnitude(objPos - treePositions[i]) < _minObjectTreeSeparation * _minObjectTreeSeparation)
+                                {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                            if (tooClose) continue;
+                            var go = SpawnObject(objPos, x, y, decorContainer.transform);
+                            _decorObjects[tilePos] = go;
+                            objectsSpawned++;
+                        }
+                    }
+                }
+            }
 	        }
 
 	        private GameObject SpawnTree(Vector2 position, int wx, int wy, Transform parent)
@@ -1141,6 +1111,8 @@ namespace Willowstead.World
             var choppable = go.AddComponent<TreeChoppable>();
             choppable.Initialize(new Vector2Int(wx, wy));
 
+            go.AddComponent<HoverOutline>();
+
             return go;
 	        }
 
@@ -1169,6 +1141,8 @@ namespace Willowstead.World
                 bc.offset = new Vector2(0f, centerWorldY - go.transform.position.y);
             }
             bc.isTrigger = false;
+
+            go.AddComponent<HoverOutline>();
 
             return go;
         }

@@ -118,6 +118,45 @@ namespace Willowstead.World
         }
 
         /// <summary>
+        /// Clears all tilled soil, watered tiles, active crops, fringes, and resets day counter.
+        /// Called when creating a new world or loading a different save so farmlands don't bleed over.
+        /// </summary>
+        public void ClearAllFarmState()
+        {
+            if (_farmingTilemap != null)
+            {
+                _farmingTilemap.ClearAllTiles();
+            }
+
+            foreach (var kvp in _activeCrops)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject != null)
+                {
+                    Destroy(kvp.Value.gameObject);
+                }
+            }
+            _activeCrops.Clear();
+
+            foreach (var list in _edgeFringes.Values)
+            {
+                if (list != null)
+                {
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        if (list[i] != null) Destroy(list[i]);
+                    }
+                }
+            }
+            _edgeFringes.Clear();
+
+            _tilledCells.Clear();
+            _wateredCells.Clear();
+            _fertilizedCells.Clear();
+            _moistureLevels.Clear();
+            CurrentDay = 1;
+        }
+
+        /// <summary>
         /// Apply all grid state from a save. Bypasses SoilPopAnimator and
         /// sets the tilemap tile instantly so a load doesn't replay
         /// animations the player has already seen. Crops are respawned
@@ -125,6 +164,7 @@ namespace Willowstead.World
         /// </summary>
         public void RestoreGridState(Willowstead.Persistence.SaveData data)
         {
+            ClearAllFarmState();
             if (data == null) return;
             if (data.currentDay > 0) CurrentDay = data.currentDay;
 

@@ -67,9 +67,18 @@ namespace Willowstead.Player
                 Willowstead.Inventory.ItemDatabase.Instance = _itemDatabase;
             }
 
+            ResetToStartingState();
+        }
+
+        /// <summary>
+        /// Resets the inventory and gold to starter configuration (Tools + Starter seeds).
+        /// </summary>
+        public void ResetToStartingState()
+        {
             for (int i = 0; i < slots.Length; i++)
             {
-                slots[i] = new InventorySlot();
+                if (slots[i] == null) slots[i] = new InventorySlot();
+                else slots[i].Clear();
             }
 
             slots[0].itemName = "Hoe";
@@ -78,9 +87,10 @@ namespace Willowstead.Player
             slots[1].itemName = "Watering Can";
             slots[1].quantity = 1;
 
-            // the woodcutting tool out of the player's 1-8 quick-swap.
             slots[2].itemName = "Axe";
             slots[2].quantity = 1;
+
+            _gold = 0;
 
             foreach (var item in _startingItems)
             {
@@ -92,15 +102,14 @@ namespace Willowstead.Player
                 }
                 else
                 {
-                    if (item.itemName == "Hoe" || item.itemName == "Watering Can") continue;
+                    if (item.itemName == "Hoe" || item.itemName == "Watering Can" || item.itemName == "Axe") continue;
 
                     AddItem(item.itemName, item.quantity);
                 }
             }
 
-#if UNITY_EDITOR
-            PrintInventory();
-#endif
+            if (HotbarUI.Instance != null) HotbarUI.Instance.RefreshUI();
+            if (InventoryUI.Instance != null) InventoryUI.Instance.RefreshUI();
         }
 
         /// <summary>

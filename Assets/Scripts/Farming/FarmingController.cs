@@ -433,6 +433,8 @@ namespace Willowstead.Farming
                     World.GridManager.Instance.WaterTile(targetCell);
                     if (Player.SkillsManager.Instance != null)
                         Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 4);
+                    if (World.ObjectiveManager.Instance != null)
+                        World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.WaterSoil, 1);
                     break;
 
                 case FarmTool.Axe:
@@ -474,6 +476,8 @@ namespace Willowstead.Farming
                             PlayPlantingAudio();
                             if (Player.SkillsManager.Instance != null)
                                 Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 10);
+                            if (World.ObjectiveManager.Instance != null)
+                                World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.PlantCrops, 1);
                         }
                     }
                     else
@@ -514,6 +518,9 @@ namespace Willowstead.Farming
                 PlayTillingAudio();
                 if (Player.SkillsManager.Instance != null)
                     Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 5);
+
+                if (World.ObjectiveManager.Instance != null)
+                    World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.TillSoil, 1);
             }
         }
 
@@ -634,6 +641,8 @@ namespace Willowstead.Farming
                     return;
                 }
                 World.GridManager.Instance.WaterTile(cell);
+                if (World.ObjectiveManager.Instance != null)
+                    World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.WaterSoil, 1);
             }
         }
 
@@ -650,6 +659,8 @@ namespace Willowstead.Farming
                 {
                     _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
                     PlayPlantingAudio();
+                    if (World.ObjectiveManager.Instance != null)
+                        World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.PlantCrops, 1);
                 }
             }
         }

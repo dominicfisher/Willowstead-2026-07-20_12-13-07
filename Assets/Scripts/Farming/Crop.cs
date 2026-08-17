@@ -444,6 +444,11 @@ namespace Willowstead.Farming
                 Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, xpReward);
             }
 
+            if (!isRotten && World.ObjectiveManager.Instance != null)
+            {
+                World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.HarvestCrop, 1);
+            }
+
             StartCoroutine(PlayHarvestAnimationAndDestroy(finalItemName, _cropData.YieldCount + bonusYieldPerInstance, isRotten));
 
             return totalYieldCount;

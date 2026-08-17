@@ -55,6 +55,18 @@ namespace Willowstead.Persistence
 
         // Trees the player cut down.
         public List<Vector2IntRecord> felledTrees = new List<Vector2IntRecord>();
+
+        // Placed player structures (walls, floors, doors).
+        public List<SavedStructureRecord> structures = new List<SavedStructureRecord>();
+    }
+
+    [Serializable]
+    public class SavedStructureRecord
+    {
+        public Vector3IntRecord cell;
+        public int structureType;
+        public int currentHealth;
+        public bool isOpen;
     }
 
     [Serializable]

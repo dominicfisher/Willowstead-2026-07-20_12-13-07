@@ -119,7 +119,7 @@ namespace Willowstead.Player
         private void Update()
         {
             bool shopPressed = Input.KeyRebindingManager.WasPressedThisFrame(Input.KeyAction.Shop) ||
-                               (Keyboard.current != null && (Keyboard.current.pKey.wasPressedThisFrame || Keyboard.current.bKey.wasPressedThisFrame));
+                               (Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame);
 
             if (!InputReader.BlockGameplayInput && shopPressed)
             {
@@ -170,6 +170,11 @@ namespace Willowstead.Player
                 SwitchRightTab(0);
                 RefreshLeftInventoryPage();
                 RefreshSellCatalogOwnedCounts();
+
+                if (Willowstead.World.ObjectiveManager.Instance != null)
+                {
+                    Willowstead.World.ObjectiveManager.Instance.ReportProgress(Willowstead.World.ObjectiveId.VisitShop, 1);
+                }
 
                 if (_panelGo != null)
                 {

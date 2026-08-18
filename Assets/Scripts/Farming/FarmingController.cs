@@ -424,8 +424,18 @@ namespace Willowstead.Farming
         {
             if (_gridSelector == null || !_gridSelector.IsCellInRange) return;
             if (World.GridManager.Instance == null) return;
-
             Vector3Int targetCell = _gridSelector.CurrentCell;
+            Vector3 worldPos = World.GridManager.Instance.CellToWorldCenter(targetCell);
+
+            Player.PlayerController.ActionAnimationType animType = Player.PlayerController.ActionAnimationType.None;
+            if (_currentTool == FarmTool.Axe) animType = Player.PlayerController.ActionAnimationType.Axe;
+            else if (_currentTool == FarmTool.Hoe) animType = Player.PlayerController.ActionAnimationType.Hoe;
+            else if (_currentTool == FarmTool.WateringCan) animType = Player.PlayerController.ActionAnimationType.WateringCan;
+
+            if (Player.PlayerController.Instance != null)
+            {
+                Player.PlayerController.Instance.TriggerActionAnimation(worldPos, animType);
+            }
 
             switch (_currentTool)
             {
@@ -458,34 +468,7 @@ namespace Willowstead.Farming
                     break;
 
                 case FarmTool.Seeds:
-                    if (_currentCropData != null && _cropPrefab != null)
-                    {
-                        Player.InventorySlot seedSlot = _inventory.GetSlotItem(_selectedSlotIndex);
-                        if (seedSlot == null || seedSlot.IsEmpty)
-                        {
-#if UNITY_EDITOR
-                            Debug.LogWarning("[FarmingController] Cannot plant: seed slot is empty.");
-#endif
-                            break;
-                        }
-
-                        bool success = World.GridManager.Instance.PlantCrop(targetCell, _currentCropData, _cropPrefab);
-                        if (success)
-                        {
-                            _inventory.RemoveItemFromSlot(_selectedSlotIndex, 1);
-                            PlayPlantingAudio();
-                            if (Player.SkillsManager.Instance != null)
-                                Player.SkillsManager.Instance.AddXP(Player.SkillType.Farming, 10);
-                            if (World.ObjectiveManager.Instance != null)
-                                World.ObjectiveManager.Instance.ReportProgress(World.ObjectiveId.PlantCrops, 1);
-                        }
-                    }
-                    else
-                    {
-#if UNITY_EDITOR
-                        Debug.LogWarning("[FarmingController] Cannot plant: make sure CropPrefab is assigned and a seed mapping exists.", this);
-#endif
-                    }
+                    PlantSeedAtCell(targetCell);
                     break;
             }
         }
@@ -609,6 +592,17 @@ namespace Willowstead.Farming
             if (currentCell != _lastDragCell)
             {
                 _lastDragCell = currentCell;
+                Vector3 worldPos = World.GridManager.Instance.CellToWorldCenter(currentCell);
+
+                Player.PlayerController.ActionAnimationType animType = Player.PlayerController.ActionAnimationType.None;
+                if (_currentTool == FarmTool.Axe) animType = Player.PlayerController.ActionAnimationType.Axe;
+                else if (_currentTool == FarmTool.Hoe) animType = Player.PlayerController.ActionAnimationType.Hoe;
+                else if (_currentTool == FarmTool.WateringCan) animType = Player.PlayerController.ActionAnimationType.WateringCan;
+
+                if (Player.PlayerController.Instance != null)
+                {
+                    Player.PlayerController.Instance.TriggerActionAnimation(worldPos, animType);
+                }
 
                 switch (_currentTool)
                 {

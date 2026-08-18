@@ -120,7 +120,7 @@ namespace Willowstead.World
         [SerializeField] private int _maxObjectsPerChunk = 32;
         [SerializeField] private float _jitterRange = 0.18f;
         [SerializeField] private float _minObjectTreeSeparation = 0.6f;
-        [Range(0,3)] [SerializeField] private int _minDecorDistanceFromPuddle = 1;
+        [Range(1, 4)] [SerializeField] private int _minDecorDistanceFromPuddle = 2;
 
         [Header("Collider Tuning")]
         [Range(0.05f, 1f)]   [SerializeField] private float _treeColliderWidthPct   = 0.28f;
@@ -324,6 +324,7 @@ namespace Willowstead.World
             // Tear down the existing world so the new seed has something to write onto.
             if (_grassTilemap != null) _grassTilemap.ClearAllTiles();
             if (_dirtTilemap != null) _dirtTilemap.ClearAllTiles();
+            if (_waterTilemap != null) _waterTilemap.ClearAllTiles();
 
             foreach (var kvp in _chunkContainers)
             {
@@ -370,7 +371,12 @@ namespace Willowstead.World
         {
             // Re-validate the offset in case OnEnable ran before WorldSeedService
             // finished its own Awake (e.g. domain-reloaded play-mode entry).
-            if (WorldSeedService.Instance != null) _seedOffset = WorldSeedService.Instance.SeedOffset;
+            if (WorldSeedService.Instance != null)
+            {
+                _seedOffset = WorldSeedService.Instance.SeedOffset;
+                WorldSeedService.Instance.OnSeedChanged -= HandleSeedChanged;
+                WorldSeedService.Instance.OnSeedChanged += HandleSeedChanged;
+            }
 
             // Edit-mode gate. If the user hasn't opted in (or no Scene view is open)
             // we exit early so opening the project for the first time doesn't spam
@@ -499,7 +505,8 @@ namespace Willowstead.World
                 for (int y = startY; y < startY + _chunkSize; y++)
                 {
                     float noiseVal = Mathf.PerlinNoise((x + 1000 + _seedOffset) * _noiseScale, (y + 1000 + _seedOffset) * _noiseScale);
-                    _grassData[new Vector2Int(x, y)] = noiseVal < _grassThreshold;
+                    bool rawGrass = noiseVal < _grassThreshold;
+                    _grassData[new Vector2Int(x, y)] = rawGrass && !IsDirtPatchAt(x, y);
                 }
             }
 
@@ -520,21 +527,12 @@ namespace Willowstead.World
                         }
 
                         // Grass layer (with multi-shade/biome Rule Tile selection).
-                        // Dirt-patch noise can override a grass tile back to bare dirt.
                         if (_grassData[tilePos] && _grassTilemap != null)
                         {
-                            if (IsDirtPatchAt(x, y))
+                            TileBase ruleTile = SelectGrassRuleTile(x, y);
+                            if (ruleTile != null)
                             {
-                                // adjacency checks (IsGrassAt, decor guards) stay consistent.
-                                _grassData[tilePos] = false;
-                            }
-                            else
-                            {
-                                TileBase ruleTile = SelectGrassRuleTile(x, y);
-                                if (ruleTile != null)
-                                {
-                                    _grassTilemap.SetTile(cellPos, ruleTile);
-                                }
+                                _grassTilemap.SetTile(cellPos, ruleTile);
                             }
                         }
                     }
@@ -632,7 +630,9 @@ namespace Willowstead.World
             // Chunk not generated yet — sample the same noise formula so the result
             // will match exactly when that chunk is eventually generated.
             float noiseVal = Mathf.PerlinNoise((worldX + 1000 + _seedOffset) * _noiseScale, (worldY + 1000 + _seedOffset) * _noiseScale);
-            return noiseVal < _grassThreshold;
+            bool rawGrass = noiseVal < _grassThreshold;
+            if (!rawGrass) return false;
+            return !IsDirtPatchAt(worldX, worldY);
         }
 
         public bool IsWaterAt(int worldX, int worldY)
@@ -939,22 +939,31 @@ namespace Willowstead.World
 	            return _puddleFillSprites[idx];
 	        }
 
-	        private bool IsPuddleAt(Vector2Int pos) => _puddleCells.Contains(pos);
-	        public bool HasPuddleAt(Vector3Int cellPos)
-	        {
-	            return _puddleCells.Contains(new Vector2Int(cellPos.x, cellPos.y));
-	        }
-	        private bool IsNearPuddle(Vector2Int pos, int radius)
-	        {
-	            for (int dx = -radius; dx <= radius; dx++)
-	            {
-	                for (int dy = -radius; dy <= radius; dy++)
-	                {
-	                    if (_puddleCells.Contains(new Vector2Int(pos.x + dx, pos.y + dy))) return true;
-	                }
-	            }
-	            return false;
-	        }
+	        private bool IsPuddleAt(Vector2Int pos)
+        {
+            if (_puddleCells != null && _puddleCells.Contains(pos)) return true;
+            if (_waterTilemap != null && _waterTilemap.HasTile(new Vector3Int(pos.x, pos.y, 0))) return true;
+            return false;
+        }
+
+        public bool HasPuddleAt(Vector3Int cellPos)
+        {
+            return IsPuddleAt(new Vector2Int(cellPos.x, cellPos.y));
+        }
+
+        private bool IsNearPuddle(Vector2Int pos, int radius)
+        {
+            int r = Mathf.Max(1, radius);
+            for (int dx = -r; dx <= r; dx++)
+            {
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    Vector2Int checkPos = new Vector2Int(pos.x + dx, pos.y + dy);
+                    if (IsPuddleAt(checkPos)) return true;
+                }
+            }
+            return false;
+        }
 	        private bool DiscWithinGrass(Vector2Int center, int radius)
 	        {
 	            int r2 = radius * radius;
@@ -1015,6 +1024,8 @@ namespace Willowstead.World
 	                        {
 	                            Vector2 jitter = DeterministicJitter(x, y, 7331, _jitterRange);
 	                            Vector2 pos = new Vector2(x + 0.5f + jitter.x, y + 0.5f + jitter.y);
+	                            Vector2Int treeCell = new Vector2Int(Mathf.FloorToInt(pos.x), Mathf.FloorToInt(pos.y));
+	                            if (IsPuddleAt(treeCell) || IsNearPuddle(treeCell, _minDecorDistanceFromPuddle)) continue;
 	                            treePositions.Add(pos);
 
 	                            var go = SpawnTree(pos, x, y, decorContainer.transform);
@@ -1174,22 +1185,21 @@ namespace Willowstead.World
 
         /// <summary>
         /// Belt-and-braces edge-tile filter: returns true only when the tile is grass
-        /// AND every cardinal neighbour (N, S, E, W) is also grass. This guarantees
-        /// trees and objects can never land on grass-edge transition tiles (where
-        /// grass meets dirt on at least one side), independent of sprite-name lists
-        /// or the `_restrictSpawnsToSpecificGrass` toggle. <see cref="IsGrassAt"/>
-        /// samples noise directly when a neighbour chunk hasn't been generated yet,
-        /// so the result stays accurate as the world expands.
+        /// AND every cardinal neighbour (N, S, E, W) is also non-water grass. This guarantees
+        /// that secondary grass variations and puddles only place in clean interior grass.
         /// </summary>
         private bool IsInteriorGrassTile(Vector2Int tilePos)
         {
-            if (!_grassData.TryGetValue(tilePos, out bool isGrass) || !isGrass)
+            if (!IsGrassAt(tilePos.x, tilePos.y))
                 return false;
 
-            return IsGrassAt(tilePos.x,     tilePos.y + 1)
-                && IsGrassAt(tilePos.x,     tilePos.y - 1)
-                && IsGrassAt(tilePos.x + 1, tilePos.y    )
-                && IsGrassAt(tilePos.x - 1, tilePos.y    );
+            if (IsWaterAt(tilePos.x, tilePos.y))
+                return false;
+
+            return IsGrassAt(tilePos.x, tilePos.y + 1) && !IsWaterAt(tilePos.x, tilePos.y + 1)
+                && IsGrassAt(tilePos.x, tilePos.y - 1) && !IsWaterAt(tilePos.x, tilePos.y - 1)
+                && IsGrassAt(tilePos.x + 1, tilePos.y) && !IsWaterAt(tilePos.x + 1, tilePos.y)
+                && IsGrassAt(tilePos.x - 1, tilePos.y) && !IsWaterAt(tilePos.x - 1, tilePos.y);
         }
 
 	        // All three hash helpers read _seedOffset so two seeds produce visibly
@@ -1274,25 +1284,16 @@ namespace Willowstead.World
             if (_grassBiomes == null || _grassBiomes.Length == 0) return null;
             if (_grassBiomes.Length == 1) return _grassBiomes[0].tile;
 
-            // Secondary biomes (e.g. GrassRuleTile 3) are restricted to interior grass tiles.
-            // Edge tiles that border dirt or water must always use the primary base grass (element 0)
-            // so Rule Tile edge transitions remain clean and don't mix tile set borders.
-            if (!IsInteriorGrassTile(new Vector2Int(x, y)))
-            {
-                return _grassBiomes[0].tile;
-            }
-
             if (_biomeCumulativeWeights == null || _biomeCumulativeWeights.Length != _grassBiomes.Length)
                 RebuildBiomeWeights();
 
-            // Sample secondary noise for biome selection.
-            // Perlin noise clusters around 0.4–0.6 so remap [0.15, 0.85] → [0, 1]
-            // for a more uniform distribution before walking the CDF.
+            // Sample secondary noise for biome selection (Meadows vs Swamps etc.)
+            // Perlin noise clusters around 0.4–0.6 so remap [0.20, 0.80] → [0, 1]
             float raw = Mathf.PerlinNoise((x + 5000 + _seedOffset) * _biomeNoiseScale,
                                           (y + 5000 + _seedOffset) * _biomeNoiseScale);
-            float t = Mathf.Clamp01(Mathf.InverseLerp(0.15f, 0.85f, raw));
+            float t = Mathf.Clamp01(Mathf.InverseLerp(0.20f, 0.80f, raw));
 
-            // Walk the cumulative-weight table to find which biome owns this value.
+            // Walk the cumulative-weight table to find which biome owns this territory.
             for (int i = 0; i < _biomeCumulativeWeights.Length; i++)
             {
                 if (t <= _biomeCumulativeWeights[i])

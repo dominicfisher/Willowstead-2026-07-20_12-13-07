@@ -476,6 +476,11 @@ namespace Willowstead.UI
                 WorldSeedService.Instance.SetSeed(raw, userProvided: true);
             }
 
+            if (ProceduralGridGenerator.Instance != null)
+            {
+                ProceduralGridGenerator.Instance.Regenerate();
+            }
+
             // Clear previous world/save state so nothing bleeds into the new save
             if (GridManager.Instance != null)
             {

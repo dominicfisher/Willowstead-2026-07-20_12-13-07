@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using Willowstead.World;
 
@@ -520,8 +522,117 @@ namespace Willowstead.Player
             Dirt
         }
 
+        public enum ActionAnimationType
+        {
+            None,
+            Axe,
+            Hoe,
+            WateringCan,
+            Pickaxe,
+            Sword
+        }
+
+        private static readonly Dictionary<string, Sprite[]> _actionSprites = new Dictionary<string, Sprite[]>();
+        private bool _isPlayingActionAnimation = false;
+
+        private void LoadActionSprites()
+        {
+            if (_actionSprites.Count > 0) return;
+
+#if UNITY_EDITOR
+            string[] actions = { "Axe", "Hoe", "Water", "Pickaxe", "Sword" };
+            string[] directions = { "South", "North", "East", "West" };
+
+            foreach (var act in actions)
+            {
+                foreach (var dir in directions)
+                {
+                    Sprite[] frames = new Sprite[4];
+                    for (int i = 0; i < 4; i++)
+                    {
+                        string path = $"Assets/Sprites/PlayerFrames/{act}/{dir}/frame_{i}.png";
+                        frames[i] = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                    }
+                    _actionSprites[$"{act}_{dir}"] = frames;
+                }
+            }
+#endif
+        }
+
+        /// <summary>
+        /// Instantly orients the character towards a target world position.
+        /// </summary>
+        public void FaceTarget(Vector3 targetWorldPos)
+        {
+            Vector2 diff = (Vector2)targetWorldPos - (Vector2)transform.position;
+            if (diff.sqrMagnitude < 0.001f) return;
+
+            if (Mathf.Abs(diff.x) > Mathf.Abs(diff.y))
+            {
+                _lastMoveDirection = diff.x > 0 ? Vector2.right : Vector2.left;
+            }
+            else
+            {
+                _lastMoveDirection = diff.y > 0 ? Vector2.up : Vector2.down;
+            }
+
+            if (_animator != null)
+            {
+                _animator.SetFloat("LastMoveX", _lastMoveDirection.x);
+                _animator.SetFloat("LastMoveY", _lastMoveDirection.y);
+            }
+        }
+
+        /// <summary>
+        /// Triggers animated action swing / hoe / watering / mining / sword towards target.
+        /// </summary>
+        public void TriggerActionAnimation(Vector3 targetWorldPos, ActionAnimationType actionType = ActionAnimationType.None)
+        {
+            FaceTarget(targetWorldPos);
+            if (actionType == ActionAnimationType.None) return;
+
+            LoadActionSprites();
+            StopCoroutine("ActionAnimationRoutine");
+            StartCoroutine(ActionAnimationRoutine(actionType));
+        }
+
+        private System.Collections.IEnumerator ActionAnimationRoutine(ActionAnimationType actionType)
+        {
+            string dirStr = "South";
+            if (_lastMoveDirection == Vector2.up) dirStr = "North";
+            else if (_lastMoveDirection == Vector2.right) dirStr = "East";
+            else if (_lastMoveDirection == Vector2.left) dirStr = "West";
+
+            string actStr = "Axe";
+            if (actionType == ActionAnimationType.Hoe) actStr = "Hoe";
+            else if (actionType == ActionAnimationType.WateringCan) actStr = "Water";
+            else if (actionType == ActionAnimationType.Pickaxe) actStr = "Pickaxe";
+            else if (actionType == ActionAnimationType.Sword) actStr = "Sword";
+
+            string key = $"{actStr}_{dirStr}";
+            if (_actionSprites.TryGetValue(key, out var frames) && frames != null && frames.Length > 0 && frames[0] != null)
+            {
+                _isPlayingActionAnimation = true;
+                if (_animator != null) _animator.enabled = false;
+
+                float frameDuration = actionType == ActionAnimationType.WateringCan ? 0.09f : 0.065f;
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    if (frames[i] != null && _spriteRenderer != null)
+                    {
+                        _spriteRenderer.sprite = frames[i];
+                    }
+                    yield return new WaitForSeconds(frameDuration);
+                }
+
+                if (_animator != null) _animator.enabled = true;
+                _isPlayingActionAnimation = false;
+            }
+        }
+
         private void UpdateAnimator()
         {
+            if (_isPlayingActionAnimation) return;
             if (_animator == null) return;
 
             bool isMoving = _moveInput.magnitude > 0.01f;

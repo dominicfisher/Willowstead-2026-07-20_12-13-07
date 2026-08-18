@@ -38,6 +38,7 @@ namespace Willowstead.World
         /// Mixable offset derived from <see cref="CurrentSeed"/>. Add this to any
         /// position hash or to Perlin-noise coordinates before sampling so two
         /// seeds yield visibly different terrain and decor.
+        /// Keeps offset non-negative and within a safe range for Mathf.PerlinNoise.
         /// </summary>
         public int SeedOffset
         {
@@ -45,7 +46,9 @@ namespace Willowstead.World
             {
                 unchecked
                 {
-                    return (int)(CurrentSeed * unchecked((int)0x9E3779B1));
+                    uint h = (uint)(CurrentSeed * 0x9E3779B1);
+                    h ^= h >> 16;
+                    return (int)(h % 50000);
                 }
             }
         }

@@ -12,7 +12,7 @@ namespace Willowstead.World
     {
         [Header("Targeting Settings")]
         [Tooltip("Maximum distance from the player where interactions are allowed.")]
-        [SerializeField] private float _maxInteractionDistance = 7.5f;
+        [SerializeField] private float _maxInteractionDistance = 1.85f;
 
         [Tooltip("The player transform used to measure interaction range.")]
         [SerializeField] private Transform _playerTransform;
@@ -40,10 +40,9 @@ namespace Willowstead.World
         {
             _mainCamera = Camera.main;
             
-            // Auto-boost reach range for developer convenience if still using legacy default
-            if (_maxInteractionDistance <= 2.5f)
+            if (_maxInteractionDistance > 2.0f)
             {
-                _maxInteractionDistance = 7.5f;
+                _maxInteractionDistance = 1.85f;
             }
             
             if (_playerTransform == null)
